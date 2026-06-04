@@ -203,13 +203,15 @@
       this._applyPanel(); this.refresh();
       this._vitalTimer = setInterval(() => this.paintVitalPct(), 300); // 血条居中百分比
       this._hideDodying();
-      setTimeout(() => this._syncDisabled(Store.get('on', false)), 1200); // 等 dodying 暂停按钮就绪后对齐 disabled 历史残留(原版按钮已隐藏, B大脑成唯一暂停入口)
+      // 注: 不在 mount 自动 _syncDisabled —— 默认 on=false 会把 dodying 设成 disabled 导致"一进去整个脚本不工作"。
+      //     disabled 只由用户主动 toggle 联动(见 _syncDisabled), 不再自动作妖。
     }
     _hideDodying() { // 藏掉 dodying 面板里 B 已接管的失效标签页(恢复/引导/BUFF/DEBUFF/卷轴/其他技能)
       if (document.getElementById('hb-hide')) return;
       const s = document.createElement('style'); s.id = 'hb-hide';
       s.textContent = '.hvAATabmenu>span[name="Recovery"],.hvAATabmenu>span[name="Channel"],.hvAATabmenu>span[name="Buff"],.hvAATabmenu>span[name="Debuff"],.hvAATabmenu>span[name="Scroll"],.hvAATabmenu>span[name="Skill"],.hvAATabmenu>span[name="Rule"]{display:none!important}'
-        + '.hvAAPauseUI,.pauseChange{display:none!important}'; // 暂停统一到 B大脑 ⏸: 原版暂停按钮藏起(display:none 仍可被 _syncDisabled 联动 .click)
+        + '.hvAAPauseUI,.pauseChange{display:none!important}' // 暂停统一到 B大脑 ⏸: 原版暂停按钮藏起(display:none 仍可被 _syncDisabled 联动 .click)
+        + '.encounterUI{display:none!important}'; // 去重: 隐藏 dodying 自带遭遇倒计时(与 hvUtils 那个重复, 留 hvUtils 功能更全的)
       (document.head || document.documentElement).appendChild(s);
     }
     _html() {
