@@ -1765,7 +1765,7 @@ var words = {
         'It is dead, and smaller than you expected.' : '它已经死了，而且体型比你想像中还要小。',
         'So that is where that thing ended up.' : '所以这就是事件的最终下场。',
         'It would be totally awesome, but you do not have any sharks.' : '这肯定棒呆了！但你没有养鲨鱼。',
-        'The energy cells are completely drained.' : '能量电池已完全用尽。 (BFG=Big Fucking Gun)',
+        'The energy cells are completely drained.' : '能量元已完全用尽。 (BFG=Big Fucking Gun)',
         'The electromagnetic acceleration rails are bent and twisted. Using it would be bad.' : '电磁加速轨道已折弯和扭曲，使用它会很糟糕。',
         'Now all you need is some fuel.' : '现在你所需要的是一些燃料。',
         'Great for blowing up small kingdoms, but you do not know the code to activate it.' : '很适合用来摧毁小王国，但你不知道发射密码。',
@@ -2418,7 +2418,7 @@ var words = {
         "Replace Pouch": "替换护符袋",
 
         "All equipment has a Condition value which degrades when you are defeated in battle, as well as at a fixed rate depending on the equipment Durability and the number of cleared rounds. Repairs require different Scrap Material corresponding to the equipment type; these can be salvaged from low-grade equipment, or bought from the Item Store or The Market.": "所有装备都有耐久值，在战斗失败时会损耗，并且会根据装备耐久度和已通关回合数以固定速率衰减。维修需要对应装备类型的废料材料，可从低级装备分解获得，或在道具商店、集市购买。",
-        "Magitech equipment and equipment with attached charms will also have an Energy value. Energy is consumed at a fixed rate depending on the number of cleared rounds. Recharging energy requires Energy Cells; these can be salvaged from magitech equipment, or bought from the Item Store or The Market. Attached charms affect the required number of energy cells and can also require other upkeep materials.": "魔科技装备及附带护符的装备还拥有能量值。能量会根据已通关回合数以固定速率消耗。为能量充能需要能量电池，可从魔科技装备分解获得，或在道具商店、集市购买。附加的护符会影响所需电池数量，并可能需要其他维护材料。",
+        "Magitech equipment and equipment with attached charms will also have an Energy value. Energy is consumed at a fixed rate depending on the number of cleared rounds. Recharging energy requires Energy Cells; these can be salvaged from magitech equipment, or bought from the Item Store or The Market. Attached charms affect the required number of energy cells and can also require other upkeep materials.": "魔科技装备及附带护符的装备还拥有能量值。能量会根据已通关回合数以固定速率消耗。为能量充能需要能量元，可从魔科技装备分解获得，或在道具商店、集市购买。附加的护符会影响所需能量元数量，并可能需要其他维护材料。",
         "When you are defeated in battle, any charms attached to your equipment have a chance to take damage. If a charm is protected by a pouch, this can destroy the pouch, exposing the charm. If the charm is exposed, any damage will cause it to tear. Torn charms and destroyed pouches can be replaced with spare charms and pouches from your inventory; these can be obtained in the Item World or by offering trophies in The Shrine, or bought from other players in The Market.": "当您在战斗中被击败时，装备上附带的护符有概率受到损伤。若护符被护符袋保护，袋子可能被毁坏，从而暴露护符。暴露的护符受到伤害会伤害会撕裂。撕裂的护符和损坏的护符袋可使用库存中的备用护符和袋子进行更换；这些可在物品世界获取、在神殿献祭奖杯获得，或在集市向其他玩家购买。",
         "Replace Charms & Pouches": "同时修理护符/护符袋",
         "Total Repair Cost:": "修理消耗：",
