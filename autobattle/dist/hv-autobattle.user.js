@@ -490,12 +490,14 @@
       }
       if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
         return S.gemReady ? A("item", IT.manaGem) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
-      if (C.scrollFirst && S.scrollReady && (!b.spiritShield.active && !b.protection.active || S.firstRound))
+      const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
+      const prDown = !b.protection.active || b.protection.turns <= 1;
+      if (C.scrollFirst && S.scrollReady && ssDown && prDown)
         return A("item", IT.scrollProt);
-      if (!b.protection.active || b.protection.turns <= 1)
-        return mp >= sparkCost ? A("spell", SK.Protection) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.scrollProt);
-      if (!b.spiritShield.active || b.spiritShield.turns <= 1)
-        return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.scrollProt);
+      if (prDown)
+        return mp >= sparkCost ? A("spell", SK.Protection) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
+      if (ssDown)
+        return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
       if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if (!b.regen.active || b.regen.turns <= 1) return A("spell", SK.Regen);

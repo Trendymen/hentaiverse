@@ -64,14 +64,17 @@ export class Brain {
     // P3 MP 熔断 ④(节流: 长效药冷却中改秘药)
     if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
       return S.gemReady ? A('item', IT.manaGem) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir);
-    // P4 卷轴一键铺墙(scrollFirst 关 或 卷轴不在快捷栏 → 走下面法术逐个补)
-    if (C.scrollFirst && S.scrollReady && ((!b.spiritShield.active && !b.protection.active) || S.firstRound))
+    // 物理双墙状态(缺失或剩 ≤1 回合视为需补)
+    const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
+    const prDown = !b.protection.active || b.protection.turns <= 1;
+    // P4 守护卷轴只在"两墙都缺"时一键补(省回合); 墙在/只缺一墙 → 跳过走法术单补, 不再因 firstRound 无脑铺(防有墙还浪费卷轴/打断手动守护)
+    if (C.scrollFirst && S.scrollReady && ssDown && prDown)
       return A('item', IT.scrollProt);
-    // 双物理墙 ③
-    if (!b.protection.active || b.protection.turns <= 1)
-      return mp >= sparkCost ? A('spell', SK.Protection) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.scrollProt);
-    if (!b.spiritShield.active || b.spiritShield.turns <= 1)
-      return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.scrollProt);
+    // 单墙法术补(MP 不足: Gem 回蓝 → 秘药兜底)
+    if (prDown)
+      return mp >= sparkCost ? A('spell', SK.Protection) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
+    if (ssDown)
+      return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
     // P5 Absorb(仅法系怪; TODO: 接入"当前怪是否法系")
     const isMagic = false;
     if (isMagic && (!b.absorb.active || b.absorb.turns <= 1)) return A('spell', SK.Absorb);
