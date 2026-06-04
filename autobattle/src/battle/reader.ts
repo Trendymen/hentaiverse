@@ -31,7 +31,14 @@ export class StateReader {
     const imgs = $$<HTMLImageElement>('#pane_effects>img');
     const out: Record<string, BuffState> = {};
     for (const k in BUFF_IMG) {
-      const im = imgs.find((i) => (i.getAttribute('src') || '').includes(BUFF_IMG[k]));
+      const kw = BUFF_IMG[k].toLowerCase();
+      // 匹配图标文件名(src) 或 悬停 buff 官方名(onmouseover 里 set_infopane_effect('名字') 的第一个参数;
+      // 只取名字、不含描述, 避免描述里的词误判). 比纯图标名更可靠, 且能识别图标名未知的 buff(如御谜士祝福).
+      const im = imgs.find((i) => {
+        const src = (i.getAttribute('src') || '').toLowerCase();
+        const name = ((i.getAttribute('onmouseover') || '').match(/set_infopane_effect\('([^']*)'/)?.[1] || '').toLowerCase();
+        return src.includes(kw) || name.includes(kw);
+      });
       out[k] = im ? { active: true, turns: this._expire(im) } : { active: false, turns: 0 };
     }
     return out;

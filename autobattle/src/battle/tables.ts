@@ -43,7 +43,7 @@ export const BUFF_IMG: Record<string, string> = {
   regen: 'regen',
   heartseeker: 'heartseeker',
   channeling: 'channeling',
-  blessing: 'riddle', // 御谜士的祝福(Blessing of the RiddleMaster, 答对小马图的回复增益); 图标关键字 'riddle' 待 GF 实测确认
+  blessing: 'riddlemaster', // 御谜士的祝福(Blessing of the RiddleMaster); 匹配 onmouseover buff 名里的 'RiddleMaster', 不再依赖图标文件名
   hpot: 'healthpot',
   mpot: 'manapot',
   spot: 'spiritpot',

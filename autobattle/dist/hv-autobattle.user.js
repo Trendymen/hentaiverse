@@ -267,8 +267,8 @@
     regen: "regen",
     heartseeker: "heartseeker",
     channeling: "channeling",
-    blessing: "riddle",
-    // 御谜士的祝福(Blessing of the RiddleMaster, 答对小马图的回复增益); 图标关键字 'riddle' 待 GF 实测确认
+    blessing: "riddlemaster",
+    // 御谜士的祝福(Blessing of the RiddleMaster); 匹配 onmouseover buff 名里的 'RiddleMaster', 不再依赖图标文件名
     hpot: "healthpot",
     mpot: "manapot",
     spot: "spiritpot"
@@ -322,7 +322,13 @@
       const imgs = $$("#pane_effects>img");
       const out = {};
       for (const k in BUFF_IMG) {
-        const im = imgs.find((i) => (i.getAttribute("src") || "").includes(BUFF_IMG[k]));
+        const kw = BUFF_IMG[k].toLowerCase();
+        const im = imgs.find((i) => {
+          var _a;
+          const src = (i.getAttribute("src") || "").toLowerCase();
+          const name = (((_a = (i.getAttribute("onmouseover") || "").match(/set_infopane_effect\('([^']*)'/)) == null ? void 0 : _a[1]) || "").toLowerCase();
+          return src.includes(kw) || name.includes(kw);
+        });
         out[k] = im ? { active: true, turns: this._expire(im) } : { active: false, turns: 0 };
       }
       return out;
