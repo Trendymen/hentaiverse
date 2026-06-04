@@ -1274,7 +1274,7 @@ const $equip = {
   // 装备/物品名翻译子模块(SSOT=docs/hvutils-glossary.md;译名取自 equip_chinese 字典,已去 HTML/符号)
   // 将来合并所有脚本后,此块即可升格为统一翻译核心。译名仅作显示,英文 eq.info.name 原值不动。
   $i18n: {
-    quality: { Peerless: '无双', Legendary: '传奇', Magnificent: '史诗', Exquisite: '精良', Superior: '上等', Fine: '优质', Average: '中等', Fair: '一般', Crude: '劣质', Flimsy: '薄弱' },
+    quality: { Peerless: '☯无双☯', Legendary: '✪传奇✪', Magnificent: '☆史诗☆', Exquisite: '✧精良✧', Superior: '上等', Fine: '优质', Average: '中等', Fair: '一般', Crude: '劣质', Flimsy: '薄弱' },
     prefix: { Ethereal: '虚空之', Fiery: '灼热之', Arctic: '极寒之', Shocking: '闪电之', Tempestuous: '风暴之', Hallowed: '神圣之', Demonic: '恶魔之', Radiant: '魔光', Charged: '充能的', Mystic: '神秘的', Frugal: '节能', Savage: '野蛮的', Agile: '俊敏的', Reinforced: '加固的', Shielding: '盾化的', Mithril: '秘银的', Ruby: '红宝石(火抗)', Cobalt: '钴石(冰抗)', Amber: '琥珀(雷抗)', Jade: '翡翠(风抗)', Zircon: '锆石(圣抗)', Onyx: '缟玛瑙(暗抗)' },
     type: { Rapier: '西洋剑', Club: '棍', Shortsword: '短剑', Axe: '斧', Wakizashi: '脇差', Dagger: '匕首', 'Sword Chucks': '锁链双剑', Estoc: '刺剑', Mace: '重槌', Longsword: '长剑', Katana: '太刀', Scythe: '镰刀', 'Oak Staff': '橡木法杖', 'Willow Staff': '柳木法杖', 'Katalox Staff': '铁木法杖', 'Redwood Staff': '红木法杖', 'Ebony Staff': '乌木法杖', 'Force Shield': '力场盾', Buckler: '圆盾', 'Kite Shield': '鸢盾', 'Tower Shield': '塔盾', Phase: '相位', Cotton: '棉质', Gossamer: '薄纱', Silk: '丝绸', Shade: '暗影', Leather: '皮革', Kevlar: '凯夫拉', 'Dragon Hide': '龙皮', Power: '动力', Plate: '板甲', Chainmail: '锁子甲' },
     slot: { Cap: '兜帽', Robe: '长袍', Gloves: '手套', Pants: '短裤', Shoes: '鞋', Helmet: '头盔', Breastplate: '护胸', Cuirass: '胸甲', Armor: '盔甲', Gauntlets: '手甲', Greaves: '护胫', Leggings: '护腿', Sabatons: '铁靴', Boots: '靴子' },
