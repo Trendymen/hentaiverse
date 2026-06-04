@@ -487,8 +487,9 @@
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
       if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
-      const vcp = document.getElementById("vcp"), barEl = vcp == null ? void 0 : vcp.firstElementChild;
-      const oc = vcp && barEl && vcp.offsetWidth ? Math.round(barEl.offsetWidth / vcp.offsetWidth * C.OCMAX) : 0;
+      const ocDots = $$("#vcp>div>div").length;
+      const ocEmpty = $$("#vcp>div>div#vcr").length;
+      const oc = ocDots ? (ocDots - ocEmpty) * 25 : 0;
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
       const allMkey = $$('[id^="mkey_"]');
@@ -545,9 +546,7 @@
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
         cannonReady: !!cannonEl && !cannonDimmed,
-        // 真·可放: 在技能栏且未置灰
-        cannonOnBar: !!cannonEl,
-        // 在技能栏(无论置灰)
+        // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
         scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
         firstRound: this.prev._started !== true,
         lockedRedId: this.prev.lockedRedId,
@@ -700,7 +699,9 @@
       }
       if (hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A("item", IT.sDraught);
-      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonOnBar && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      if (C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
+        return { type: "cannon", exec: Exec.cannon };
+      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
       if (chargingCannon) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
@@ -718,8 +719,6 @@
       }
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
-      if (C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES && S.cannonReady && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
-        return { type: "cannon", exec: Exec.cannon };
       const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) return A("attack", trash.sort((a, c) => a.eid - c.eid)[0].eid);
       if (tgt) {

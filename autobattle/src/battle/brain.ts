@@ -107,11 +107,22 @@ export class Brain {
     if (hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
     // P11 回 SP 喂斗气(节流)
     if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A('item', IT.sDraught);
+    // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): cannonReady=按钮未置灰=不在50回合冷却(实测置灰只代表冷却);
+    //   再叠加 OC≥200(炮耗8点斗气=200). 若排在 P12 之后, OC 攒到 200 那刻会被 P12"开架式"抢走, 架式又把 OC 烧回<200,
+    //   结果炮放不出、架式来回开关(=你看到的现象). 放到架式之前根治; survival(P1-P11)仍在其上, 不抢救命.
+    if (
+      C.useCannon &&
+      S.cannonReady &&
+      S.alive >= C.CANNON_MIN_ENEMIES &&
+      oc >= C.CANNON_MIN_OC &&
+      Date.now() - lastCannon() > C.cannonCdMs
+    )
+      return { type: 'cannon', exec: Exec.cannon };
     // P12 灵动架式开关(滞回) + 攒炮让路
-    // 小马炮需 200 OC, 而架式每回合烧 10%OC(≈25) → 架式一直开着 OC 永远到不了 200, 炮永远放不出.
-    // 攒炮模式: 想用炮(开关on + 炮在技能栏 + 够怪)且 OC 没攒够 → 架式让路(开着就关止血, 关着就别开), 让 OC 爬到 200.
+    //   攒炮模式: 炮已冷却好(cannonReady)+ 够怪 + OC 没攒够 → 架式让路(开着就关止血/关着别开), 让 OC 爬到 200.
+    //   ⚠用 cannonReady(冷却好)而非"在技能栏": 炮在50回合冷却中就不攒、架式照常用, 否则冷却期也压着架式空等→来回开关.
     const chargingCannon =
-      C.useCannon && C.cannonYieldStance && S.cannonOnBar && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      C.useCannon && C.cannonYieldStance && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
     if (chargingCannon) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
     } else {
@@ -131,15 +142,6 @@ export class Brain {
     // P14 Heartseeker(持久战提暴)
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
-    // P15 小马炮 AOE: cannonReady 已含"按钮未置灰"(=OC≥200 且不在50回合冷却); oc≥CANNON_MIN_OC 双保险; cannonCdMs 仅防同回合重复点
-    if (
-      C.useCannon &&
-      S.alive >= C.CANNON_MIN_ENEMIES &&
-      S.cannonReady &&
-      oc >= C.CANNON_MIN_OC &&
-      Date.now() - lastCannon() > C.cannonCdMs
-    )
-      return { type: 'cannon', exec: Exec.cannon };
     // P16 破甲滚雪球平砍: 先清最弱杂兵, 仅剩红怪锁定持续平砍
     const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
     if (trash.length) return A('attack', trash.sort((a, c) => a.eid - c.eid)[0].eid);

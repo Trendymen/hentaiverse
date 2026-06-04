@@ -71,10 +71,12 @@ export class StateReader {
     if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
     if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
 
-    const vcp = document.getElementById('vcp'),
-      barEl = vcp?.firstElementChild as HTMLElement | null;
-    const oc =
-      vcp && barEl && vcp.offsetWidth ? Math.round((barEl.offsetWidth / vcp.offsetWidth) * C.OCMAX) : 0;
+    // OC(斗气): 数亮点 —— dodying 原版法(hvAutoAttack.user.js:2666): 总点(#vcp>div>div) 减 灭点(id=vcr), 每点 25(满10点=250).
+    // ⚠旧 B大脑(我之前翻写的底本)用 bar宽/vcp宽×250 是错的: 满 OC 也只算出 ~119(190/400×250),
+    //   致 oc≥200 永不成立 → 小马炮永不放 + 攒炮模式永远压着架式("来回开关灵动"总根因). 已弃用.
+    const ocDots = $$('#vcp>div>div').length;
+    const ocEmpty = $$('#vcp>div>div#vcr').length;
+    const oc = ocDots ? (ocDots - ocEmpty) * 25 : 0;
 
     const B = this._buffs();
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;
@@ -99,8 +101,8 @@ export class StateReader {
     const lastDmg =
       typeof this.prev.hp === 'number' && this.prev.hp > hp ? this.prev.hp - hp : 0;
 
-    // 小马炮按钮: 置灰(opacity:0.5)表示 OC 不足(<200)或在 50 回合冷却 → 不可放; 未置灰才算"真·可放".
-    // 实测 DOM: 不可用时 <div ... onclick=null style="opacity:0.5">, 可用时无 opacity 且有 onclick.
+    // 小马炮按钮置灰(opacity:0.5 + onclick=null)= 在 50 回合冷却中. 实测 OC=119<200 仍未置灰 → 置灰只代表冷却, 不代表 OC.
+    // 故 cannonReady = 未置灰(冷却好); 能否真放再由 brain 叠加 OC≥200 判. 可用态 DOM: 无 opacity、有 onclick.
     const cannonEl = $$<HTMLElement>('#pane_skill [onmouseover]').find((e) =>
       /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
     );
@@ -141,8 +143,7 @@ export class StateReader {
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
-      cannonReady: !!cannonEl && !cannonDimmed, // 真·可放: 在技能栏且未置灰
-      cannonOnBar: !!cannonEl, // 在技能栏(无论置灰)
+      cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,
       lockedRedId: this.prev.lockedRedId,
