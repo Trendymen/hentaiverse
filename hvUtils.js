@@ -1840,7 +1840,7 @@ const $equip = {
         div.classList.add('hvut-eq-customname');
         div.dataset.eqname = eq.info.name;
       }
-      div.classList.add('hvut-eq-' + eq.info.quality);
+      if (!$config.settings.translateNames) { div.classList.add('hvut-eq-' + eq.info.quality); }
       return eq;
     });
     if ($config.settings.equipSort && sort) {
