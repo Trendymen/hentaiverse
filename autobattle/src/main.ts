@@ -2,7 +2,9 @@ import { CSS } from './ui/styles';
 import { el, onReady } from './core/dom';
 import { createHud } from './ui/hud';
 import { createPanel, togglePanel } from './ui/panel';
+import { createLogView, toggleLog } from './ui/log';
 import { config } from './core/config';
+import { logger } from './core/logger';
 import { startLoop } from './loop';
 
 // ── document-start: 最早 hook XHR/fetch 旁路(只读不改) ──
@@ -52,6 +54,7 @@ function mountUI(): void {
   root.appendChild(style);
 
   const panel = createPanel();
+  const logView = createLogView();
   const hud = createHud(
     () => {
       config.set('enabled', !config.get('enabled'));
@@ -61,20 +64,28 @@ function mountUI(): void {
       togglePanel(panel, open);
       config.set('panelOpen', open);
     },
+    () => toggleLog(logView),
   );
 
   root.appendChild(hud);
   root.appendChild(panel);
+  root.appendChild(logView);
   document.body.appendChild(root);
 
   if (config.get('panelOpen')) togglePanel(panel, true);
 }
 
-// 调试接口(产物未压缩, devtools 可直接调用 window.__hvab.getLastBattle())
-(window as unknown as { __hvab: unknown }).__hvab = {
-  getLastBattle: () => lastBattleResponse,
-  config,
-};
+// 调试接口: 挂到 unsafeWindow(页面世界), devtools/console 与外部脚本可直接读 __hvab.log()/logText()/getLastBattle()
+{
+  const w = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window) as unknown as { __hvab: unknown };
+  w.__hvab = {
+    getLastBattle: () => lastBattleResponse,
+    config,
+    log: () => logger.all(),
+    logText: () => logger.toText(),
+    clearLog: () => logger.clear(),
+  };
+}
 
 // ── 入口 ──
 hookNet(); // document-start: 立即 hook, 早于一切业务请求

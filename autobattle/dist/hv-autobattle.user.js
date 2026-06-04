@@ -51,6 +51,13 @@
 .hvab-in em{font-style:normal;opacity:.55;font-size:10px}
 .hvab-row input[type=number]{width:46px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:11px monospace;padding:1px 4px;text-align:right}
 .hvab-row input[type=checkbox]{accent-color:#3a7;width:15px;height:15px;cursor:pointer}
+#hvab-logbtn{cursor:pointer;border:0;background:none;color:#9aa;font-size:13px;padding:0}
+#hvab-log{position:fixed;right:10px;bottom:10px;z-index:100000;width:min(480px,92vw);max-height:74vh;flex-direction:column;background:rgba(16,18,28,.975);backdrop-filter:blur(9px);border:1px solid rgba(120,140,200,.38);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.6);display:none;color:#dce3f0}
+.hvab-log-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.1);flex:0 0 auto;font-size:12px}
+.hvab-log-btns button{cursor:pointer;border:0;border-radius:5px;margin-left:4px;padding:3px 8px;font-size:11px;background:rgba(255,255,255,.12);color:#cde}
+.hvab-log-btns #hvab-log-clr{background:#a55;color:#fff}
+.hvab-log-btns #hvab-log-x{background:none;color:#9aa;font-size:13px;padding:2px 4px}
+.hvab-log-body{flex:1 1 auto;overflow:auto;padding:6px 10px;white-space:pre-wrap;word-break:break-word;font:10px/1.5 ui-monospace,Consolas,monospace;color:#bcd}
 `;
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -172,13 +179,14 @@
       return current;
     }
   };
-  function createHud(onToggle, onGear) {
+  function createHud(onToggle, onGear, onLog) {
     const hud = el("div", { id: "hvab-hud" });
     const bar = (id, name) => `<div class="hvab-bar"><i id="hvab-${id}"></i><span id="hvab-${id}t">${name} -</span></div>`;
     hud.innerHTML = `
     <div class="hvab-top">
       <button id="hvab-sw"></button>
       <b class="hvab-name">🛡 盾战大脑</b>
+      <button id="hvab-logbtn" title="战斗日志">📋</button>
       <button id="hvab-gear">⚙</button>
     </div>
     ${bar("hp", "HP")}${bar("mp", "MP")}${bar("sp", "SP")}${bar("oc", "OC")}
@@ -197,6 +205,7 @@
       refresh();
     };
     hud.querySelector("#hvab-gear").onclick = onGear;
+    hud.querySelector("#hvab-logbtn").onclick = onLog;
     refresh();
     bus.on("hud:update", (d) => {
       const setBar = (key, v, m, name) => {
@@ -306,6 +315,124 @@
   }
   function togglePanel(panel, open) {
     panel.classList.toggle("open", open);
+  }
+  const MAX = 5e3;
+  const KEY = "battlelog";
+  let buf = (() => {
+    const saved = Store.get(KEY, []);
+    return Array.isArray(saved) ? saved.slice(-MAX) : [];
+  })();
+  let saveTimer = null;
+  function scheduleSave() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      Store.set(KEY, buf);
+    }, 3e3);
+  }
+  function fmtLine(r) {
+    const p = (n, w) => String(n).padStart(w);
+    return `${r.round.padEnd(7)} T${p(r.turn, 2)} | OC ${p(r.oc, 3)} ${r.cannon} | 怪${r.alive}/${r.total} | HP${p(r.hp, 3)} MP${p(r.mp, 3)} SP${p(r.sp, 3)} | 架${r.stance ? "开" : "关"} | ▶ ${r.action}${r.note ? "  « " + r.note : ""}`;
+  }
+  const logger = {
+    push(r) {
+      buf.push(r);
+      if (buf.length > MAX) buf.splice(0, buf.length - MAX);
+      scheduleSave();
+      bus.emit("log:update", r);
+    },
+    all() {
+      return buf;
+    },
+    count() {
+      return buf.length;
+    },
+    toText() {
+      return buf.map(fmtLine).join("\n");
+    },
+    clear() {
+      buf = [];
+      Store.set(KEY, []);
+      bus.emit("log:update", null);
+    }
+  };
+  function copyText(t) {
+    var _a;
+    const fallback = () => {
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+      }
+      ta.remove();
+    };
+    try {
+      if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) navigator.clipboard.writeText(t).catch(fallback);
+      else fallback();
+    } catch {
+      fallback();
+    }
+  }
+  function downloadText(t) {
+    const blob = new Blob([t], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hv-battlelog.txt";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
+  }
+  function createLogView() {
+    const box = el("div", { id: "hvab-log" });
+    box.innerHTML = `
+    <div class="hvab-log-hd">
+      <b>📋 战斗日志 <span id="hvab-log-n">0</span></b>
+      <span class="hvab-log-btns">
+        <button id="hvab-log-copy" title="整段复制到剪贴板">复制</button>
+        <button id="hvab-log-exp" title="导出为 .txt">导出</button>
+        <button id="hvab-log-clr" title="清空日志">清空</button>
+        <button id="hvab-log-x" title="关闭">✕</button>
+      </span>
+    </div>
+    <div class="hvab-log-body" id="hvab-log-body"></div>`;
+    const body = box.querySelector("#hvab-log-body");
+    const nEl = box.querySelector("#hvab-log-n");
+    const renderAll = () => {
+      body.textContent = logger.toText();
+      nEl.textContent = String(logger.count());
+      body.scrollTop = body.scrollHeight;
+    };
+    bus.on("log:update", (r) => {
+      if (box.style.display !== "flex") return;
+      if (r === null) {
+        renderAll();
+        return;
+      }
+      const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+      body.appendChild(document.createTextNode(fmtLine(r) + "\n"));
+      nEl.textContent = String(logger.count());
+      if (atBottom) body.scrollTop = body.scrollHeight;
+    });
+    box.querySelector("#hvab-log-copy").onclick = () => copyText(logger.toText());
+    box.querySelector("#hvab-log-exp").onclick = () => downloadText(logger.toText());
+    box.querySelector("#hvab-log-clr").onclick = () => {
+      logger.clear();
+      renderAll();
+    };
+    box.querySelector("#hvab-log-x").onclick = () => toggleLog(box, false);
+    box._renderAll = renderAll;
+    return box;
+  }
+  function toggleLog(box, open) {
+    var _a;
+    const show = open ?? box.style.display !== "flex";
+    box.style.display = show ? "flex" : "none";
+    if (show) (_a = box._renderAll) == null ? void 0 : _a.call(box);
   }
   const SK = {
     Weaken: 212,
@@ -787,6 +914,27 @@
             battleType: S.battleType,
             action: actionLabel(a)
           });
+          const C = config.all();
+          const pct = (v, m) => m ? Math.min(100, Math.round(v / m * 100)) : 0;
+          let note = "";
+          if (a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
+            if (!S.cannonReady) note = "炮:冷却";
+            else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
+          }
+          logger.push({
+            round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
+            turn,
+            oc: S.overcharge,
+            hp: pct(S.hp, S.maxHp || C.HPMAX),
+            mp: pct(S.mp, S.maxMp || C.MPMAX),
+            sp: pct(S.sp, S.maxSp || C.SPMAX),
+            alive: S.alive,
+            total: S.monsterTotal,
+            cannon: S.cannonReady ? "可用" : "冷却",
+            stance: S.stanceOn,
+            action: actionLabel(a),
+            note
+          });
           if (a == null ? void 0 : a.exec) {
             const dMin = config.get("delayMin"), dMax = config.get("delayMax");
             const delay = dMin + Math.random() * Math.max(1, dMax - dMin);
@@ -852,6 +1000,7 @@
     style.textContent = CSS;
     root.appendChild(style);
     const panel = createPanel();
+    const logView = createLogView();
     const hud = createHud(
       () => {
         config.set("enabled", !config.get("enabled"));
@@ -860,17 +1009,25 @@
         const open = !panel.classList.contains("open");
         togglePanel(panel, open);
         config.set("panelOpen", open);
-      }
+      },
+      () => toggleLog(logView)
     );
     root.appendChild(hud);
     root.appendChild(panel);
+    root.appendChild(logView);
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
   }
-  window.__hvab = {
-    getLastBattle: () => lastBattleResponse,
-    config
-  };
+  {
+    const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+    w.__hvab = {
+      getLastBattle: () => lastBattleResponse,
+      config,
+      log: () => logger.all(),
+      logText: () => logger.toText(),
+      clearLog: () => logger.clear()
+    };
+  }
   hookNet();
   onReady(() => {
     mountUI();

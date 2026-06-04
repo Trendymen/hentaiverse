@@ -3,7 +3,7 @@ import { bus } from '../core/bus';
 import { config } from '../core/config';
 
 /** 右下常驻 HUD. onToggle: 点开关回调; onGear: 点齿轮回调. */
-export function createHud(onToggle: () => void, onGear: () => void): HTMLElement {
+export function createHud(onToggle: () => void, onGear: () => void, onLog: () => void): HTMLElement {
   const hud = el('div', { id: 'hvab-hud' });
   const bar = (id: string, name: string) =>
     `<div class="hvab-bar"><i id="hvab-${id}"></i><span id="hvab-${id}t">${name} -</span></div>`;
@@ -11,6 +11,7 @@ export function createHud(onToggle: () => void, onGear: () => void): HTMLElement
     <div class="hvab-top">
       <button id="hvab-sw"></button>
       <b class="hvab-name">🛡 盾战大脑</b>
+      <button id="hvab-logbtn" title="战斗日志">📋</button>
       <button id="hvab-gear">⚙</button>
     </div>
     ${bar('hp', 'HP')}${bar('mp', 'MP')}${bar('sp', 'SP')}${bar('oc', 'OC')}
@@ -30,6 +31,7 @@ export function createHud(onToggle: () => void, onGear: () => void): HTMLElement
     refresh();
   };
   hud.querySelector<HTMLButtonElement>('#hvab-gear')!.onclick = onGear;
+  hud.querySelector<HTMLButtonElement>('#hvab-logbtn')!.onclick = onLog;
   refresh();
 
   // 战斗循环每回合 emit hud:update → 更新 vital 条 + 战斗信息(类型/轮数/回合/怪数/动作)

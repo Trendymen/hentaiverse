@@ -26,6 +26,22 @@ export interface HudData {
   action: string;
 }
 
+/** 战斗日志一条记录(每决策一条; 落盘 GM, 供场中/场后诊断) */
+export interface LogRecord {
+  round: string; // "R51/55" 或战斗类型
+  turn: number;
+  oc: number; // 0~250
+  hp: number; // %
+  mp: number; // %
+  sp: number; // %
+  alive: number;
+  total: number;
+  cannon: string; // '可用' | '冷却'
+  stance: boolean;
+  action: string; // 中文动作名
+  note: string; // 诊断, 如 "炮:冷却" / "炮:OC 150/200" / ""
+}
+
 /** 单个 buff/debuff 状态 */
 export interface BuffState {
   active: boolean;
@@ -100,5 +116,6 @@ export interface Action {
 export interface BusEvents {
   'state:update': VitalSnapshot;
   'hud:update': HudData;
+  'log:update': LogRecord | null;
   'ui:toggle': boolean;
 }

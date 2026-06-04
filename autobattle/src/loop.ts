@@ -6,6 +6,7 @@ import { reader } from './battle/reader';
 import { brain } from './battle/brain';
 import { actionLabel } from './battle/tables';
 import { bus } from './core/bus';
+import { logger } from './core/logger';
 import type { BattleState } from './types';
 
 let lastFp = '';
@@ -62,6 +63,30 @@ function tick(): void {
           battleType: S.battleType,
           action: actionLabel(a),
         });
+
+        // 战斗日志: 每决策一条(含"为什么没放炮"诊断), 落盘 GM
+        const C = config.all();
+        const pct = (v: number, m: number) => (m ? Math.min(100, Math.round((v / m) * 100)) : 0);
+        let note = '';
+        if (a.type !== 'cannon' && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
+          if (!S.cannonReady) note = '炮:冷却';
+          else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
+        }
+        logger.push({
+          round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
+          turn,
+          oc: S.overcharge,
+          hp: pct(S.hp, S.maxHp || C.HPMAX),
+          mp: pct(S.mp, S.maxMp || C.MPMAX),
+          sp: pct(S.sp, S.maxSp || C.SPMAX),
+          alive: S.alive,
+          total: S.monsterTotal,
+          cannon: S.cannonReady ? '可用' : '冷却',
+          stance: S.stanceOn,
+          action: actionLabel(a),
+          note,
+        });
+
         if (a?.exec) {
           const dMin = config.get('delayMin'),
             dMax = config.get('delayMax');

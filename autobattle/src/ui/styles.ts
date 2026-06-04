@@ -29,4 +29,11 @@ export const CSS = `
 .hvab-in em{font-style:normal;opacity:.55;font-size:10px}
 .hvab-row input[type=number]{width:46px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:11px monospace;padding:1px 4px;text-align:right}
 .hvab-row input[type=checkbox]{accent-color:#3a7;width:15px;height:15px;cursor:pointer}
+#hvab-logbtn{cursor:pointer;border:0;background:none;color:#9aa;font-size:13px;padding:0}
+#hvab-log{position:fixed;right:10px;bottom:10px;z-index:100000;width:min(480px,92vw);max-height:74vh;flex-direction:column;background:rgba(16,18,28,.975);backdrop-filter:blur(9px);border:1px solid rgba(120,140,200,.38);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.6);display:none;color:#dce3f0}
+.hvab-log-hd{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.1);flex:0 0 auto;font-size:12px}
+.hvab-log-btns button{cursor:pointer;border:0;border-radius:5px;margin-left:4px;padding:3px 8px;font-size:11px;background:rgba(255,255,255,.12);color:#cde}
+.hvab-log-btns #hvab-log-clr{background:#a55;color:#fff}
+.hvab-log-btns #hvab-log-x{background:none;color:#9aa;font-size:13px;padding:2px 4px}
+.hvab-log-body{flex:1 1 auto;overflow:auto;padding:6px 10px;white-space:pre-wrap;word-break:break-word;font:10px/1.5 ui-monospace,Consolas,monospace;color:#bcd}
 `;
