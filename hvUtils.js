@@ -491,6 +491,50 @@ const $config = {
   ls_del: function (key, prefix = $config.prefix) {
     localStorage.removeItem(prefix + key);
   },
+  titles: {
+    reNotification: '随机遭遇通知',
+    reGallery: '画廊内通知',
+    reGalleryAlt: '画廊用 alt 服务器',
+    reBeep: '提示音',
+    topMenuIntegration: '顶部菜单整合',
+    topMenuLinks: '顶部快捷链接',
+    confirmStaminaRestorative: '确认使用耐力恢复剂',
+    disableStaminaRestorative: '禁用耐力恢复剂阈值',
+    warnLowStamina: '低耐力警告',
+    showCredits: '显示绅士币余额',
+    showEquipSlots: '显示装备空闲格',
+    trainingNotification: '训练通知',
+    lotteryNotification: '彩票通知',
+    lotteryFilters: '彩票筛选',
+    equipInventoryIntegration: '装备仓库整合',
+    equipSort: '装备排序',
+    equipColor: '装备品质着色',
+    equipHoverFunctions: '鼠标悬停功能',
+    equipTouchFunctions: '触控功能',
+    equipCode: '装备代码格式',
+    equipNameCode: '装备名装饰规则',
+    equipmentShopIntegration: '装备店整合',
+    equipmentShopShowLevel: '显示装备等级',
+    equipmentShopShowPAB: '显示装备 PAB',
+    equipmentShopConfirm: '买卖确认',
+    equipmentShopProtectFilters: '贵重装备保护',
+    equipmentShopAutoLock: '自动锁定保护装备',
+    equipmentShopBazaarFilters: '集市保留筛选',
+    monsterLab: '怪物实验室增强',
+    monsterLabDefaultSort: '默认排序方式',
+    shrineHideItems: '祭坛隐藏物品',
+    shrineFilters: '祭坛奖励筛选',
+    moogleMail: '莫古邮件增强',
+    moogleMailCouponClipper: '优惠券剪贴者服务',
+    moogleMailDarkDescent: '黑暗降临服务',
+    equipEnchantPosition: '面板位置',
+    equipEnchantWeapon: '武器附魔次数',
+    equipEnchantArmor: '防具附魔次数',
+    equipEnchantRepairThreshold: '耐久警告阈值',
+    equipEnchantItemInventory: '物品库存提示',
+    equipEnchantCheckArmors: '显示防具附魔',
+  },
+
   create: function () {
     GM_addStyle(/*css*/`
       .hvut-cfg-div { position: absolute; top: 27px; left: 0; width: 60%; height: calc(100% - 27px); padding: 0 20%; overflow: auto; font-size: 10pt; text-align: left; background-color:#EDEBDF; z-index: 9; }
@@ -524,7 +568,8 @@ const $config = {
       }
       o.node = {};
       o.node.div = $element('div', $config.node.div);
-      $element('h2', o.node.div, o.key);
+      const _title = $config.titles[o.key];
+      $element('h2', o.node.div, _title ? `${_title} (${o.key})` : o.key);
 
       if (o.input === 'textarea') {
         //o.node.input = $element('textarea', o.node.div, { spellcheck: false });
