@@ -21,4 +21,12 @@ export const CSS = `
 .hvab-info{margin-top:5px;font-size:10px;line-height:1.5;opacity:.82;text-align:center}
 #hvab-meta1{opacity:.75;letter-spacing:.3px}
 #hvab-meta2{font-weight:600}
+.hvab-grp{margin-bottom:8px}
+.hvab-gh{font-size:9px;letter-spacing:.5px;opacity:.5;margin:4px 0 3px}
+.hvab-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:2px 0;gap:6px}
+.hvab-row>span:first-child{flex:1;opacity:.85}
+.hvab-in{opacity:.8;display:inline-flex;align-items:center;gap:2px}
+.hvab-in em{font-style:normal;opacity:.55;font-size:10px}
+.hvab-row input[type=number]{width:46px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:11px monospace;padding:1px 4px;text-align:right}
+.hvab-row input[type=checkbox]{accent-color:#3a7;width:15px;height:15px;cursor:pointer}
 `;
