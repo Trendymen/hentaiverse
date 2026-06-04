@@ -45,6 +45,7 @@ const settings = {
   showEquipSlots: 1, // 0:disable, 1:on battle pages only, 2:always
   trainingNotification: true,
   lotteryNotification: true,
+  translateNames: true,
   lotteryFilters: [
     'Rapier && Slaughter',
     'Ethereal && (Rapier || Wakizashi) && (Balance || Nimble)',
@@ -226,6 +227,7 @@ const $config = {
     { key: 'equipInventoryIntegration', type: 'boolean', label: '在装备仓库中将所有类型的装备整合到一个列表。' },
     { key: 'equipSort', type: 'boolean', label: '对装备列表进行排序和分类。' },
     { key: 'equipColor', type: 'boolean', label: '按品质设置装备颜色。' },
+    { key: 'translateNames', type: 'boolean', label: '将装备名/物品名显示为中文(彩票、战斗面板、列表等;英文原值仍用于筛选)。' },
     { key: 'equipHoverFunctions', type: 'boolean', label: '鼠标悬停在装备上时支持键盘和鼠标操作。' },
     { key: 'equipTouchFunctions', type: 'boolean', label: '在移动端支持触控操作' },
     { key: 'equipCode', type: 'string', input: 'textarea', text: '设置论坛代码的格式。', style: 'height: 80px; white-space: normal;' },
@@ -509,6 +511,7 @@ const $config = {
     equipInventoryIntegration: '装备仓库整合',
     equipSort: '装备排序',
     equipColor: '装备品质着色',
+    translateNames: '装备名中文显示',
     equipHoverFunctions: '鼠标悬停功能',
     equipTouchFunctions: '触控功能',
     equipCode: '装备代码格式',
@@ -1267,6 +1270,55 @@ const $equip = {
     magic: /Fire|Cold|Elec|Wind|Holy|Dark/i,
     pab: /Strength|Dexterity|Agility|Endurance|Intelligence|Wisdom/g,
   },
+
+  // 装备/物品名翻译子模块(SSOT=docs/hvutils-glossary.md;译名取自 equip_chinese 字典,已去 HTML/符号)
+  // 将来合并所有脚本后,此块即可升格为统一翻译核心。译名仅作显示,英文 eq.info.name 原值不动。
+  $i18n: {
+    quality: { Peerless: '无双', Legendary: '传奇', Magnificent: '史诗', Exquisite: '精良', Superior: '上等', Fine: '优质', Average: '中等', Fair: '一般', Crude: '劣质', Flimsy: '薄弱' },
+    prefix: { Ethereal: '虚空之', Fiery: '灼热之', Arctic: '极寒之', Shocking: '闪电之', Tempestuous: '风暴之', Hallowed: '神圣之', Demonic: '恶魔之', Radiant: '魔光', Charged: '充能的', Mystic: '神秘的', Frugal: '节能', Savage: '野蛮的', Agile: '俊敏的', Reinforced: '加固的', Shielding: '盾化的', Mithril: '秘银的', Ruby: '红宝石(火抗)', Cobalt: '钴石(冰抗)', Amber: '琥珀(雷抗)', Jade: '翡翠(风抗)', Zircon: '锆石(圣抗)', Onyx: '缟玛瑙(暗抗)' },
+    type: { Rapier: '西洋剑', Club: '棍', Shortsword: '短剑', Axe: '斧', Wakizashi: '脇差', Dagger: '匕首', 'Sword Chucks': '锁链双剑', Estoc: '刺剑', Mace: '重槌', Longsword: '长剑', Katana: '太刀', Scythe: '镰刀', 'Oak Staff': '橡木法杖', 'Willow Staff': '柳木法杖', 'Katalox Staff': '铁木法杖', 'Redwood Staff': '红木法杖', 'Ebony Staff': '乌木法杖', 'Force Shield': '力场盾', Buckler: '圆盾', 'Kite Shield': '鸢盾', 'Tower Shield': '塔盾', Phase: '相位', Cotton: '棉质', Gossamer: '薄纱', Silk: '丝绸', Shade: '暗影', Leather: '皮革', Kevlar: '凯夫拉', 'Dragon Hide': '龙皮', Power: '动力', Plate: '板甲', Chainmail: '锁子甲' },
+    slot: { Cap: '兜帽', Robe: '长袍', Gloves: '手套', Pants: '短裤', Shoes: '鞋', Helmet: '头盔', Breastplate: '护胸', Cuirass: '胸甲', Armor: '盔甲', Gauntlets: '手甲', Greaves: '护胫', Leggings: '护腿', Sabatons: '铁靴', Boots: '靴子' },
+    suffix: { Slaughter: '杀戮', Balance: '平衡', Swiftness: '加速', 'the Barrier': '格挡', 'the Nimble': '招架', 'the Battlecaster': '战法师', 'the Vampire': '吸血鬼', 'the Illithid': '灵吸怪', 'the Banshee': '报丧女妖', Destruction: '毁灭', Surtr: '苏尔特(火伤)', Niflheim: '尼芙菲姆(冰伤)', Mjolnir: '姆乔尔尼尔(雷伤)', Freyr: '弗瑞尔(风伤)', Heimdall: '海姆达(圣伤)', Fenrir: '芬里尔(暗伤)', Focus: '专注', 'the Elementalist': '元素使', 'the Heaven-sent': '天堂', 'the Demon-fiend': '恶魔', 'the Earth-walker': '地行者', 'the Curse-weaver': '咒术师', 'the Shadowdancer': '影舞者', 'the Fleet': '迅捷', 'the Arcanist': '奥术师', Negation: '否定', Protection: '物防', Warding: '魔防', Dampening: '抑制', Stoneskin: '石肤', Deflection: '偏转', 'the Ox': '牛(力量)', 'the Raccoon': '浣熊(灵巧)', 'the Cheetah': '猎豹(敏捷)', 'the Turtle': '乌龟(体质)', 'the Fox': '狐狸(智力)', 'the Owl': '猫头鹰(智慧)', 'the Fire-eater': '噬火者', 'the Thunder-child': '雷之子', 'the Wind-waker': '风之杖', 'the Frost-born': '冰人', 'the Spirit-ward': '灵魂护佑', 'the Thrice-blessed': '三重祝福' },
+    items: {
+      'Binding of Slaughter': '粘合剂 基础物理伤害', 'Binding of Balance': '粘合剂 物理命中率', 'Binding of Isaac': '粘合剂 物理暴击率', 'Binding of Destruction': '粘合剂 基础魔法伤害', 'Binding of Focus': '粘合剂 魔法命中率', 'Binding of Friendship': '粘合剂 魔法暴击率', 'Binding of Protection': '粘合剂 物理减伤', 'Binding of Warding': '粘合剂 魔法减伤', 'Binding of the Fleet': '粘合剂 回避率', 'Binding of the Barrier': '粘合剂 格挡率', 'Binding of the Nimble': '粘合剂 招架率', 'Binding of Negation': '粘合剂 抵抗率', 'Binding of the Ox': '粘合剂 力量', 'Binding of the Raccoon': '粘合剂 灵巧', 'Binding of the Cheetah': '粘合剂 敏捷', 'Binding of the Turtle': '粘合剂 体质', 'Binding of the Fox': '粘合剂 智力', 'Binding of the Owl': '粘合剂 智慧', 'Binding of the Elementalist': '粘合剂 元素魔法熟练度', 'Binding of the Heaven-sent': '粘合剂 神圣魔法熟练度', 'Binding of the Demon-fiend': '粘合剂 黑暗魔法熟练度', 'Binding of the Curse-weaver': '粘合剂 减益魔法熟练度', 'Binding of the Earth-walker': '粘合剂 增益魔法熟练度', 'Binding of Surtr': '粘合剂 火属性咒语伤害', 'Binding of Niflheim': '粘合剂 冰属性咒语伤害', 'Binding of Mjolnir': '粘合剂 雷属性咒语伤害', 'Binding of Freyr': '粘合剂 风属性咒语伤害', 'Binding of Heimdall': '粘合剂 圣属性咒语伤害', 'Binding of Fenrir': '粘合剂 暗属性咒语伤害', 'Binding of Dampening': '粘合剂 敲击减伤', 'Binding of Stoneskin': '粘合剂 斩击减伤', 'Binding of Deflection': '粘合剂 刺击减伤', 'Binding of the Fire-eater': '粘合剂 火属性减伤', 'Binding of the Frost-born': '粘合剂 冰属性减伤', 'Binding of the Thunder-child': '粘合剂 雷属性减伤', 'Binding of the Wind-waker': '粘合剂 风属性减伤', 'Binding of the Thrice-blessed': '粘合剂 圣属性减伤', 'Binding of the Spirit-ward': '粘合剂 暗属性减伤',
+      'Health Potion': '体力药水', 'Health Draught': '体力长效药', 'Health Elixir': '终极体力药', 'Mana Potion': '法力药水', 'Mana Draught': '法力长效药', 'Mana Elixir': '终极法力药', 'Spirit Potion': '灵力药水', 'Spirit Draught': '灵力长效药', 'Spirit Elixir': '终极灵力药', 'Last Elixir': '终极秘药', 'Energy Drink': '能量饮料', 'Caffeinated Candy': '咖啡因糖果', 'Monster Chow': '怪物饲料', 'Monster Edibles': '怪物食品', 'Monster Cuisine': '怪物料理', 'Golden Lottery Ticket': '黄金彩票券',
+      'Infusion of Flames': '火焰魔药', 'Infusion of Frost': '冰冷魔药', 'Infusion of Lightning': '闪电魔药', 'Infusion of Storms': '风暴魔药', 'Infusion of Divinity': '神圣魔药', 'Infusion of Darkness': '黑暗魔药',
+      'Scroll of Swiftness': '加速卷轴', 'Scroll of Protection': '保护卷轴', 'Scroll of the Avatar': '化身卷轴', 'Scroll of Absorption': '吸收卷轴', 'Scroll of Shadows': '幻影卷轴', 'Scroll of Life': '生命卷轴', 'Scroll of the Gods': '神之卷轴',
+      'Flower Vase': '花瓶', 'Bubble-Gum': '泡泡糖', 'Soul Stone': '灵魂石',
+      'Voidseeker Shard': '虚空碎片', 'Aether Shard': '以太碎片', 'Featherweight Shard': '羽毛碎片', 'Amnesia Shard': '重铸碎片', 'Crystallized Phazon': '相位碎片(布)', 'Shade Fragment': '暗影碎片(轻)', 'Repurposed Actuator': '动力碎片(重)', 'Defense Matrix Modulator': '力场碎片(盾)',
+      'Crystal of Vigor': '力量水晶', 'Crystal of Finesse': '灵巧水晶', 'Crystal of Swiftness': '敏捷水晶', 'Crystal of Fortitude': '体质水晶', 'Crystal of Cunning': '智力水晶', 'Crystal of Knowledge': '智慧水晶', 'Crystal of Flames': '火焰水晶', 'Crystal of Frost': '冰冻水晶', 'Crystal of Lightning': '闪电水晶', 'Crystal of Tempest': '疾风水晶', 'Crystal of Devotion': '神圣水晶', 'Crystal of Corruption': '暗黑水晶',
+      "Voidseeker's Blessing": '虚空探索者的祝福', 'Suffused Aether': '弥漫的以太', 'Featherweight Charm': '轻如鸿毛', 'Infused Flames': '火焰附魔', 'Infused Frost': '冰霜附魔', 'Infused Lightning': '雷电附魔', 'Infused Storm': '风暴附魔', 'Infused Divinity': '神圣附魔', 'Infused Darkness': '黑暗附魔',
+      'Scrap Metal': '废金属', 'Scrap Wood': '废木料', 'Energy Cell': '能量电池',
+    },
+    _join: function (i) {
+      const I = $equip.$i18n;
+      const q = I.quality[i.quality] || i.quality || '';
+      const pre = i.prefix ? (I.prefix[i.prefix] || i.prefix) : '';
+      const t = i.type ? (I.type[i.type] || i.type) : '';
+      const slot = i.slot ? (I.slot[i.slot] || i.slot) : '';
+      const suf = i.suffix ? (I.suffix[i.suffix] || i.suffix) : '';
+      return [q, pre, t, slot, suf].filter(Boolean).join(' ');
+    },
+    // 入参为已解析 eq:直接读段拼中文;未解析(无 quality)则回退英文整名
+    applyEquip: function (eq) {
+      return eq.info.quality ? $equip.$i18n._join(eq.info) : eq.info.name;
+    },
+    // 入参为装备名字符串(彩票/邮件等):正则拆段后拼中文;解析失败原样返回
+    equipName: function (str) {
+      const exec = $equip.reg.name.exec(str);
+      if (!exec) { return str; }
+      return $equip.$i18n._join({ quality: exec[1], prefix: exec[2] || exec[3], type: exec[4] || exec[5] || exec[6] || exec[7] || exec[8] || exec[9] || exec[10], slot: exec[11], suffix: exec[12] });
+    },
+    // 物品整名翻译,未收录回退英文
+    itemName: function (name) { return $equip.$i18n.items[name] || name; },
+    // 装备显示名:开关关→英文;customname 玩家红字名不翻;否则用派生 namezh,缺失则即时解析
+    displayName: function (eq) {
+      if (!$config.settings.translateNames) { return eq.info.customname || eq.info.name; }
+      if (eq.info.customname) { return eq.info.customname; }
+      return eq.info.namezh || $equip.$i18n.equipName(eq.info.name);
+    },
+  },
+
   stats: {
     'Attack Damage': { scale: 50 / 3, fluc: 0.0854, forge: 'Physical Damage', binding: 'Binding of Slaughter', potency: 'Butcher', plus: 0.02 },
     'Attack Speed': { scale: Infinity, fluc: 0.0481, potency: 'Swift Strike', plus: 1.924, multi: true },
@@ -1455,6 +1507,9 @@ const $equip = {
         eq.info.suffix = exec[12];
       } else if (!eq.info.category) {
         eq.info.category = 'Unknown';
+      }
+      if ($config.settings.translateNames) {
+        eq.info.namezh = $equip.$i18n.applyEquip(eq);
       }
       return eq;
     },
@@ -2675,7 +2730,7 @@ const $battle = {
     if (eq.data.repair) {
       eq.data.repair.forEach(({ name, count }) => {
         const stock = $item.count(name);
-        const textContent = `${name} x ${count} (${stock})`;
+        const textContent = `${$config.settings.translateNames ? $equip.$i18n.itemName(name) : name} x ${count} (${stock})`;
         const className = stock < count ? 'hvut-bt-warn' : '';
         $element('li', $battle.node.repair, { textContent, className });
       });
@@ -2700,7 +2755,7 @@ const $battle = {
           li.classList.add('hvut-bt-nostock');
         }
         $element('span', li, [`[+${count}]`, '.hvut-cphu', { dataset: { action: 'enchant', item: name, count } }]);
-        $element('span', li, [`${item.effect}`, '.hvut-cphu', { dataset: { action: 'enchant', item: name, count: 1 } }]);
+        $element('span', li, [`${$config.settings.translateNames ? $equip.$i18n.itemName(item.effect) : item.effect}`, '.hvut-cphu', { dataset: { action: 'enchant', item: name, count: 1 } }]);
         $element('span', li, [`(${stock})`]);
       }
     });
@@ -2900,7 +2955,7 @@ const $battle = {
     }
     Object.entries($config.settings.equipEnchantItemInventory).forEach(([name, count]) => {
       const stock = $item.count(name);
-      const textContent = `${name} (${stock})`;
+      const textContent = `${$config.settings.translateNames ? $equip.$i18n.itemName(name) : name} (${stock})`;
       const className = stock < count ? 'hvut-bt-warn' : '';
       const dataset = { action: 'buy', item: name, count };
       $element('li', $battle.node.inventory, { textContent, className, dataset });
@@ -2908,7 +2963,7 @@ const $battle = {
     if ($battle.repair.repairall) {
       $battle.repair.repairall.forEach(({ name, count }) => {
         const stock = $item.count(name);
-        const textContent = `${name} x ${count} (${stock})`;
+        const textContent = `${$config.settings.translateNames ? $equip.$i18n.itemName(name) : name} x ${count} (${stock})`;
         const className = stock < count ? 'hvut-bt-warn' : '';
         $element('li', $battle.node.repairall, { textContent, className });
       });
@@ -2935,7 +2990,7 @@ const $battle = {
       const eq = { info, data: {}, node: {} };
       eq.info.cat = (eq.info.category === 'One-handed Weapon' || eq.info.category === 'Two-handed Weapon' || eq.info.category === 'Staff') ? 'weapon' : 'armor';
       eq.node.li = $element('li', $battle.node.equip);
-      eq.node.name = $element('a', eq.node.li, { textContent: eq.info.customname || eq.info.name, href: `equip/${eq.info.eid}/${eq.info.key}`, target: '_blank' });
+      eq.node.name = $element('a', eq.node.li, { textContent: $equip.$i18n.displayName(eq), href: `equip/${eq.info.eid}/${eq.info.key}`, target: '_blank' });
       eq.node.enc = $element('span', eq.node.li);
       eq.node.cdt = $element('span', eq.node.li, { textContent: '...', dataset: { action: 'view', eid: eq.info.eid } });
 
@@ -3890,7 +3945,7 @@ if ($config.settings.lotteryNotification) {
       } else if (lottery.check) {
         _bottom.node[ss].div.classList.add('hvut-lt-check');
       }
-      _bottom.node[ss].equip.textContent = lottery.equip;
+      _bottom.node[ss].equip.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip;
       _bottom.node[ss].time.textContent = time_format(lottery.date - now, 1);
       return;
     }
@@ -3932,7 +3987,7 @@ if ($config.settings.lotteryNotification) {
     $config.set('lt_notif', json, 'hvut_');
     if (lottery.check) {
       const date_text = eqname.previousElementSibling.textContent;
-      popup(`<p>${date_text}</p><p style="color: #f00; font-weight: bold;">${lottery.equip}</p>`);
+      popup(`<p>${date_text}</p><p style="color: #f00; font-weight: bold;">${$config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip}</p>`);
     }
 
     _bottom.node[ss].equip.textContent = lottery.equip;
