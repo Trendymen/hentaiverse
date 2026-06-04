@@ -172,8 +172,6 @@ let words = {
   'Shadow Veil' : '影纱',
   'Absorb' : '吸收',
   'Spark of Life' : '生命火花',
-  'Arcane Focus' : '奥术集中',
-  'Heartseeker' : '觅心者',
   '[sS]pirit [sS]hield' : '灵力盾',
 
   //武器效果
@@ -367,7 +365,6 @@ let items_words = {
         'Crystal of Devotion' : '神圣水晶',
         'Crystal of Corruption' : '暗黑水晶',
         'Crystal of Quintessence' : '灵魂水晶',
-        'Crystal of Corruption' : '腐化水晶',
 
         'Monster Edibles' : '怪物食品',
         'Monster Chow' : '怪物口粮',
