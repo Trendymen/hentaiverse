@@ -267,6 +267,8 @@
     regen: "regen",
     heartseeker: "heartseeker",
     channeling: "channeling",
+    blessing: "riddle",
+    // 御谜士的祝福(Blessing of the RiddleMaster, 答对小马图的回复增益); 图标关键字 'riddle' 待 GF 实测确认
     hpot: "healthpot",
     mpot: "manapot",
     spot: "spiritpot"
@@ -357,6 +359,7 @@
         haste: B.haste,
         regen: B.regen,
         heartseeker: B.heartseeker,
+        blessing: B.blessing,
         hpot: B.hpot,
         mpot: B.mpot,
         spot: B.spot
@@ -513,7 +516,7 @@
         return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
       if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
-      if (!b.regen.active || b.regen.turns <= 1) return A("spell", SK.Regen);
+      if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A("spell", SK.Regen);
       if (mpFree < C.MP_LOW * MM) {
         if (S.gemReady) return A("item", IT.manaGem);
         if (!b.mpot.active) return A("item", IT.mDraught);

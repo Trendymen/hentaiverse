@@ -36,6 +36,7 @@ export interface BuffMap {
   haste: BuffState;
   regen: BuffState;
   heartseeker: BuffState;
+  blessing: BuffState;
   hpot: BuffState;
   mpot: BuffState;
   spot: BuffState;

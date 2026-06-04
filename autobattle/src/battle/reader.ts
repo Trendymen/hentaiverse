@@ -81,6 +81,7 @@ export class StateReader {
       haste: B.haste,
       regen: B.regen,
       heartseeker: B.heartseeker,
+      blessing: B.blessing,
       hpot: B.hpot,
       mpot: B.mpot,
       spot: B.spot,
