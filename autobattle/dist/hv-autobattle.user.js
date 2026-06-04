@@ -256,7 +256,7 @@
     const p = el("div");
     p.appendChild(group("喝药线(低于即补)", pctRow("PANIC_RED", "急救血"), pctRow("HP_HEAL", "常规喝血"), pctRow("MP_LOW", "回蓝"), pctRow("SP_LOW", "喝灵力")));
     p.appendChild(group("灵动架式(斗气)", pctRow("OC_ON", "≥ 开"), pctRow("OC_OFF", "< 关")));
-    p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺破魔"), swRow("useChanneling", "Channeling 增益")));
+    p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "觅心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
     return p;
@@ -363,30 +363,30 @@
   );
   const SK_CN = {
     212: "虚弱",
-    213: "破魔",
-    311: "治疗",
-    312: "再生",
-    313: "全愈",
+    213: "陷危",
+    311: "治疗术",
+    312: "细胞活化",
+    313: "完全治疗术",
     411: "守护",
-    412: "加速",
+    412: "急速",
     421: "吸收",
     422: "生命火花",
-    423: "灵盾",
-    431: "觅心"
+    423: "灵力盾",
+    431: "穿心"
   };
   const IT_CN = {
-    11191: "体力长效",
+    11191: "体力长效药",
     11195: "体力药水",
-    11199: "体力秘药",
-    11291: "魔力长效",
-    11295: "魔力药水",
-    11299: "魔力秘药",
-    11391: "灵力长效",
+    11199: "终极体力药",
+    11291: "法力长效药",
+    11295: "法力药水",
+    11299: "终极法力药",
+    11391: "灵力长效药",
     11395: "灵力药水",
-    13111: "守护卷轴",
+    13111: "保护卷轴",
     12601: "黑暗魔药",
     12501: "神圣魔药",
-    10006: "魔晶"
+    10006: "魔力宝石"
   };
   const SS_CN = {
     gr: "压榨界",
