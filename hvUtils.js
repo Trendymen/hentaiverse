@@ -4729,7 +4729,11 @@ if (_query.s === 'Character' && _query.ss === 'eq') {
     _eq.show_base();
     _eq.equiplist = $equip.list($id('eqsb'), false);
     _eq.equiplist.forEach((eq) => {
-      eq.node.div.textContent = eq.node.div.textContent;
+      if ($config.settings.translateNames) {
+        eq.node.div.innerHTML = $equip.$i18n.displayNameHtml(eq);
+      } else {
+        eq.node.div.textContent = eq.node.div.textContent;
+      }
       $element('div', eq.node.wrapper.firstElementChild, ['.hvut-eq-info']).append(
         $element('span', null, [(eq.info.soulbound ? '灵魂绑定' : 'Lv.' + eq.info.level), (eq.info.soulbound || !eq.info.tradeable ? '.hvut-eq-untradeable' : '')]), ' : ',
         $element('span', null, 'IW ' + eq.info.tier), ' : ',
