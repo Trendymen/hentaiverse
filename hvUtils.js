@@ -1319,6 +1319,35 @@ const $equip = {
       if (eq.info.customname) { return eq.info.customname; }
       return eq.info.namezh || $equip.$i18n.equipName(eq.info.name);
     },
+    // 配色:段值 → [背景色, 字色(默认黑)];取自 equip_chinese 配色
+    colors: {
+      Peerless: ['#ffd760'], Legendary: ['#ffbbff'], Magnificent: ['#a6daf6'], Exquisite: ['#d7e698'], Superior: ['#fbf9f9'], Fine: ['#b9ffb9'], Average: ['#dfdfdf'], Fair: ['#c1c1c1'], Crude: ['#acacac'],
+      Fiery: ['#f97c7c'], Arctic: ['#94c2f5'], Shocking: ['#f4f375'], Tempestuous: ['#7ff97c'], Hallowed: ['#ffffff'], Demonic: ['#000000', '#fff'], Ethereal: ['#e8e8e8'],
+      Ruby: ['#ffa6a6'], Cobalt: ['#a0f4f4'], Amber: ['#ffff00'], Jade: ['#b1f9b1'], Zircon: ['#f0f0f0'], Onyx: ['#cccccc'],
+      Slaughter: ['#FF0000', '#fff'], Destruction: ['#9400d3', '#fff'], Surtr: ['#f97c7c'], Niflheim: ['#94c2f5'], Mjolnir: ['#f4f375'], Freyr: ['#7ff97c'], Heimdall: ['#ffffff'], Fenrir: ['#000000', '#fff'],
+    },
+    _esc: function (s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); },
+    // 富文本装备名:按段查表+配色,输出带 span 的 HTML;解析失败转义原文
+    equipNameHtml: function (str) {
+      const I = $equip.$i18n;
+      const exec = $equip.reg.name.exec(str);
+      if (!exec) { return I._esc(str); }
+      const segs = [[exec[1], I.quality], [exec[2] || exec[3], I.prefix], [exec[4] || exec[5] || exec[6] || exec[7] || exec[8] || exec[9] || exec[10], I.type], [exec[11], I.slot], [exec[12], I.suffix]];
+      return segs.filter((s) => s[0]).map(([v, map]) => {
+        const zh = map[v] || I._esc(v);
+        const c = I.colors[v];
+        return c ? `<span style="background:${c[0]};color:${c[1] || '#000'};padding:0 3px;border-radius:2px;">${zh}</span>` : zh;
+      }).join(' ');
+    },
+    // 富文本显示名:开关关→转义英文;customname 不翻;否则富文本
+    displayNameHtml: function (eq) {
+      const I = $equip.$i18n;
+      if (!$config.settings.translateNames) { return I._esc(eq.info.customname || eq.info.name); }
+      if (eq.info.customname) { return I._esc(eq.info.customname); }
+      return I.equipNameHtml(eq.info.name);
+    },
+    // 富文本任意名:装备→配色富文本,物品→转义纯文本
+    anyNameHtml: function (str) { const I = $equip.$i18n; return I.equipName(str) !== str ? I.equipNameHtml(str) : I._esc(I.itemName(str)); },
   },
 
   stats: {
@@ -2992,7 +3021,8 @@ const $battle = {
       const eq = { info, data: {}, node: {} };
       eq.info.cat = (eq.info.category === 'One-handed Weapon' || eq.info.category === 'Two-handed Weapon' || eq.info.category === 'Staff') ? 'weapon' : 'armor';
       eq.node.li = $element('li', $battle.node.equip);
-      eq.node.name = $element('a', eq.node.li, { textContent: $equip.$i18n.displayName(eq), href: `equip/${eq.info.eid}/${eq.info.key}`, target: '_blank' });
+      eq.node.name = $element('a', eq.node.li, { href: `equip/${eq.info.eid}/${eq.info.key}`, target: '_blank' });
+      eq.node.name.innerHTML = $equip.$i18n.displayNameHtml(eq);
       eq.node.enc = $element('span', eq.node.li);
       eq.node.cdt = $element('span', eq.node.li, { textContent: '...', dataset: { action: 'view', eid: eq.info.eid } });
 
@@ -3947,7 +3977,7 @@ if ($config.settings.lotteryNotification) {
       } else if (lottery.check) {
         _bottom.node[ss].div.classList.add('hvut-lt-check');
       }
-      _bottom.node[ss].equip.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip;
+      _bottom.node[ss].equip.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(lottery.equip) : $equip.$i18n._esc(lottery.equip);
       _bottom.node[ss].time.textContent = time_format(lottery.date - now, 1);
       return;
     }
@@ -3989,10 +4019,10 @@ if ($config.settings.lotteryNotification) {
     $config.set('lt_notif', json, 'hvut_');
     if (lottery.check) {
       const date_text = eqname.previousElementSibling.textContent;
-      popup(`<p>${date_text}</p><p style="color: #f00; font-weight: bold;">${$config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip}</p>`);
+      popup(`<p>${date_text}</p><p style="color: #f00; font-weight: bold;">${$config.settings.translateNames ? $equip.$i18n.equipNameHtml(lottery.equip) : $equip.$i18n._esc(lottery.equip)}</p>`);
     }
 
-    _bottom.node[ss].equip.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip;
+    _bottom.node[ss].equip.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(lottery.equip) : $equip.$i18n._esc(lottery.equip);
     _bottom.node[ss].time.textContent = time_format(lottery.date - now, 1);
   };
 
@@ -6565,7 +6595,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
 
       if (item.type === 'Trophy') {
         if ($equip.filter($config.settings.shrineFilters, n)) {
-          $element('li', [results[r].li, 'afterend'], [$config.settings.translateNames ? $equip.$i18n.equipName(n) : n, '.hvut-ss-equip']);
+          $element('li', [results[r].li, 'afterend'], ['/' + ($config.settings.translateNames ? $equip.$i18n.equipNameHtml(n) : $equip.$i18n._esc(n)), '.hvut-ss-equip']);
         }
         _ss.equip.received++;
         _ss.equip.total = _ss.equip.current + _ss.equip.received - _ss.equip.sold - _ss.equip.salvaged;
@@ -6662,7 +6692,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
     item.li = $element('li');
     item.sp = $element('span', item.li);
     item.sc = $element('span', item.li);
-    $element('span', item.li, $config.settings.translateNames ? $equip.$i18n.anyName(r) : r);
+    $element('span', item.li, ['/' + ($config.settings.translateNames ? $equip.$i18n.anyNameHtml(r) : $equip.$i18n._esc(r))]);
     if (g) {
       item.group = g;
       item.li.classList.add('hvut-ss-group');
@@ -9278,9 +9308,9 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
         const span = $element('span', tr.cells[2], [`.hvut-mm-attach-${e.t}`]);
         if (e.t === 'e') {
           if (e.e && e.k) {
-            $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+            { const a = $element('a', span, { href: `equip/${e.e}/${e.k}`, target: '_blank' }); a.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n); }
           } else {
-            span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
+            span.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n);
           }
         } else {
           span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
@@ -9593,9 +9623,9 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
           const span = $element('span', li, [`.hvut-mm-attach-${e.t}`]);
           if (e.t === 'e') {
             if (e.e && e.k) {
-              $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+              { const a = $element('a', span, { href: `equip/${e.e}/${e.k}`, target: '_blank' }); a.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n); }
             } else {
-              span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
+              span.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n);
             }
           } else {
             span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
@@ -9766,9 +9796,9 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
         const span = $element('span', tr.cells[2], [`.hvut-mm-attach-${e.t}`]);
         if (e.t === 'e') {
           if (e.e && e.k) {
-            $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+            { const a = $element('a', span, { href: `equip/${e.e}/${e.k}`, target: '_blank' }); a.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n); }
           } else {
-            span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
+            span.innerHTML = $config.settings.translateNames ? $equip.$i18n.equipNameHtml(e.n) : $equip.$i18n._esc(e.n);
           }
         } else {
           span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
@@ -10611,7 +10641,7 @@ if (_query.s === 'Forge' && _query.ss === 'up') {
       : `${quality} ?? (无法计算此装备的基础 PXP)`;
 
     _up.node.salvage_summary.innerHTML = `
-      <li>${$config.settings.translateNames ? $equip.$i18n.displayName(eq) : eq.info.name}</li>
+      <li>${$equip.$i18n.displayNameHtml(eq)}</li>
       <li>PXP 品质: ${pxp_text}</li>
       <li>升级费用: ${credits.toLocaleString()}</li>
       <li>返还价值: ${return_credits.toLocaleString()}</li>`;

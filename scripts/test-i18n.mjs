@@ -48,3 +48,16 @@ for (const [en, want] of cases) {
 }
 console.log('\n物品:', itemName('Health Draught'), '|', itemName("Voidseeker's Blessing"), '|', itemName('Scrap Metal'));
 console.log(`\n装备名 ${pass}/${cases.length} 通过`);
+
+// 富文本配色输出测试
+const colors = { Legendary: ['#ffbbff'], Shocking: ['#f4f375'], Slaughter: ['#FF0000', '#fff'], Peerless: ['#ffd760'], Fiery: ['#f97c7c'] };
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const equipNameHtml = (str) => {
+  const e = RE.exec(str);
+  if (!e) return esc(str);
+  const segs = [[e[1], T.quality], [e[2] || e[3], T.prefix], [e[4] || e[5] || e[6] || e[7] || e[8] || e[9] || e[10], T.type], [e[11], T.slot], [e[12], T.suffix]];
+  return segs.filter((s) => s[0]).map(([v, m]) => { const zh = m[v] || esc(v); const c = colors[v]; return c ? `<span style="background:${c[0]};color:${c[1] || '#000'}">${zh}</span>` : zh; }).join(' ');
+};
+console.log('\n富文本配色输出:');
+console.log('  ' + equipNameHtml('Legendary Shocking Rapier of Slaughter'));
+console.log('  ' + equipNameHtml('Peerless Fiery Longsword of Slaughter'));
