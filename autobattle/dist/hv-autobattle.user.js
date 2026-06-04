@@ -165,6 +165,13 @@
     // Channeling 主动利用
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
+  const CONFIG_VERSION = 2;
+  if (Store.get("configVersion", 0) < CONFIG_VERSION) {
+    current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs;
+    current.OC_ON = DEFAULT_CONFIG.OC_ON;
+    Store.set("config", current);
+    Store.set("configVersion", CONFIG_VERSION);
+  }
   const config = {
     get(key) {
       return current[key];

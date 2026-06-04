@@ -41,6 +41,16 @@ export type Config = typeof DEFAULT_CONFIG;
 // 单一真相: 模块加载时合并默认值 + 持久化覆盖; 之后所有读写统一走 config.get/set, 落盘到 Store 'config' 键.
 let current: Config = { ...DEFAULT_CONFIG, ...Store.get<Partial<Config>>('config', {}) };
 
+// 配置迁移: 旧存档里"后来改过默认值"的键会用旧值盖住新默认(根因: config = {...新默认, ...旧存档}).
+// 版本升级时, 对这些键强制采用新默认(一次性; 之后仍尊重用户面板改动).
+const CONFIG_VERSION = 2;
+if (Store.get<number>('configVersion', 0) < CONFIG_VERSION) {
+  current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs; // 旧存档 22000(22s) → 1500: 根治"炮放一次后整轮不再放"
+  current.OC_ON = DEFAULT_CONFIG.OC_ON; // 0.4 → 0.5: 架式开启对齐游戏 ≥50% 要求, 去掉无效空点
+  Store.set('config', current);
+  Store.set('configVersion', CONFIG_VERSION);
+}
+
 export const config = {
   get<K extends keyof Config>(key: K): Config[K] {
     return current[key];
