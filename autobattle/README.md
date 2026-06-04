@@ -1,49 +1,35 @@
-# HV 自动战斗 — B大脑（单手盾战）
+# HV 自动战斗 · 盾战大脑(现代化独立重写)
 
-在 dodying 停更的 `hvAutoAttack.user.js` 基础上，焊接一个为 **L398 PFUDOR 单手虚空盾战** 定制的现代化决策内核「B大脑」。一键开关（🧠自动 / ⏸暂停），关闭后**不会**退回 dodying 原版自动战斗，由 B大脑自己接管或彻底停手。
+为 L398 PFUDOR 单手虚空盾战定制的现代化半自动辅助。TypeScript + vite-plugin-monkey 工程,产物为单文件、**不压缩、可调试**,仅中文。
 
-> ⚠️ 仅作半自动辅助。禁止无人值守挂机/规避检测——L398 无双装，封号代价极高。小马图（riddle）默认**不自动答题**。
+> ⚠️ 半自动辅助。禁止无人值守挂机 / 检测规避(封号红线)。小马图默认不自动答题。
 
-## 目录结构
-
-```
-autobattle/
-├── hvAutoAttack.user.js          # 原版 dodying 基底（只读，不手改）
-├── hv_brain_modern.user.js       # ★ B大脑模块源 —— 演进只改这个文件
-├── weld.mjs                      # 焊接脚本：基底 + B大脑源 → dist 产物
-├── dist/
-│   └── hvAutoAttack_BRAIN.user.js  # ★ 合体产物 —— 装进 Tampermonkey 的就是它
-└── reference/
-    ├── hv_decideAction.js        # 早期决策伪代码草稿（历史参考）
-    └── hv_shield_brain.js        # 早期 B大脑草稿（历史参考）
-```
-
-## 构建
+## 开发
 
 ```bash
 cd autobattle
-node weld.mjs        # 读 hvAutoAttack.user.js + hv_brain_modern.user.js → 写 dist/hvAutoAttack_BRAIN.user.js
+npm install
+npm run dev        # 开发模式, 控制台给出油猴安装链接(热更新)
+npm run build      # 构建 dist/hv-autobattle.user.js(不压缩可调试)
+npm run typecheck  # tsc 类型检查
 ```
-
-`weld.mjs` 路径自适应（基于脚本所在目录），在仓库任意位置都能跑。
 
 ## 安装
 
-把 `dist/hvAutoAttack_BRAIN.user.js` 全文覆盖进 Tampermonkey 对应脚本，刷新 HV 页面即可。改了 `hv_brain_modern.user.js` 后必须重跑 `node weld.mjs` 再覆盖安装。
+把 `dist/hv-autobattle.user.js` 安装进 Tampermonkey,刷新 HV 页面。改了 `src/` 后重跑 `npm run build` 再覆盖。
 
-## B大脑设计要点
+## 结构
 
-- **decideAction 16 级联**：小马图 → Spark 零空窗保命 → 承伤预测急救 → MP 熔断 → 双物理墙 → Absorb(魔法怪) → Haste → 重击波兜底 → Regen → 回 MP → HP 维持 → SP 喂鬥气 → 灵动架式开关 → 红怪减益 → Heartseeker → 小马炮 AOE → 破甲滚雪球平砍。
-- **减益(对红怪)**：表驱动 `DEBUFFS`，顺序 **Weaken(禁暴击/减伤) → Imperil(破抗增伤)**；`castHostileOn` 精确锁定红怪 eid，不误打杂兵。
-- **Channeling 主动利用**：检测到 Channeling(下个法术 1MP +50% 增强) 时，优先把最贵的 Spark / 双墙 / Imperil / Heartseeker 塞进这回合吃满折扣（保命永远排它前面）。
-- **控制台开关**：红怪铺 Weaken / 红怪铺 Imperil / Channeling 增益 / 小马炮 / 守护卷轴优先 / 动作间延迟区间，均可调，`localStorage` 持久化。
+- `src/core/` — store(持久化 GM/localStorage)/config(单一真相配置)/dom(工具)/bus(类型化事件总线)
+- `src/ui/` — hud(右下常驻 HUD)/panel(四 tab 抽屉)/components/styles
+- `src/main.ts` — 入口(`@run-at document-start` hook XHR/fetch + 挂载 UI)
+- `src/global.d.ts` — GM API 全局类型声明
+- `reference/` — dodying 原版 + 旧焊接版(翻写底本, 不参与构建)
 
-## 焊接原理
+## 里程碑
 
-`weld.mjs` 在 dodying `onBattle()` 的 `taskList` 决策分发前插入：
-
-```js
-if (window.HVShieldBrain) { window.HVShieldBrain.step(); return; }
-```
-
-开启时 B大脑接管出招并 `return`（跳过 dodying 原决策）；模块未注册时照走原逻辑。同时关掉 dodying 歪斜的血条百分比，改由 B大脑居中渲染。
+- **M1 地基** ✅ — 工程 / 构建(不压缩)/ core / UI 骨架 / document-start hook
+- M2 战斗内 — Reader + Brain(迁移现有 B大脑)+ Executor
+- M3 连刷 — 遭遇 / 竞技场 / GF
+- M4 保护后勤 — 精力 / 无响应 / 修复 / 库存 / 统计
+- M5 杂项打磨 — 告警 / 异世界 / 小马提醒 + UI 精修
