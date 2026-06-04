@@ -71,12 +71,13 @@ export class StateReader {
     if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
     if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
 
-    // OC(斗气): 数亮点 —— dodying 原版法(hvAutoAttack.user.js:2666): 总点(#vcp>div>div) 减 灭点(id=vcr), 每点 25(满10点=250).
-    // ⚠旧 B大脑(我之前翻写的底本)用 bar宽/vcp宽×250 是错的: 满 OC 也只算出 ~119(190/400×250),
-    //   致 oc≥200 永不成立 → 小马炮永不放 + 攒炮模式永远压着架式("来回开关灵动"总根因). 已弃用.
-    const ocDots = $$('#vcp>div>div').length;
-    const ocEmpty = $$('#vcp>div>div#vcr').length;
-    const oc = ocDots ? (ocDots - ocEmpty) * 25 : 0;
+    // OC(斗气) 数点: 满点 ×25 + 在建点(id=vcr, 半亮 opacity0.5)按半点 ≈12.5 估 → 粒度 25→12.5(更细 + 架式阈值更准).
+    //   实测: HV 把斗气画成 N 个点(每点25), 正充能的那点 id=vcr/opacity0.5; DOM 不暴露其精确填充, 故在建点按半点估.
+    //   dodying 原版(hvAutoAttack.user.js:2666)是 floor(直接减掉 vcr); 这里多给半点, 修"架式过早关"+"OC 只跳整10%".
+    //   ⚠旧 B大脑量条法(bar宽/vcp宽×250)是错的: 满 OC 也只算 ~119 → oc≥200 永不成立 → 炮永不放(总根因), 已弃.
+    const ocDots = $$<HTMLElement>('#vcp>div>div');
+    const ocVcr = ocDots.filter((d) => d.id === 'vcr').length;
+    const oc = ocDots.length ? Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5) : 0;
 
     const B = this._buffs();
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;

@@ -614,9 +614,9 @@
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
       if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
-      const ocDots = $$("#vcp>div>div").length;
-      const ocEmpty = $$("#vcp>div>div#vcr").length;
-      const oc = ocDots ? (ocDots - ocEmpty) * 25 : 0;
+      const ocDots = $$("#vcp>div>div");
+      const ocVcr = ocDots.filter((d) => d.id === "vcr").length;
+      const oc = ocDots.length ? Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5) : 0;
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
       const allMkey = $$('[id^="mkey_"]');
