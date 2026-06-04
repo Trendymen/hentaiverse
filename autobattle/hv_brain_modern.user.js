@@ -8,9 +8,10 @@
  *   · 一键开关 UI(🧠按钮) + HUD; 开关状态持久化, 不依赖 dodying 存储
  *   · 现代 JS: class / 箭头 / 解构 / 可选链 / Map-Set
  *
- * 焊接(改 dodying onBattle line 2840, taskList 之前插一行):
- *   if (window.HVShieldBrain?.enabled()) { window.HVShieldBrain.step(); return; }
- * 其余 onBattle(统计/换图/继续回合) 与整个 dodying 框架一行不改、全程照跑。
+ * 焊接(改 dodying onBattle, taskList 之前插一行; 见 weld.mjs):
+ *   if (window.HVShieldBrain) { window.HVShieldBrain.step(); return; }
+ * B关(⏸)时 step() 内部 return 不出招 → 不回退 dodying 原决策; 暂停键统一(联动原版 disabled 当硬总闸)。
+ * 其余 onBattle(统计/换图/继续回合)与整个 dodying 框架一行不改、全程照跑。
  *
  * 已内置对抗审查 4 项致命加固: ①Spark预算锁 ②满暴击波承伤预测
  *   ③保命墙脱离Channeling依赖 ④MP熔断阈值30%
@@ -202,11 +203,13 @@
       this._applyPanel(); this.refresh();
       this._vitalTimer = setInterval(() => this.paintVitalPct(), 300); // 血条居中百分比
       this._hideDodying();
+      setTimeout(() => this._syncDisabled(Store.get('on', false)), 1200); // 等 dodying 暂停按钮就绪后对齐 disabled 历史残留(原版按钮已隐藏, B大脑成唯一暂停入口)
     }
     _hideDodying() { // 藏掉 dodying 面板里 B 已接管的失效标签页(恢复/引导/BUFF/DEBUFF/卷轴/其他技能)
       if (document.getElementById('hb-hide')) return;
       const s = document.createElement('style'); s.id = 'hb-hide';
-      s.textContent = '.hvAATabmenu>span[name="Recovery"],.hvAATabmenu>span[name="Channel"],.hvAATabmenu>span[name="Buff"],.hvAATabmenu>span[name="Debuff"],.hvAATabmenu>span[name="Scroll"],.hvAATabmenu>span[name="Skill"]{display:none!important}';
+      s.textContent = '.hvAATabmenu>span[name="Recovery"],.hvAATabmenu>span[name="Channel"],.hvAATabmenu>span[name="Buff"],.hvAATabmenu>span[name="Debuff"],.hvAATabmenu>span[name="Scroll"],.hvAATabmenu>span[name="Skill"],.hvAATabmenu>span[name="Rule"]{display:none!important}'
+        + '.hvAAPauseUI,.pauseChange{display:none!important}'; // 暂停统一到 B大脑 ⏸: 原版暂停按钮藏起(display:none 仍可被 _syncDisabled 联动 .click)
       (document.head || document.documentElement).appendChild(s);
     }
     _html() {
@@ -261,7 +264,16 @@
         lbl.textContent = pct + '%';
       }
     }
-    toggle() { Store.set('on', !Store.get('on', false)); this.refresh(); }
+    toggle() { const on = !Store.get('on', false); Store.set('on', on); this.refresh(); this._syncDisabled(on); }
+    _syncDisabled(on) { // 一键统一: 让 dodying 原版 disabled(硬总闸@onBattle 2823, 比 step return 更彻底, 连 autoFlee/渲染都停)跟随 B大脑开关. 复用隐藏的原版暂停按钮(display:none 仍可 .click 触发 pauseChange, 恢复时自动续跑 onBattle)
+      try {
+        const raw = (typeof GM_getValue === 'function') ? GM_getValue('disabled', null) : (localStorage.getItem('hvAA-disabled') ?? null);
+        const isDisabled = !!raw && raw !== 'null' && raw !== 'false';
+        if (isDisabled === !on) return;                 // 已一致, 幂等(避免反相切换)
+        const btn = document.querySelector('.pauseChange');
+        if (btn) btn.click();                            // 切换 → pauseChange 同步 disabled
+      } catch (e) {}
+    }
     refresh() { const on = Store.get('on', false), b = document.getElementById('hb-toggle'); if (b) { b.textContent = on ? '🧠 自动' : '⏸ 暂停'; b.style.background = on ? '#3a7' : '#a55'; b.style.color = '#fff'; } }
     update(S, a) {
       this.last = a ? `${a.type}${a.id ? ':' + a.id : ''}` : '';
