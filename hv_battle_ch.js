@@ -161,8 +161,8 @@ let words = {
   'Blind' : '致盲',
   'MagNet' : '魔磁网',
 
-  'Full-Cure' : '完全治疗术',
-  'Cure' : '治疗术',
+  'Full-Cure' : '完全治愈',
+  'Cure' : '治疗',
   'Haste' : '急速',
   'Absorb' : '吸收',
   '[sS]pirit [sS]hield' : '灵力盾',
