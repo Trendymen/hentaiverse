@@ -2073,7 +2073,7 @@ var words = {
         'of the Fire-eater' : '噬火者（火抗）',
         'of the Frost-born' : '冰人（冰抗）',
         'of the Thunder-child' : '雷之子（雷抗）',
-        'of the Wind-waker' : '驭风者（风抗）',
+        'of the Wind-waker' : '风之杖（风抗）',
         'of the Thrice-blessed' : '三重祝福（圣抗）',
         'of the Spirit-ward' : '灵魂护佑（暗抗）',
 
@@ -2130,7 +2130,7 @@ var words = {
         '/Fire-eater$/' : '噬火者（火抗）',
         '/Frost-born$/' : '冰人（冰抗）',
         '/Thunder-child$/' : '雷之子（雷抗）',
-        '/Wind-waker$/' : '驭风者（风抗）',
+        '/Wind-waker$/' : '风之杖（风抗）',
         '/Thrice-blessed$/' : '三重祝福（圣抗）',
         '/Spirit-ward$/' : '灵魂护佑（暗抗）',
 
