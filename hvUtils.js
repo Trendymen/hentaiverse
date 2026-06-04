@@ -3992,7 +3992,7 @@ if ($config.settings.lotteryNotification) {
       popup(`<p>${date_text}</p><p style="color: #f00; font-weight: bold;">${$config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip}</p>`);
     }
 
-    _bottom.node[ss].equip.textContent = lottery.equip;
+    _bottom.node[ss].equip.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(lottery.equip) : lottery.equip;
     _bottom.node[ss].time.textContent = time_format(lottery.date - now, 1);
   };
 
