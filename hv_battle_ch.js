@@ -24,9 +24,9 @@ let words = {
     //颜色请使用html颜色代码,注意添加逗号
 
   // 恢复
-  'Refreshment' : '灵力长效药',
-  'Regeneration' : '生命长效药',
-  'Replenishment' : '魔力长效药',
+  'Refreshment' : '提神',
+  'Regeneration' : '再生',
+  'Replenishment' : '补给',
   'Kicking Ass': '海扁',
   'Sleeper Imprint' : '沉睡烙印',
 
