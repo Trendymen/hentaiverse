@@ -6356,9 +6356,9 @@ if (_query.s === 'Bazaar' && _query.ss === 'es') {
 
   _es.node.side = $element('div', $id('eqshop_outer'), ['.hvut-side hvut-es-side']);
   toggle_button($input('button', _es.node.side, { className: 'hvut-side-margin' }), '显示全部装备', '仅显示已筛选', $id('shop_pane'), 'hvut-none-cont', $config.settings.equipmentShopBazaarFilters.length);
-  $input(['button', '选择:'], _es.node.side, null, () => { _es.select_all('sell'); });
+  $input(['button', '选择待售'], _es.node.side, null, () => { _es.select_all('sell'); });
   $input(['button', '出售'], _es.node.side, { className: 'hvut-side-margin' }, () => { _es.sell_all(); });
-  $input(['button', '选择:'], _es.node.side, null, () => { _es.select_all('salvage'); });
+  $input(['button', '选择待分解'], _es.node.side, null, () => { _es.select_all('salvage'); });
   $input(['button', '分解'], _es.node.side, { className: 'hvut-side-margin' }, () => { _es.salvage_all(); });
   $input(['button', '编辑筛选'], _es.node.side, null, () => { $config.open('equipmentShopProtectFilters'); });
   $input(['button', '物品价格'], _es.node.side, null, () => { $price.edit('Materials', 'ma', _es.edit_price); });
