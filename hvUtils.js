@@ -6532,7 +6532,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
     }
     if (!item.results) {
       item.results = _ss.create_list(item.type);
-      item.node.span = $element('p', _ss.node.results, [($config.settings.translateNames ? $equip.$i18n.anyName(item.name) : item.name) + (item.upgrade ? ' => Tier ' + item.upgrade : '') + ' ', '.hvut-ss-p']).appendChild($element('span'));
+      item.node.span = $element('p', _ss.node.results, ['/' + ($config.settings.translateNames ? $equip.$i18n.anyNameHtml(item.name) : $equip.$i18n._esc(item.name)) + (item.upgrade ? ' => Tier ' + item.upgrade : '') + ' ', '.hvut-ss-p']).appendChild($element('span'));
       item.node.ul = $element('ul', _ss.node.results, ['.hvut-ss-ul']);
       Object.values(item.results).forEach((r) => { item.node.ul.appendChild(r.li).classList.add('hvut-none'); });
       scrollIntoView(item.node.ul);
@@ -6648,7 +6648,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
         total /= 2;
       }
 
-      $element('p', div, [`${$config.settings.translateNames ? $equip.$i18n.anyName(n) : n} (${total})`, '.hvut-ss-p']);
+      $element('p', div, ['/' + `${$config.settings.translateNames ? $equip.$i18n.anyNameHtml(n) : $equip.$i18n._esc(n)} (${total})`, '.hvut-ss-p']);
       const ul = $element('ul', div, ['.hvut-ss-ul']);
 
       Object.entries(log).forEach(([r, c]) => {
@@ -10679,7 +10679,7 @@ if (_query.s === 'Forge' && _query.ss === 'up') {
     const left = $element('div', _up.node.salvage);
     const right = $element('div', _up.node.salvage);
     if (_up.equip) {
-      $input(['button', _up.equip.info.name], left, { style: 'min-width: 350px; margin-bottom: 20px;' }, () => { _up.node.salvage_equip.value = $id('leftpane').textContent; _up.salvage_calc(_up.equip.upgrade.quality); });
+      $element('button', left, ['/' + ($config.settings.translateNames ? $equip.$i18n.displayNameHtml(_up.equip) : $equip.$i18n._esc(_up.equip.info.name)), { style: 'min-width: 350px; margin-bottom: 20px;' }], () => { _up.node.salvage_equip.value = $id('leftpane').textContent; _up.salvage_calc(_up.equip.upgrade.quality); });
       $element('br', left);
     }
     _up.node.salvage_quality = $input(['select', [':PXP 品质', 'Leg:Leg (348~)', 'Mag:Mag (335~348)', 'Exq:Exq (313~335)', 'Sup:Sup (~313)']], left);
