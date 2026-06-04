@@ -46,11 +46,14 @@ export class StateReader {
     return out;
   }
 
-  /** 从战斗日志 #textlog 解析轮数 "(Round N / M)"(取最新); 读不到则保留上次缓存 */
+  /** 从战斗日志 #textlog 解析轮数(取最新); 读不到则保留上次缓存.
+   *  英文优先(精确); 汉化/通用兜底: 括号内 "N / M"(防某些汉化把 Round 译成中文改了 textContent). */
   private _round(): void {
     const tl = document.getElementById('textlog');
     if (!tl) return;
-    const ms = [...(tl.textContent || '').matchAll(/\(Round\s*(\d+)\s*\/\s*(\d+)\)/g)];
+    const txt = tl.textContent || '';
+    let ms = [...txt.matchAll(/Round\s*(\d+)\s*\/\s*(\d+)/gi)];
+    if (!ms.length) ms = [...txt.matchAll(/[(（][^)）]{0,8}?(\d+)\s*\/\s*(\d+)[^)）]{0,8}?[)）]/g)];
     const last = ms[ms.length - 1];
     if (last) {
       this.roundNow = +last[1];
