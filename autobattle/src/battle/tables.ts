@@ -1,6 +1,6 @@
 // 技能/物品/buff ID 表 + 红怪减益序列 + Channeling 队列. 翻写自 reference/hv_brain_modern.user.js:47-68
 import { config } from '../core/config';
-import type { BattleState, BuffMap } from '../types';
+import type { Action, BattleState, BuffMap } from '../types';
 
 /** 法术 DBID */
 export const SK = {
@@ -91,3 +91,46 @@ export const cannonBtn = (): HTMLElement | undefined =>
   [...document.querySelectorAll<HTMLElement>('#pane_skill [onmouseover]')].find((e) =>
     /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
   );
+
+/** 法术 id → 中文名(HUD 显示用) */
+export const SK_CN: Record<number, string> = {
+  212: '虚弱', 213: '破魔', 311: '治疗', 312: '再生', 313: '全愈',
+  411: '守护', 412: '加速', 421: '吸收', 422: '生命火花', 423: '灵盾', 431: '觅心',
+};
+/** 物品 DBID → 中文名 */
+export const IT_CN: Record<number, string> = {
+  11191: '体力长效', 11195: '体力药水', 11199: '体力秘药',
+  11291: '魔力长效', 11295: '魔力药水', 11299: '魔力秘药',
+  11391: '灵力长效', 11395: '灵力药水',
+  13111: '守护卷轴', 12601: '黑暗魔药', 12501: '神圣魔药', 10006: '魔晶',
+};
+/** URL ss 参数 → 战斗类型中文 */
+export const SS_CN: Record<string, string> = {
+  gr: '压榨界', ar: '竞技场', rb: '浴血擂台', iw: '道具界', tw: '塔楼', ba: '遭遇战',
+};
+/** 决策动作 → 中文友好标签(HUD 显示) */
+export function actionLabel(a: Action | null): string {
+  if (!a) return '-';
+  switch (a.type) {
+    case 'attack':
+      return `平砍 ${a.id ?? ''}号`;
+    case 'spell':
+      return SK_CN[a.id ?? 0] || `法术#${a.id ?? ''}`;
+    case 'item':
+      return IT_CN[a.id ?? 0] || `用#${a.id ?? ''}`;
+    case 'cannon':
+      return '小马炮';
+    case 'stance':
+      return '切架式';
+    case 'defend':
+      return '防御';
+    case 'continue':
+      return '继续下一波';
+    case 'riddle':
+      return '小马图(人工)';
+    case 'skip':
+      return '跳过';
+    default:
+      return a.type;
+  }
+}

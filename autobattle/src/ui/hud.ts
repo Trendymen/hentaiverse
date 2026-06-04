@@ -14,7 +14,10 @@ export function createHud(onToggle: () => void, onGear: () => void): HTMLElement
       <button id="hvab-gear">⚙</button>
     </div>
     ${bar('hp', 'HP')}${bar('mp', 'MP')}${bar('sp', 'SP')}${bar('oc', 'OC')}
-    <div id="hvab-meta" style="font-size:10px;opacity:.7;margin-top:4px">怪 - · 待战斗</div>`;
+    <div class="hvab-info">
+      <div id="hvab-meta1">待战斗</div>
+      <div id="hvab-meta2">怪 - · ▶ -</div>
+    </div>`;
 
   const sw = hud.querySelector<HTMLButtonElement>('#hvab-sw')!;
   const refresh = () => {
@@ -29,7 +32,7 @@ export function createHud(onToggle: () => void, onGear: () => void): HTMLElement
   hud.querySelector<HTMLButtonElement>('#hvab-gear')!.onclick = onGear;
   refresh();
 
-  // 战斗循环每回合 emit hud:update → 更新 vital 条 + 怪数 + 当前动作
+  // 战斗循环每回合 emit hud:update → 更新 vital 条 + 战斗信息(类型/轮数/回合/怪数/动作)
   bus.on('hud:update', (d) => {
     const setBar = (key: string, v: number, m: number, name: string) => {
       const i = document.getElementById('hvab-' + key);
@@ -42,8 +45,12 @@ export function createHud(onToggle: () => void, onGear: () => void): HTMLElement
     setBar('mp', d.mp, d.maxMp, 'MP');
     setBar('sp', d.sp, d.maxSp, 'SP');
     setBar('oc', d.oc, config.get('OCMAX'), 'OC');
-    const meta = document.getElementById('hvab-meta');
-    if (meta) meta.textContent = `怪 ${d.alive}  ▶ ${d.action || '-'}`;
+
+    const m1 = document.getElementById('hvab-meta1');
+    const m2 = document.getElementById('hvab-meta2');
+    const round = d.roundAll ? ` R${d.roundNow}/${d.roundAll}` : '';
+    if (m1) m1.textContent = `${d.battleType}${round} · T${d.turn}`;
+    if (m2) m2.textContent = `怪 ${d.alive}/${d.monsterTotal} · ▶ ${d.action}`;
   });
   return hud;
 }

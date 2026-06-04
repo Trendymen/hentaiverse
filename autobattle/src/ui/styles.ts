@@ -18,4 +18,7 @@ export const CSS = `
 .hvab-tabpane{display:none}
 .hvab-tabpane.active{display:block}
 .hvab-empty{opacity:.5;font-size:11px;padding:10px 0;text-align:center}
+.hvab-info{margin-top:5px;font-size:10px;line-height:1.5;opacity:.82;text-align:center}
+#hvab-meta1{opacity:.75;letter-spacing:.3px}
+#hvab-meta2{font-weight:600}
 `;

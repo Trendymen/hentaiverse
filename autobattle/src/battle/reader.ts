@@ -2,7 +2,7 @@
 // XHR 旁路捕获已在 main.ts(document-start)完成; 本层以 DOM 解析为主数据源.
 import { config } from '../core/config';
 import { $, $$ } from '../core/dom';
-import { BUFF_IMG, DEBUFFS } from './tables';
+import { BUFF_IMG, DEBUFFS, SS_CN } from './tables';
 import { IT } from './tables';
 import type { BattleState, BuffMap, BuffState, EnemyState } from '../types';
 
@@ -11,6 +11,8 @@ export class StateReader {
   maxHp = 0;
   maxMp = 0;
   maxSp = 0;
+  roundNow = 0;
+  roundAll = 0;
 
   /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等 */
   private _num(id: string): number {
@@ -44,8 +46,21 @@ export class StateReader {
     return out;
   }
 
+  /** 从战斗日志 #textlog 解析轮数 "(Round N / M)"(取最新); 读不到则保留上次缓存 */
+  private _round(): void {
+    const tl = document.getElementById('textlog');
+    if (!tl) return;
+    const ms = [...(tl.textContent || '').matchAll(/\(Round\s*(\d+)\s*\/\s*(\d+)\)/g)];
+    const last = ms[ms.length - 1];
+    if (last) {
+      this.roundNow = +last[1];
+      this.roundAll = +last[2];
+    }
+  }
+
   read(): BattleState {
     const C = config.all();
+    this._round(); // 更新轮数缓存
     const hp = this._num('vrhd'),
       mp = this._num('vrm'),
       sp = this._num('vrs');
@@ -61,7 +76,8 @@ export class StateReader {
     const B = this._buffs();
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;
 
-    const enemies: EnemyState[] = $$<HTMLElement>('[id^="mkey_"]')
+    const allMkey = $$<HTMLElement>('[id^="mkey_"]');
+    const enemies: EnemyState[] = allMkey
       .map((m) => {
         const eid = +m.id.split('_')[1];
         const dimg = $$<HTMLImageElement>('.btm6 img', m).map((i) => i.getAttribute('src') || '');
@@ -110,6 +126,10 @@ export class StateReader {
       stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute('src') || '')),
       riddle: !!document.getElementById('riddlecounter'),
       canContinue: !!document.getElementById('btcp'),
+      roundNow: this.roundNow,
+      roundAll: this.roundAll,
+      monsterTotal: allMkey.length,
+      battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
       cannonReady: !!$$('#pane_skill [onmouseover]').find((e) =>
         /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),

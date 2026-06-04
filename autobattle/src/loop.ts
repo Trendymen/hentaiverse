@@ -4,12 +4,15 @@
 import { config } from './core/config';
 import { reader } from './battle/reader';
 import { brain } from './battle/brain';
+import { actionLabel } from './battle/tables';
 import { bus } from './core/bus';
 import type { BattleState } from './types';
 
 let lastFp = '';
 let actedAt = 0;
 let busyUntil = 0;
+let turn = 0;
+let lastRound = -1;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 function inBattle(): boolean {
@@ -34,10 +37,15 @@ function tick(): void {
       const S = reader.read();
       const fp = fingerprint(S);
       const changed = fp !== lastFp;
-      const stalled = Date.now() - actedAt > 2500; // 2.5s 状态没推进 → 上一招可能无效(物品不在栏/元素未就绪), 强制重新决策换招(防自锁死)
+      const stalled = Date.now() - actedAt > 2500; // 2.5s 状态没推进 → 上一招可能无效, 强制重新决策换招(防自锁死)
       if (changed || stalled) {
         const a = brain.decide(S);
-        const action = a ? `${a.type}${a.id ? ':' + a.id : ''}` : '';
+        // 轮数变 → 回合计数归零(新一波从 T1 起)
+        if (S.roundNow !== lastRound) {
+          turn = 0;
+          lastRound = S.roundNow;
+        }
+        turn++;
         bus.emit('hud:update', {
           hp: S.hp,
           mp: S.mp,
@@ -47,7 +55,12 @@ function tick(): void {
           maxMp: S.maxMp,
           maxSp: S.maxSp,
           alive: S.alive,
-          action,
+          monsterTotal: S.monsterTotal,
+          roundNow: S.roundNow,
+          roundAll: S.roundAll,
+          turn,
+          battleType: S.battleType,
+          action: actionLabel(a),
         });
         if (a?.exec) {
           const dMin = config.get('delayMin'),
@@ -61,7 +74,7 @@ function tick(): void {
               /* HV 处理中/元素未就绪 */
             }
           }, delay);
-          busyUntil = Date.now() + delay + 150; // 出招后极短锁(仅覆盖 exec 执行那一下); 同回合重复主要靠下面的指纹去重, 锁短 = 换回合后响应快
+          busyUntil = Date.now() + delay + 150; // 出招后极短锁(仅覆盖 exec 执行那一下); 同回合重复主要靠指纹去重, 锁短 = 换回合后响应快
           actedAt = Date.now();
         }
         lastFp = fp;
@@ -71,7 +84,7 @@ function tick(): void {
   } catch {
     /* tick 不能崩, 否则循环断 */
   }
-  timer = setTimeout(tick, 300); // 轮询更快 = 换回合后更早检测到新回合(原 500ms)
+  timer = setTimeout(tick, 300); // 轮询更快 = 换回合后更早检测到新回合
 }
 
 export function startLoop(): void {

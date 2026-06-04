@@ -40,6 +40,9 @@
 .hvab-tabpane{display:none}
 .hvab-tabpane.active{display:block}
 .hvab-empty{opacity:.5;font-size:11px;padding:10px 0;text-align:center}
+.hvab-info{margin-top:5px;font-size:10px;line-height:1.5;opacity:.82;text-align:center}
+#hvab-meta1{opacity:.75;letter-spacing:.3px}
+#hvab-meta2{font-weight:600}
 `;
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -166,7 +169,10 @@
       <button id="hvab-gear">⚙</button>
     </div>
     ${bar("hp", "HP")}${bar("mp", "MP")}${bar("sp", "SP")}${bar("oc", "OC")}
-    <div id="hvab-meta" style="font-size:10px;opacity:.7;margin-top:4px">怪 - · 待战斗</div>`;
+    <div class="hvab-info">
+      <div id="hvab-meta1">待战斗</div>
+      <div id="hvab-meta2">怪 - · ▶ -</div>
+    </div>`;
     const sw = hud.querySelector("#hvab-sw");
     const refresh = () => {
       const on = config.get("enabled");
@@ -191,8 +197,11 @@
       setBar("mp", d.mp, d.maxMp, "MP");
       setBar("sp", d.sp, d.maxSp, "SP");
       setBar("oc", d.oc, config.get("OCMAX"), "OC");
-      const meta = document.getElementById("hvab-meta");
-      if (meta) meta.textContent = `怪 ${d.alive}  ▶ ${d.action || "-"}`;
+      const m1 = document.getElementById("hvab-meta1");
+      const m2 = document.getElementById("hvab-meta2");
+      const round = d.roundAll ? ` R${d.roundNow}/${d.roundAll}` : "";
+      if (m1) m1.textContent = `${d.battleType}${round} · T${d.turn}`;
+      if (m2) m2.textContent = `怪 ${d.alive}/${d.monsterTotal} · ▶ ${d.action}`;
     });
     return hud;
   }
@@ -297,12 +306,74 @@
   const cannonBtn = () => [...document.querySelectorAll("#pane_skill [onmouseover]")].find(
     (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
   );
+  const SK_CN = {
+    212: "虚弱",
+    213: "破魔",
+    311: "治疗",
+    312: "再生",
+    313: "全愈",
+    411: "守护",
+    412: "加速",
+    421: "吸收",
+    422: "生命火花",
+    423: "灵盾",
+    431: "觅心"
+  };
+  const IT_CN = {
+    11191: "体力长效",
+    11195: "体力药水",
+    11199: "体力秘药",
+    11291: "魔力长效",
+    11295: "魔力药水",
+    11299: "魔力秘药",
+    11391: "灵力长效",
+    11395: "灵力药水",
+    13111: "守护卷轴",
+    12601: "黑暗魔药",
+    12501: "神圣魔药",
+    10006: "魔晶"
+  };
+  const SS_CN = {
+    gr: "压榨界",
+    ar: "竞技场",
+    rb: "浴血擂台",
+    iw: "道具界",
+    tw: "塔楼",
+    ba: "遭遇战"
+  };
+  function actionLabel(a) {
+    if (!a) return "-";
+    switch (a.type) {
+      case "attack":
+        return `平砍 ${a.id ?? ""}号`;
+      case "spell":
+        return SK_CN[a.id ?? 0] || `法术#${a.id ?? ""}`;
+      case "item":
+        return IT_CN[a.id ?? 0] || `用#${a.id ?? ""}`;
+      case "cannon":
+        return "小马炮";
+      case "stance":
+        return "切架式";
+      case "defend":
+        return "防御";
+      case "continue":
+        return "继续下一波";
+      case "riddle":
+        return "小马图(人工)";
+      case "skip":
+        return "跳过";
+      default:
+        return a.type;
+    }
+  }
   class StateReader {
     constructor() {
       this.prev = {};
       this.maxHp = 0;
       this.maxMp = 0;
       this.maxSp = 0;
+      this.roundNow = 0;
+      this.roundAll = 0;
     }
     /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等 */
     _num(id) {
@@ -333,8 +404,20 @@
       }
       return out;
     }
+    /** 从战斗日志 #textlog 解析轮数 "(Round N / M)"(取最新); 读不到则保留上次缓存 */
+    _round() {
+      const tl = document.getElementById("textlog");
+      if (!tl) return;
+      const ms = [...(tl.textContent || "").matchAll(/\(Round\s*(\d+)\s*\/\s*(\d+)\)/g)];
+      const last = ms[ms.length - 1];
+      if (last) {
+        this.roundNow = +last[1];
+        this.roundAll = +last[2];
+      }
+    }
     read() {
       const C = config.all();
+      this._round();
       const hp = this._num("vrhd"), mp = this._num("vrm"), sp = this._num("vrs");
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
@@ -343,7 +426,8 @@
       const oc = vcp && barEl && vcp.offsetWidth ? Math.round(barEl.offsetWidth / vcp.offsetWidth * C.OCMAX) : 0;
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
-      const enemies = $$('[id^="mkey_"]').map((m) => {
+      const allMkey = $$('[id^="mkey_"]');
+      const enemies = allMkey.map((m) => {
         const eid = +m.id.split("_")[1];
         const dimg = $$(".btm6 img", m).map((i) => i.getAttribute("src") || "");
         const debuff = {};
@@ -386,6 +470,10 @@
         stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute("src") || "")),
         riddle: !!document.getElementById("riddlecounter"),
         canContinue: !!document.getElementById("btcp"),
+        roundNow: this.roundNow,
+        roundAll: this.roundAll,
+        monsterTotal: allMkey.length,
+        battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
         cannonReady: !!$$("#pane_skill [onmouseover]").find(
           (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
@@ -571,6 +659,8 @@
   let lastFp = "";
   let actedAt = 0;
   let busyUntil = 0;
+  let turn = 0;
+  let lastRound = -1;
   let timer = null;
   function inBattle() {
     return !!document.getElementById("vrhd");
@@ -589,7 +679,11 @@
         const stalled = Date.now() - actedAt > 2500;
         if (changed || stalled) {
           const a = brain.decide(S);
-          const action = a ? `${a.type}${a.id ? ":" + a.id : ""}` : "";
+          if (S.roundNow !== lastRound) {
+            turn = 0;
+            lastRound = S.roundNow;
+          }
+          turn++;
           bus.emit("hud:update", {
             hp: S.hp,
             mp: S.mp,
@@ -599,7 +693,12 @@
             maxMp: S.maxMp,
             maxSp: S.maxSp,
             alive: S.alive,
-            action
+            monsterTotal: S.monsterTotal,
+            roundNow: S.roundNow,
+            roundAll: S.roundAll,
+            turn,
+            battleType: S.battleType,
+            action: actionLabel(a)
           });
           if (a == null ? void 0 : a.exec) {
             const dMin = config.get("delayMin"), dMax = config.get("delayMax");

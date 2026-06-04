@@ -18,6 +18,11 @@ export interface HudData {
   maxMp: number;
   maxSp: number;
   alive: number;
+  monsterTotal: number;
+  roundNow: number;
+  roundAll: number;
+  turn: number;
+  battleType: string;
   action: string;
 }
 
@@ -68,6 +73,10 @@ export interface BattleState {
   stanceOn: boolean;
   riddle: boolean;
   canContinue: boolean;
+  roundNow: number;
+  roundAll: number;
+  monsterTotal: number;
+  battleType: string;
   gemReady: boolean;
   cannonReady: boolean;
   scrollReady: boolean;
