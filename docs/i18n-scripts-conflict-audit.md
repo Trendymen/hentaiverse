@@ -194,8 +194,10 @@
 
 ## 8. 待决/待补测清单
 
-- [ ] **Wind-waker** 译名方向（驭风者 改三家 / 风之杖 改一处）——待用户拍板。
-- [ ] **Refreshment/Regeneration/Replenishment** 是效果名还是道具名——需核实游戏实际指代。
+> 更新（2026-06-05）：本轮已落地 P1 剩余对齐 + §5 hvUtils 补漏 + §6 全部重复键清理。本次改动：Monster Chow→怪物饲料、Ether Tap(hv_chinese)→魔力回流、奥数集成→奥术集成(错字)、Wind-waker→驭风者(四文件后缀显示值)、hvUtils 补 Crystal of Quintessence/旧材质 Ironsilk·Drakehide·Reactive(type 表+解析正则)/锁甲 slot Coif·Hauberk·Mitons·Chausses、Cloak of the Fallen 用字统一(陨落斗篷)、hv_battle_ch words 对象 8 处重复键清理、hv_chinese 2559/2560 静默覆盖整理、glossary Magnificent→史诗。
+
+- [x] **Wind-waker** 译名方向 —— 已定 **驭风者**（2026-06-05 用户决策）；四文件后缀显示值统一为「驭风者」（hv_chinese/equip2 保留「（风抗）」角标），hvUtils suffix 表同步；Binding 条目（粘合剂 风属性减伤）不动。
+- [x] **Refreshment/Regeneration/Replenishment** —— 已确认四文件均译为效果名「提神/再生/补给」且一致（hv_battle_ch 与 hv_chinese 两段），无冲突。
 - [x] **物品 tooltip 判据**：已验证物品 tooltip 不含 `.eq`，`#popup_box .eq` 可靠区分装备/物品（2026-06-04 实测）。
 - [ ] hvUtils 旧材质装备是否真整名回退英文——需有对应旧装备的页面实测。
 - [ ] 是否投入 P2 SSOT 架构重构。

@@ -798,7 +798,7 @@ var words = {
         'Better Absorb' : '强力吸收',
         'Stronger Spirit' : '强力灵能力',
         'Better Heartseeker' : '强力穿心',
-        'Better Arcane Focus' : '强力奥数集成',
+        'Better Arcane Focus' : '强力奥术集成',
         'Better Regen' : '强力细胞活化',
         'Better Cure' : '强力治疗',
         'Better Spark' : '强力生命火花',
@@ -2073,7 +2073,7 @@ var words = {
         'of the Fire-eater' : '噬火者（火抗）',
         'of the Frost-born' : '冰人（冰抗）',
         'of the Thunder-child' : '雷之子（雷抗）',
-        'of the Wind-waker' : '风之杖（风抗）',
+        'of the Wind-waker' : '驭风者（风抗）',
         'of the Thrice-blessed' : '三重祝福（圣抗）',
         'of the Spirit-ward' : '灵魂护佑（暗抗）',
 
@@ -2130,7 +2130,7 @@ var words = {
         '/Fire-eater$/' : '噬火者（火抗）',
         '/Frost-born$/' : '冰人（冰抗）',
         '/Thunder-child$/' : '雷之子（雷抗）',
-        '/Wind-waker$/' : '风之杖（风抗）',
+        '/Wind-waker$/' : '驭风者（风抗）',
         '/Thrice-blessed$/' : '三重祝福（圣抗）',
         '/Spirit-ward$/' : '灵魂护佑（暗抗）',
 
@@ -2556,8 +2556,7 @@ var words = {
         'Enchantments will also wear off immediately\nif the item is sold or sent through MoogleMail.' : '附魔效果在装备售出或寄出后会立即失效。',
 
         'Select an equipment piece from the list to the left\nthen hit Salvage Item below to salvage it. This will\npermanently destroy the item in question.' : '从左侧列表选择一件装备，然后点击下方 Salvage Item 分解装备。此操作将会永久摧毁装备（其实分解24小时内可以在商店里买回，但是价格是5倍正常价或者至少10K，且装备潜能等级会被重置并会变成不可交易）',
-        'You have a chance to get some forge upgrading\nmaterials when you salvage an item. The type\ndepends on the kind of item salvaged while the\ntier depends on the quality of the item as well\nas a random chance. At the very least you will\nreceive some scrap that can be used to repair\nother items.' : '你有机会通过分解装备获得一些用于装备升级的材料。分解出的素材种类取决于被分解装备的类型与品质，分解获得的材料数量也有一定的随机波动。但至少，你可以获得用各种废料素材来修理其他装备。',
-        'You have a chance to get some forge upgrading\nmaterials when you salvage an item. The type\ndepends on the kind of item salvaged while the\ntier depends on the quality of the item as well\nas a random chance. At the very least you will\nreceive some scrap that can be used to repair\nother items.' : '分解装备可以获得一些素材用于强化或者修复装备。分解出的素材种类取决于被分解装备的类型与品质，现在上等及以上装备分解你会获得对应品质的强化素材，中等或更差的装备分解可以获得一些对应的废料用来修理其他装备，稀有装备类型分解还可以获得一些能量元。每件装备现在只能获得一次基础分解素材，也就是说如果你分解一件装备之后再次从商店购买回来分解将无法再次得到上述素材。', //0.87变更，作为对照上原文保留
+        'You have a chance to get some forge upgrading\nmaterials when you salvage an item. The type\ndepends on the kind of item salvaged while the\ntier depends on the quality of the item as well\nas a random chance. At the very least you will\nreceive some scrap that can be used to repair\nother items.' : '分解装备可以获得一些素材用于强化或者修复装备。分解出的素材种类取决于被分解装备的类型与品质，现在上等及以上装备分解你会获得对应品质的强化素材，中等或更差的装备分解可以获得一些对应的废料用来修理其他装备，稀有装备类型分解还可以获得一些能量元。每件装备现在只能获得一次基础分解素材，也就是说如果你分解一件装备之后再次从商店购买回来分解将无法再次得到上述素材。', //0.87变更
         'If an equipment piece has been upgraded in the\nforge then salvaging it will return 90% of the\nmaterials spent upgrading it. Catalyst items\ncannot be recovered this way.' : '分解一件被强化过的装备会返还 90% 使用的强化材料。催化剂无法通过分解装备回收。',
 
         'Select an equipment piece from the list to the left\nthen hit Reforge Item below to reforge it.' : '从左侧列表选择一件装备，然后点击下方 Reforge Item 按钮重铸它。',
@@ -3433,7 +3432,7 @@ var words = {
         //战斗风格
         'Overwhelming Strikes' : '压制打击',
         '/^Coalesced Mana$/' : '魔力合流',
-        'Ether Tap' : '以太水龙头',
+        'Ether Tap' : '魔力回流',
         'Increases attack damage by 15% and attack accuracy by 50%. Also grants a 20% chance per stack to overwhelm enemy parry.' : '增加15%攻击伤害和50%攻击准确度。每一道特效有20%反制怪物招架几率，最多可堆叠5道特效 (完全无视怪物的招架)',
         'Mystical energies have converged on this target. Striking it with any magic spell will consume only half the normal mana.' : '神秘的能量汇集于这个目标，对它施放魔法咒语只需消耗一半的魔力值 (可以和灵动架式共同作用)。',
         'You are absorbing magicks from shattering the Coalesced Mana surrounding a target.' : '你打散了合流于目标周围的魔力然后吸取中。',
@@ -3502,7 +3501,7 @@ var words = {
         '/^Hastened$/' : '急速[S]',
         '/^Absorbing Ward$/' : '吸收结界',
         '/^Spark of Life$/' : '生命火花[S]',
-        '/^Cloak of the Fallen$/' : '陨落的披风[S]',
+        '/^Cloak of the Fallen$/' : '陨落斗篷[S]',
         '/^Heartseeker$/' : '穿心[S]',
         '/^Arcane Focus$/' : '奥术集成[S]',
         'The holy effects of the spell are restoring your body.' : '神奇的细胞再生效果正在恢复你的身体',

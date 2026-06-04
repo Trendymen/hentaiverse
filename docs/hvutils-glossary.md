@@ -44,7 +44,7 @@
 |---|---|---|---|
 | Peerless | 无双 | eq | ☯无双☯(eq 正则) |
 | Legendary | 传奇 | eq | |
-| Magnificent | 华丽 | cc | 【任务2 fandom 确认】 |
+| Magnificent | 史诗 | cc | 代码统一作「史诗」 |
 | Exquisite | 精致 | fd | |
 | Superior | 优良 | cc | |
 | Fine / Average / Fair / Crude / Flimsy | 精良/普通/尚可/粗糙/劣质 | cc | 低频,留英文 |
@@ -217,6 +217,6 @@ hvUtils 能力预设(HP Tank / Better Haste / Archmage…)若为配置匹配键�
 
 - fandom `Acronyms` 提供前后缀/品质缩写参考(Ethereal=空灵、Battlecaster=战法师、Exquisite=精致、Slaughter=杀戮);前后缀在 hvUtils 留英文,仅参考。
 - fandom `Monster_Lab` 词条**无 Chaos 词条标准中文译名表**(仅机制描述)→ A-11 Chaos 词条名采用意译(cc),desc 直译。
-- 常识/译者定(待用户审核):Bazaar=集市、MoogleMail=莫古邮件、Magnificent=华丽、Coupon Clipper=优惠券剪贴者、Dark Descent=黑暗降临。
+- 常识/译者定(待用户审核):Bazaar=集市、MoogleMail=莫古邮件、Magnificent=史诗、Coupon Clipper=优惠券剪贴者、Dark Descent=黑暗降临。
 - ehwiki 已提供主要场所/机制译法(竞技场/浴血擂台/压榨界/道具界/附魔/重铸/灵魂同步等),已并入对应条目。
 - 待用户拍板:Salvage = 分解(推荐) / 报废(ehwiki)。

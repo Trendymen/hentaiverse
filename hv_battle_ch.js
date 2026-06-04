@@ -50,8 +50,6 @@ let words = {
   'Ether Theft' : '魔力汲取',
   'Spirit Theft' : '灵力汲取',
   'Confused' : '混乱',
-  'Hastened' : '急速',
-  'Absorbing Ward' : '吸收结界',
   'Slowed' : '缓慢',
   'Weakened' : '虚弱',
   'Imperiled' : '陷危',
@@ -59,7 +57,6 @@ let words = {
   'Asleep' : '沉眠',
   'Silenced' : '沉默',
   'Magically Snared' : '魔磁网',
-  'Vital Theft' : '生命汲取',
 
   //战斗风格
   'Overwhelming Strikes': '压制打击',
@@ -164,14 +161,10 @@ let words = {
   'Blind' : '致盲',
   'MagNet' : '魔磁网',
 
-  'Regen' : '细胞活化',
   'Full-Cure' : '完全治疗术',
   'Cure' : '治疗术',
   'Haste' : '急速',
-  'Protection' : '守护',
-  'Shadow Veil' : '影纱',
   'Absorb' : '吸收',
-  'Spark of Life' : '生命火花',
   '[sS]pirit [sS]hield' : '灵力盾',
 
   //武器效果
@@ -231,7 +224,6 @@ let words = {
   'misses the attack against' : '攻击没有命中',
   'but misses the attack.' : '但这次攻击没有命中',
   'parries your attack': '<span style=\"background:	#00FFFF\" >招架了你的攻击</span>',
-  'The effect (.*) on (.*) has expired': '<span style=\"color:	#b06161\" >$2 身上的状态 $1 已失效</span>',
   'resists your spell' : '<span style=\"background:#81f7f3\" >抵抗了你的魔法</span>',
   'got knocked out of confuse' : '从混乱中脱离',
   
@@ -367,7 +359,7 @@ let items_words = {
         'Crystal of Quintessence' : '灵魂水晶',
 
         'Monster Edibles' : '怪物食品',
-        'Monster Chow' : '怪物口粮',
+        'Monster Chow' : '怪物饲料',
         'Monster Cuisine' : '怪物料理',
         'Happy Pills' : '快乐药丸',
 
@@ -516,7 +508,7 @@ let items_words = {
         'of the Fleet':'迅捷(闪避+)',
         'of the Fire-eater':'噬火者',
         'of the Thunder-child':'雷之子',
-        'of the Wind-waker':'风之杖',
+        'of the Wind-waker':'驭风者',
         'of the Frost-born':'冰人',
         'of the Spirit-ward':'灵魂护佑',
         'of the Thrice-blessed':'三重祝福',
@@ -648,7 +640,7 @@ function add_to_log(text) {
   let log = document.querySelector('#translog');
 
   // 添加新日志之前检查日志数量
-  if (log.children.length >= 100) {
+  if (log.children.length >= 9999) {
     // 如果超过100条，删除最旧的日志
     log.lastChild.remove();
   }

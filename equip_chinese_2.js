@@ -1201,7 +1201,7 @@ function loadEquips(){
         'of the Fleet':'迅捷',
         'of the Fire-eater':'噬火者（火抗）',
         'of the Thunder-child':'雷之子（雷抗）',
-        'of the Wind-waker':'风之杖（风抗）',
+        'of the Wind-waker':'驭风者（风抗）',
         'of the Frost-born':'冰人（冰抗）',
         'of the Spirit-ward':'灵魂护佑（暗抗）',
         'of the Thrice-blessed':'三重祝福（圣抗）',
