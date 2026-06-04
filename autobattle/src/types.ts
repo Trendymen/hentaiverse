@@ -78,7 +78,8 @@ export interface BattleState {
   monsterTotal: number;
   battleType: string;
   gemReady: boolean;
-  cannonReady: boolean;
+  cannonReady: boolean; // 小马炮"真·可放": 按钮在技能栏且未置灰(OC≥200 且不在 50 回合冷却)
+  cannonOnBar: boolean; // 小马炮按钮是否在技能栏(无论置灰; 用于"攒炮让架式让路"判定)
   scrollReady: boolean;
   firstRound: boolean;
   lockedRedId: number | undefined;

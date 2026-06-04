@@ -133,14 +133,19 @@
     HP_HEAL: 0.6,
     MP_LOW: 0.35,
     SP_LOW: 0.3,
-    OC_ON: 0.4,
+    OC_ON: 0.5,
+    // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
     HS_MIN_ENEMIES: 2,
     CANNON_MIN_ENEMIES: 4,
+    CANNON_MIN_OC: 200,
+    // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     // ── M2 开关/节奏 ──
     useCannon: true,
-    cannonCdMs: 22e3,
-    // 小马炮冷却节流(放完 22s 内不重放防卡)
+    cannonYieldStance: true,
+    // 攒炮时架式让路: 架式每回合烧 10%OC, 一开就永远攒不到 200; 关掉它让 OC 爬满放炮
+    cannonCdMs: 1500,
+    // 仅防"同回合重复点"的短保护; 真冷却(50回合)与 OC 门控靠按钮置灰检测, 不再用墙钟节流
     scrollFirst: true,
     // 起手/2墙缺优先卷轴(关=法术逐个补省卷轴)
     delayMin: 160,
@@ -315,12 +320,14 @@
   };
   const IT = {
     hDraught: 11191,
+    hPotion: 11195,
     hElixir: 11199,
     mDraught: 11291,
     mElixir: 11299,
     sDraught: 11391,
     scrollProt: 13111,
-    manaGem: 10006
+    manaGem: 10008
+    // Mystic Gem(神秘宝石, 回 HP/MP/SP)实测背包 id=10008; 旧值 10006 在背包不存在 → gemReady 永远 false、宝石永远点不出
   };
   const BUFF_IMG = {
     spark: "sparklife",
@@ -386,7 +393,7 @@
     13111: "保护卷轴",
     12601: "黑暗魔药",
     12501: "神圣魔药",
-    10006: "魔力宝石"
+    10008: "魔力宝石"
   };
   const SS_CN = {
     gr: "压榨界",
@@ -499,6 +506,10 @@
         };
       }).filter((e) => e.alive);
       const lastDmg = typeof this.prev.hp === "number" && this.prev.hp > hp ? this.prev.hp - hp : 0;
+      const cannonEl = $$("#pane_skill [onmouseover]").find(
+        (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
+      );
+      const cannonDimmed = /opacity\s*:\s*0?\.\d/.test((cannonEl == null ? void 0 : cannonEl.getAttribute("style")) || "");
       const buff = {
         spark: B.spark,
         spiritShield: B.spiritShield,
@@ -533,9 +544,10 @@
         monsterTotal: allMkey.length,
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
-        cannonReady: !!$$("#pane_skill [onmouseover]").find(
-          (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
-        ),
+        cannonReady: !!cannonEl && !cannonDimmed,
+        // 真·可放: 在技能栏且未置灰
+        cannonOnBar: !!cannonEl,
+        // 在技能栏(无论置灰)
         scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
         firstRound: this.prev._started !== true,
         lockedRedId: this.prev.lockedRedId,
@@ -564,6 +576,10 @@
       const e = document.querySelector(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
       return e ? (e.click(), true) : false;
     },
+    /** 物品当前是否可点: 没货/冷却时 HV 不渲染该悬浮触发器. 用于决策前查库存, 避免选中点不出的药而空转(死循环根因之一) */
+    itemAvailable(db) {
+      return !!document.querySelector(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+    },
     /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
     attack(n) {
       var _a;
@@ -589,6 +605,7 @@
     cannon() {
       const c = cannonBtn();
       if (!c) return false;
+      if (/opacity\s*:\s*0?\.\d/.test(c.getAttribute("style") || "")) return false;
       const id = parseInt(c.id);
       const r = Number.isNaN(id) ? (c.click(), true) : Exec.skill(id);
       if (r) _lastCannon = Date.now();
@@ -629,6 +646,12 @@
         id,
         exec: t === "spell" ? () => Exec.skill(id) : t === "item" ? () => Exec.item(id) : () => Exec.attack(id)
       });
+      const pickHeal = () => {
+        for (const id of [IT.hElixir, IT.hDraught, IT.hPotion]) {
+          if (Exec.itemAvailable(id)) return A("item", id);
+        }
+        return null;
+      };
       if (S.riddle) {
         const r = this.riddle();
         return r ? { type: "riddle", option: r.option, exec: () => {
@@ -640,11 +663,13 @@
       if (!b.spark.active || b.spark.turns <= 2) {
         if (mp >= sparkCost) return A("spell", SK.Spark);
         if (!b.spark.active)
-          return hp < 0.6 * HM ? A("item", IT.hElixir) : { type: "defend", exec: Exec.defend, note: "Spark真空+缺MP硬抗" };
+          return hp < 0.6 * HM ? pickHeal() ?? { type: "defend", exec: Exec.defend, note: "Spark真空+急救药耗尽硬抗" } : { type: "defend", exec: Exec.defend, note: "Spark真空+缺MP硬抗" };
         return S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
       }
-      if (hp < PANIC || predicted < PANIC)
-        return mp >= C.MP_LOW * MM || ch ? A("spell", SK.FullCure) : A("item", IT.hElixir);
+      if (hp < PANIC || predicted < PANIC && hp < C.HP_HEAL * HM) {
+        if (mp >= C.MP_LOW * MM || ch) return A("spell", SK.FullCure);
+        return pickHeal() ?? (mp >= sparkCost ? A("spell", SK.Spark) : { type: "defend", exec: Exec.defend, note: "急救药耗尽+缺MP硬抗" });
+      }
       if (ch && C.useChanneling !== false) {
         for (const q of CHANNEL_Q) {
           if (!q.need(b, S)) continue;
@@ -675,8 +700,13 @@
       }
       if (hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A("item", IT.sDraught);
-      if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: "stance", exec: Exec.stance };
-      if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
+      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonOnBar && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      if (chargingCannon) {
+        if (S.stanceOn) return { type: "stance", exec: Exec.stance };
+      } else {
+        if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: "stance", exec: Exec.stance };
+        if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
+      }
       const tgt = this.lockTarget(S);
       if (tgt == null ? void 0 : tgt.is_red_boss) {
         for (const d of DEBUFFS) {
@@ -688,7 +718,7 @@
       }
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
-      if (C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES && S.cannonReady && Date.now() - lastCannon() > C.cannonCdMs)
+      if (C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES && S.cannonReady && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
         return { type: "cannon", exec: Exec.cannon };
       const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) return A("attack", trash.sort((a, c) => a.eid - c.eid)[0].eid);

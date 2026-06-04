@@ -99,6 +99,13 @@ export class StateReader {
     const lastDmg =
       typeof this.prev.hp === 'number' && this.prev.hp > hp ? this.prev.hp - hp : 0;
 
+    // 小马炮按钮: 置灰(opacity:0.5)表示 OC 不足(<200)或在 50 回合冷却 → 不可放; 未置灰才算"真·可放".
+    // 实测 DOM: 不可用时 <div ... onclick=null style="opacity:0.5">, 可用时无 opacity 且有 onclick.
+    const cannonEl = $$<HTMLElement>('#pane_skill [onmouseover]').find((e) =>
+      /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
+    );
+    const cannonDimmed = /opacity\s*:\s*0?\.\d/.test(cannonEl?.getAttribute('style') || '');
+
     const buff: BuffMap = {
       spark: B.spark,
       spiritShield: B.spiritShield,
@@ -134,9 +141,8 @@ export class StateReader {
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
-      cannonReady: !!$$('#pane_skill [onmouseover]').find((e) =>
-        /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
-      ),
+      cannonReady: !!cannonEl && !cannonDimmed, // 真·可放: 在技能栏且未置灰
+      cannonOnBar: !!cannonEl, // 在技能栏(无论置灰)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,
       lockedRedId: this.prev.lockedRedId,

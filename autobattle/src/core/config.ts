@@ -19,13 +19,15 @@ export const DEFAULT_CONFIG = {
   HP_HEAL: 0.6,
   MP_LOW: 0.35,
   SP_LOW: 0.3,
-  OC_ON: 0.4,
+  OC_ON: 0.5, // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
   OC_OFF: 0.22,
   HS_MIN_ENEMIES: 2,
   CANNON_MIN_ENEMIES: 4,
+  CANNON_MIN_OC: 200, // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
   // ── M2 开关/节奏 ──
   useCannon: true,
-  cannonCdMs: 22000, // 小马炮冷却节流(放完 22s 内不重放防卡)
+  cannonYieldStance: true, // 攒炮时架式让路: 架式每回合烧 10%OC, 一开就永远攒不到 200; 关掉它让 OC 爬满放炮
+  cannonCdMs: 1500, // 仅防"同回合重复点"的短保护; 真冷却(50回合)与 OC 门控靠按钮置灰检测, 不再用墙钟节流
   scrollFirst: true, // 起手/2墙缺优先卷轴(关=法术逐个补省卷轴)
   delayMin: 160,
   delayMax: 400, // 动作间随机延迟范围(ms)

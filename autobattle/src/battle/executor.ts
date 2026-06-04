@@ -23,6 +23,10 @@ export const Exec = {
     const e = document.querySelector<HTMLElement>(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
     return e ? (e.click(), true) : false;
   },
+  /** 物品当前是否可点: 没货/冷却时 HV 不渲染该悬浮触发器. 用于决策前查库存, 避免选中点不出的药而空转(死循环根因之一) */
+  itemAvailable(db: number): boolean {
+    return !!document.querySelector(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+  },
   /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
   attack(n: number): boolean {
     const w =
@@ -48,6 +52,8 @@ export const Exec = {
   cannon(): boolean {
     const c = cannonBtn();
     if (!c) return false;
+    // 修‘放空也进冷却’bug: 按钮置灰(opacity:0.5 = OC<200 或在50回合冷却)即不可用 → 不放、也不盖冷却戳
+    if (/opacity\s*:\s*0?\.\d/.test(c.getAttribute('style') || '')) return false;
     const id = parseInt(c.id);
     const r = Number.isNaN(id) ? (c.click(), true) : Exec.skill(id);
     if (r) _lastCannon = Date.now();

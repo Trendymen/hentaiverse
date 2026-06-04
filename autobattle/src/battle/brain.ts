@@ -31,6 +31,14 @@ export class Brain {
             ? () => Exec.item(id)
             : () => Exec.attack(id),
     });
+    // 体力急救药降级链: 终极体力药 → 体力长效药 → 体力药水, 取背包里第一个"可点"的;
+    // 全部没货/冷却 → 返回 null, 交上层降级(火花/防御), 不再空转点击不存在的药(修死循环根因)
+    const pickHeal = (): Action | null => {
+      for (const id of [IT.hElixir, IT.hDraught, IT.hPotion]) {
+        if (Exec.itemAvailable(id)) return A('item', id);
+      }
+      return null;
+    };
 
     // P0 小马图: 留人工
     if (S.riddle) {
@@ -44,13 +52,17 @@ export class Brain {
       if (mp >= sparkCost) return A('spell', SK.Spark);
       if (!b.spark.active)
         return hp < 0.6 * HM
-          ? A('item', IT.hElixir)
+          ? (pickHeal() ?? { type: 'defend', exec: Exec.defend, note: 'Spark真空+急救药耗尽硬抗' })
           : { type: 'defend', exec: Exec.defend, note: 'Spark真空+缺MP硬抗' };
       return S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
     }
-    // P2 承伤预测式急救 ②
-    if (hp < PANIC || predicted < PANIC)
-      return mp >= C.MP_LOW * MM || ch ? A('spell', SK.FullCure) : A('item', IT.hElixir);
+    // P2 承伤预测式急救: 仅"当前血已破红线(hp<PANIC)" 或 "预测下一发致命且当前血本就不健康(hp<HP_HEAL)" 才救.
+    // 血量健康(≥HP_HEAL)即便有红怪也不急救 —— 红怪单发 ≤BURST_EST, 健康血挨一发死不了, 不浪费顶级药.
+    // (修: 91%血+红怪误触发 → 喝终极体力药; 且 Elixir 耗尽点不动 → 空转死循环. 喝药改降级链, 没货则火花/防御兜底)
+    if (hp < PANIC || (predicted < PANIC && hp < C.HP_HEAL * HM)) {
+      if (mp >= C.MP_LOW * MM || ch) return A('spell', SK.FullCure);
+      return pickHeal() ?? (mp >= sparkCost ? A('spell', SK.Spark) : { type: 'defend', exec: Exec.defend, note: '急救药耗尽+缺MP硬抗' });
+    }
     // P2.5 Channeling 主动利用: 折扣窗口补最贵(保命已在前, 不抢)
     if (ch && C.useChanneling !== false) {
       for (const q of CHANNEL_Q) {
@@ -95,9 +107,17 @@ export class Brain {
     if (hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
     // P11 回 SP 喂斗气(节流)
     if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A('item', IT.sDraught);
-    // P12 灵动架式开关(滞回)
-    if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: 'stance', exec: Exec.stance };
-    if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
+    // P12 灵动架式开关(滞回) + 攒炮让路
+    // 小马炮需 200 OC, 而架式每回合烧 10%OC(≈25) → 架式一直开着 OC 永远到不了 200, 炮永远放不出.
+    // 攒炮模式: 想用炮(开关on + 炮在技能栏 + 够怪)且 OC 没攒够 → 架式让路(开着就关止血, 关着就别开), 让 OC 爬到 200.
+    const chargingCannon =
+      C.useCannon && C.cannonYieldStance && S.cannonOnBar && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+    if (chargingCannon) {
+      if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
+    } else {
+      if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: 'stance', exec: Exec.stance };
+      if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
+    }
     // P13 红怪减益序列(表驱动 Weaken→Imperil; 定向 commit 红怪)
     const tgt = this.lockTarget(S);
     if (tgt?.is_red_boss) {
@@ -111,8 +131,14 @@ export class Brain {
     // P14 Heartseeker(持久战提暴)
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
-    // P15 小马炮 AOE(开 + 冷却节流)
-    if (C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES && S.cannonReady && Date.now() - lastCannon() > C.cannonCdMs)
+    // P15 小马炮 AOE: cannonReady 已含"按钮未置灰"(=OC≥200 且不在50回合冷却); oc≥CANNON_MIN_OC 双保险; cannonCdMs 仅防同回合重复点
+    if (
+      C.useCannon &&
+      S.alive >= C.CANNON_MIN_ENEMIES &&
+      S.cannonReady &&
+      oc >= C.CANNON_MIN_OC &&
+      Date.now() - lastCannon() > C.cannonCdMs
+    )
       return { type: 'cannon', exec: Exec.cannon };
     // P16 破甲滚雪球平砍: 先清最弱杂兵, 仅剩红怪锁定持续平砍
     const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
