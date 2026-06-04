@@ -1840,7 +1840,7 @@ const $equip = {
         div.classList.add('hvut-eq-customname');
         div.dataset.eqname = eq.info.name;
       }
-      if (!$config.settings.translateNames) { div.classList.add('hvut-eq-' + eq.info.quality); }
+      if (!$config.settings.translateNames) { div.classList.add('hvut-eq-' + eq.info.quality); } else if (!eq.info.quality) { div.classList.add('hvut-eq-custom'); }
       return eq;
     });
     if ($config.settings.equipSort && sort) {
@@ -3163,6 +3163,7 @@ GM_addStyle(/*css*/`
   .eqp { margin: 5px; width: auto; }
   .eqp:hover { background-color: #ddd; }
   .eqp > div:last-child { position: relative; padding: 1px 5px; line-height: 20px; white-space: nowrap; }
+  .hvut-eq-custom { background-color: #cde; }
   .hvut-eq-customname::after { visibility: hidden; content: attr(data-eqname); position: absolute; top: -1px; left: -1px; min-width: 100%; border: 1px solid; padding: inherit; background-color: inherit; }
   .hvut-eq-customname:hover::after { visibility: visible; }
   .hvut-eq-category { margin: 10px 0 5px; padding: 2px 5px; border: 1px solid; font-size: 10pt; font-weight: bold; background-color: #edb; }
