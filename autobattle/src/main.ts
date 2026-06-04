@@ -3,6 +3,7 @@ import { el, onReady } from './core/dom';
 import { createHud } from './ui/hud';
 import { createPanel, togglePanel } from './ui/panel';
 import { config } from './core/config';
+import { startLoop } from './loop';
 
 // ── document-start: 最早 hook XHR/fetch 旁路(只读不改) ──
 // 在 HV 的 battle 对象绑定发送引用之前注入, 才能捕获战斗响应(M2 解析 buff 剩余回合/精确鬥气).
@@ -77,4 +78,7 @@ function mountUI(): void {
 
 // ── 入口 ──
 hookNet(); // document-start: 立即 hook, 早于一切业务请求
-onReady(mountUI); // body 就绪后挂载 UI
+onReady(() => {
+  mountUI(); // body 就绪后挂载 UI
+  startLoop(); // 启动战斗轮询(内部判断 enabled/inBattle, 暂停时不出招)
+});
