@@ -1311,6 +1311,8 @@ const $equip = {
     },
     // 物品整名翻译,未收录回退英文
     itemName: function (name) { return $equip.$i18n.items[name] || name; },
+    // 任意名(装备或物品混合场景,如祭坛奖励):先按装备名解析,失败再查物品表
+    anyName: function (str) { const e = $equip.$i18n.equipName(str); return e !== str ? e : $equip.$i18n.itemName(str); },
     // 装备显示名:开关关→英文;customname 玩家红字名不翻;否则用派生 namezh,缺失则即时解析
     displayName: function (eq) {
       if (!$config.settings.translateNames) { return eq.info.customname || eq.info.name; }
@@ -6488,7 +6490,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
     }
     if (!item.results) {
       item.results = _ss.create_list(item.type);
-      item.node.span = $element('p', _ss.node.results, [item.name + (item.upgrade ? ' => Tier ' + item.upgrade : '') + ' ', '.hvut-ss-p']).appendChild($element('span'));
+      item.node.span = $element('p', _ss.node.results, [($config.settings.translateNames ? $equip.$i18n.anyName(item.name) : item.name) + (item.upgrade ? ' => Tier ' + item.upgrade : '') + ' ', '.hvut-ss-p']).appendChild($element('span'));
       item.node.ul = $element('ul', _ss.node.results, ['.hvut-ss-ul']);
       Object.values(item.results).forEach((r) => { item.node.ul.appendChild(r.li).classList.add('hvut-none'); });
       scrollIntoView(item.node.ul);
@@ -6563,7 +6565,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
 
       if (item.type === 'Trophy') {
         if ($equip.filter($config.settings.shrineFilters, n)) {
-          $element('li', [results[r].li, 'afterend'], [n, '.hvut-ss-equip']);
+          $element('li', [results[r].li, 'afterend'], [$config.settings.translateNames ? $equip.$i18n.equipName(n) : n, '.hvut-ss-equip']);
         }
         _ss.equip.received++;
         _ss.equip.total = _ss.equip.current + _ss.equip.received - _ss.equip.sold - _ss.equip.salvaged;
@@ -6604,7 +6606,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
         total /= 2;
       }
 
-      $element('p', div, [`${n} (${total})`, '.hvut-ss-p']);
+      $element('p', div, [`${$config.settings.translateNames ? $equip.$i18n.anyName(n) : n} (${total})`, '.hvut-ss-p']);
       const ul = $element('ul', div, ['.hvut-ss-ul']);
 
       Object.entries(log).forEach(([r, c]) => {
@@ -6660,7 +6662,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ss') {
     item.li = $element('li');
     item.sp = $element('span', item.li);
     item.sc = $element('span', item.li);
-    $element('span', item.li, r);
+    $element('span', item.li, $config.settings.translateNames ? $equip.$i18n.anyName(r) : r);
     if (g) {
       item.group = g;
       item.li.classList.add('hvut-ss-group');
@@ -7187,10 +7189,10 @@ if (_query.s === 'Bazaar' && _query.ss === 'ml' && $config.settings.monsterLab) 
           _ml.main.node.summary = $element('ul', $id('monster_outer'), ['.hvut-ml-summary']);
         }
         _ml.main.node.summary.innerHTML = '';
-        $element('li', _ml.main.node.summary, `${mobs.length} monster(s) brought you ${gains.length} gift(s), ${_ml.price2str(income)} credits`);
+        $element('li', _ml.main.node.summary, `${mobs.length} 只怪物带来 ${gains.length} 份礼物,共 ${_ml.price2str(income)} 绅士币`);
         _ml.materials.forEach((g) => {
           if (summary[g]) {
-            $element('li', _ml.main.node.summary, `${summary[g]} x ${g}`);
+            $element('li', _ml.main.node.summary, `${summary[g]} x ${$config.settings.translateNames ? $equip.$i18n.itemName(g) : g}`);
           }
         });
       },
@@ -7225,7 +7227,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ml' && $config.settings.monsterLab) 
         let count = 0;
         let income = 0;
         _ml.materials.forEach((mat, i) => {
-          const li = $element('li', mob.node.log, mob.log.gifts[i] + ' x ' + mat);
+          const li = $element('li', mob.node.log, mob.log.gifts[i] + ' x ' + ($config.settings.translateNames ? $equip.$i18n.itemName(mat) : mat));
           if (i === 12 || i === 16 || i === 22 || i === 28 || i === 33 || i === 39 || i === 42 || i === 48) {
             li.classList.add('hvut-ml-margin');
           }
@@ -7347,7 +7349,7 @@ if (_query.s === 'Bazaar' && _query.ss === 'ml' && $config.settings.monsterLab) 
         $element('span', mob.node.gains, gains.length);
         const ul = $element('ul', mob.node.gains);
         gains.forEach((g) => {
-          $element('li', ul, g);
+          $element('li', ul, $config.settings.translateNames ? $equip.$i18n.itemName(g) : g);
           mob.log.gifts[_ml.materials.indexOf(g)]++;
         });
       }
@@ -9276,12 +9278,12 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
         const span = $element('span', tr.cells[2], [`.hvut-mm-attach-${e.t}`]);
         if (e.t === 'e') {
           if (e.e && e.k) {
-            $element('a', span, { textContent: e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+            $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
           } else {
-            span.textContent = e.n;
+            span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
           }
         } else {
-          span.textContent = `${e.c.toLocaleString()} x ${e.n}`;
+          span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
         }
       });
       if (db?.cod) {
@@ -9591,12 +9593,12 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
           const span = $element('span', li, [`.hvut-mm-attach-${e.t}`]);
           if (e.t === 'e') {
             if (e.e && e.k) {
-              $element('a', span, { textContent: e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+              $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
             } else {
-              span.textContent = e.n;
+              span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
             }
           } else {
-            span.textContent = `${e.c.toLocaleString()} x ${e.n}`;
+            span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
           }
           e.node = {};
           if (e.n === 'Credits') {
@@ -9764,12 +9766,12 @@ if (_query.s === 'Bazaar' && _query.ss === 'mm' && $config.settings.moogleMail) 
         const span = $element('span', tr.cells[2], [`.hvut-mm-attach-${e.t}`]);
         if (e.t === 'e') {
           if (e.e && e.k) {
-            $element('a', span, { textContent: e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
+            $element('a', span, { textContent: $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n, href: `equip/${e.e}/${e.k}`, target: '_blank' });
           } else {
-            span.textContent = e.n;
+            span.textContent = $config.settings.translateNames ? $equip.$i18n.equipName(e.n) : e.n;
           }
         } else {
-          span.textContent = `${e.c.toLocaleString()} x ${e.n}`;
+          span.textContent = `${e.c.toLocaleString()} x ${$config.settings.translateNames ? $equip.$i18n.itemName(e.n) : e.n}`;
         }
       });
       if (db.cod) {
@@ -10609,7 +10611,7 @@ if (_query.s === 'Forge' && _query.ss === 'up') {
       : `${quality} ?? (无法计算此装备的基础 PXP)`;
 
     _up.node.salvage_summary.innerHTML = `
-      <li>${eq.info.name}</li>
+      <li>${$config.settings.translateNames ? $equip.$i18n.displayName(eq) : eq.info.name}</li>
       <li>PXP 品质: ${pxp_text}</li>
       <li>升级费用: ${credits.toLocaleString()}</li>
       <li>返还价值: ${return_credits.toLocaleString()}</li>`;
@@ -10620,7 +10622,7 @@ if (_query.s === 'Forge' && _query.ss === 'up') {
       const r = return_materials[n] || '';
       const p = prices[n] || '';
       if (u) {
-        $element('tr', _up.node.salvage_returns, [`/<td>${n}</td><td>${u}</td><td>${r}</td><td>${p}</td>`]);
+        $element('tr', _up.node.salvage_returns, [`/<td>${$config.settings.translateNames ? $equip.$i18n.itemName(n) : n}</td><td>${u}</td><td>${r}</td><td>${p}</td>`]);
       }
     });
   };
