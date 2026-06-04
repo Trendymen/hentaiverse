@@ -1348,6 +1348,9 @@ const $equip = {
     },
     // 富文本任意名:装备→配色富文本,物品→转义纯文本
     anyNameHtml: function (str) { const I = $equip.$i18n; return I.equipName(str) !== str ? I.equipNameHtml(str) : I._esc(I.itemName(str)); },
+    category: { 'One-handed Weapon': '单手武器', 'Two-handed Weapon': '双手武器', 'Staff': '法杖', 'Shield': '盾牌', 'Cloth Armor': '布甲', 'Light Armor': '轻甲', 'Heavy Armor': '重甲', 'Unknown': '未知' },
+    // 段翻译:开关开且有值则查表(未收录回退原值),否则原值
+    seg: function (map, v) { return v && $config.settings.translateNames ? (map[v] || v) : v; },
   },
 
   stats: {
@@ -1883,34 +1886,34 @@ const $equip = {
     equiplist.forEach((eq, i, a) => {
       const p = a[i - 1] || { info: {} };
       if (eq.info.category !== p.info.category) {
-        $element('p', frag, [eq.info.category, '.hvut-eq-category']);
+        $element('p', frag, [$equip.$i18n.seg($equip.$i18n.category, eq.info.category), '.hvut-eq-category']);
       }
       switch (eq.info.category) {
         case 'One-handed Weapon':
         case 'Two-handed Weapon':
           if (eq.info.type !== p.info.type) {
-            $element('p', frag, [eq.info.type || 'Unknown', '.hvut-eq-type']);
+            $element('p', frag, [$equip.$i18n.seg($equip.$i18n.type, eq.info.type) || '未知', '.hvut-eq-type']);
           } else if (eq.info.suffix !== p.info.suffix) {
             eq.node.wrapper.classList.add('hvut-eq-border');
           }
           break;
         case 'Staff':
           if (eq.info.type !== p.info.type) {
-            $element('p', frag, [eq.info.type || 'Unknown', '.hvut-eq-type']);
+            $element('p', frag, [$equip.$i18n.seg($equip.$i18n.type, eq.info.type) || '未知', '.hvut-eq-type']);
           } else if (eq.info.prefix !== p.info.prefix) {
             eq.node.wrapper.classList.add('hvut-eq-border');
           }
           break;
         case 'Shield':
           if (eq.info.type !== p.info.type) {
-            $element('p', frag, [eq.info.type || 'Unknown', '.hvut-eq-type']);
+            $element('p', frag, [$equip.$i18n.seg($equip.$i18n.type, eq.info.type) || '未知', '.hvut-eq-type']);
           } else if (eq.info.suffix !== p.info.suffix && eq.info.type === 'Buckler') {
             eq.node.wrapper.classList.add('hvut-eq-border');
           }
           break;
         case 'Cloth Armor':
           if (eq.info.type !== p.info.type || eq.info.suffix !== p.info.suffix) {
-            $element('p', frag, [(eq.info.type ? eq.info.suffix || '[No Suffix]' : 'Unknown'), '.hvut-eq-type']);
+            $element('p', frag, [(eq.info.type ? $equip.$i18n.seg($equip.$i18n.suffix, eq.info.suffix) || '[无后缀]' : '未知'), '.hvut-eq-type']);
           } else if (eq.info.slot !== p.info.slot) {
             eq.node.wrapper.classList.add('hvut-eq-border');
           }
@@ -1918,11 +1921,15 @@ const $equip = {
         case 'Light Armor':
         case 'Heavy Armor':
           if (eq.info.type !== p.info.type || eq.info.slot !== p.info.slot) {
-            $element('p', frag, [(eq.info.type ? `${eq.info.type} ${eq.info.slot}` : 'Unknown'), '.hvut-eq-type']);
+            $element('p', frag, [(eq.info.type ? `${$equip.$i18n.seg($equip.$i18n.type, eq.info.type)} ${$equip.$i18n.seg($equip.$i18n.slot, eq.info.slot)}` : '未知'), '.hvut-eq-type']);
           } else if (eq.info.suffix !== p.info.suffix && (eq.info.type === 'Shade' || eq.info.type === 'Power')) {
             eq.node.wrapper.classList.add('hvut-eq-border');
           }
           break;
+      }
+      if ($config.settings.translateNames && eq.node.div) {
+        const tn = Array.from(eq.node.div.childNodes).find((n) => n.nodeType === 3 && n.nodeValue.trim());
+        if (tn) { const s = document.createElement('span'); s.innerHTML = $equip.$i18n.displayNameHtml(eq); eq.node.div.replaceChild(s, tn); }
       }
       frag.appendChild(eq.node.wrapper);
     });
@@ -5337,8 +5344,8 @@ if (_query.s === 'Character' && _query.ss === 'in') {
   _in.init_list = function (filter) {
     const parent = ['acloth', 'alight', 'aheavy'].includes(filter) ? $id('inv_eqstor') : $id('inv_equip');
     _in.category[filter].div = $element('div', parent, ['.equiplist nosel']);
-    $element('p', _in.category[filter].div, [$equip.alias[filter], '.hvut-eq-category']);
-    $element('span', $qs('.hvut-in-header', parent.parentNode), { textContent: $equip.alias[filter], dataset: { action: 'scroll', filter } });
+    $element('p', _in.category[filter].div, [$equip.$i18n.seg($equip.$i18n.category, $equip.alias[filter]), '.hvut-eq-category']);
+    $element('span', $qs('.hvut-in-header', parent.parentNode), { textContent: $equip.$i18n.seg($equip.$i18n.category, $equip.alias[filter]), dataset: { action: 'scroll', filter } });
   };
 
   _in.load_list = async function (filter) {
@@ -6135,8 +6142,8 @@ if (_query.s === 'Bazaar' && _query.ss === 'es') {
   _es.init_list = function (filter) {
     _es.category[filter].item_div = $element('div', $id('item_pane'), ['.equiplist nosel']);
     _es.category[filter].shop_div = $element('div', $id('shop_pane'), ['.equiplist nosel']);
-    $element('p', _es.category[filter].item_div, [$equip.alias[filter], '.hvut-eq-category']);
-    $element('p', _es.category[filter].shop_div, [$equip.alias[filter], '.hvut-eq-category']);
+    $element('p', _es.category[filter].item_div, [$equip.$i18n.seg($equip.$i18n.category, $equip.alias[filter]), '.hvut-eq-category']);
+    $element('p', _es.category[filter].shop_div, [$equip.$i18n.seg($equip.$i18n.category, $equip.alias[filter]), '.hvut-eq-category']);
   };
 
   _es.load_list = async function (filter) {
