@@ -14,11 +14,14 @@ export class StateReader {
   roundNow = 0;
   roundAll = 0;
 
-  /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等 */
-  private _num(id: string): number {
-    const e = document.getElementById(id);
-    const m = e && (e.textContent || '').match(/\d+/);
-    return m ? parseInt(m[0]) : NaN;
+  /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等. 传多个 id = 依次兜底(HV 两套战斗布局: 标准 vrhd / 宽屏 dvrhd) */
+  private _num(...ids: string[]): number {
+    for (const id of ids) {
+      const e = document.getElementById(id);
+      const m = e && (e.textContent || '').match(/\d+/);
+      if (m) return parseInt(m[0]);
+    }
+    return NaN;
   }
 
   /** buff 剩余回合(【待 GF 实测核对读法】) */
@@ -64,9 +67,10 @@ export class StateReader {
   read(): BattleState {
     const C = config.all();
     this._round(); // 更新轮数缓存
-    const hp = this._num('vrhd'),
-      mp = this._num('vrm'),
-      sp = this._num('vrs');
+    // HV 两套战斗布局: 标准版 vrhd/vrm/vrs, 宽屏(d)版 dvrhd/dvrm/dvrs. 只认一套会在切布局时读不到 → HUD 全 - / inBattle 误判停摆(对齐原版 hvAutoAttack:4114-4116 的 ?? 兜底)
+    const hp = this._num('vrhd', 'dvrhd'),
+      mp = this._num('vrm', 'dvrm'),
+      sp = this._num('vrs', 'dvrs');
     if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp); // 动态识别满值(自适应成长/插件), 解决 >100%
     if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
     if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
@@ -76,8 +80,15 @@ export class StateReader {
     //   dodying 原版(hvAutoAttack.user.js:2666)是 floor(直接减掉 vcr); 这里多给半点, 修"架式过早关"+"OC 只跳整10%".
     //   ⚠旧 B大脑量条法(bar宽/vcp宽×250)是错的: 满 OC 也只算 ~119 → oc≥200 永不成立 → 炮永不放(总根因), 已弃.
     const ocDots = $$<HTMLElement>('#vcp>div>div');
-    const ocVcr = ocDots.filter((d) => d.id === 'vcr').length;
-    const oc = ocDots.length ? Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5) : 0;
+    let oc: number;
+    if (ocDots.length) {
+      const ocVcr = ocDots.filter((d) => d.id === 'vcr').length;
+      oc = Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5);
+    } else {
+      // 宽屏(d)版无 #vcp 数点, OC 直接读 #dvrc 数值(原版 hvAutoAttack:2671)
+      const dvrc = document.getElementById('dvrc');
+      oc = dvrc ? parseInt((dvrc.textContent || '').match(/\d+/)?.[0] ?? '0') || 0 : 0;
+    }
 
     const B = this._buffs();
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;

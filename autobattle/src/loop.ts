@@ -20,7 +20,8 @@ let lastSig = ''; // 上一次决策动作签名(死循环安全网用)
 let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
 
 function inBattle(): boolean {
-  return !!document.getElementById('vrhd');
+  // HV 两套战斗布局: 标准版根 #vrhd, 宽屏(d)版根 #dvrhd. 只认一套会在切布局时误判"不在战斗" → 整脚本停摆(HUD 不更新)
+  return !!(document.getElementById('vrhd') || document.getElementById('dvrhd'));
 }
 
 // 回合指纹: 状态没变=同回合(不重复出招); 变了=新回合(可出招). 含怪的减益(铺 Weaken/Imperil 后也算推进).

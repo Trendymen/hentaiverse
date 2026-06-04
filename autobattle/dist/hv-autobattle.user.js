@@ -572,11 +572,14 @@
       this.roundNow = 0;
       this.roundAll = 0;
     }
-    /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等 */
-    _num(id) {
-      const e = document.getElementById(id);
-      const m = e && (e.textContent || "").match(/\d+/);
-      return m ? parseInt(m[0]) : NaN;
+    /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等. 传多个 id = 依次兜底(HV 两套战斗布局: 标准 vrhd / 宽屏 dvrhd) */
+    _num(...ids) {
+      for (const id of ids) {
+        const e = document.getElementById(id);
+        const m = e && (e.textContent || "").match(/\d+/);
+        if (m) return parseInt(m[0]);
+      }
+      return NaN;
     }
     /** buff 剩余回合(【待 GF 实测核对读法】) */
     _expire(img) {
@@ -616,15 +619,22 @@
       }
     }
     read() {
+      var _a;
       const C = config.all();
       this._round();
-      const hp = this._num("vrhd"), mp = this._num("vrm"), sp = this._num("vrs");
+      const hp = this._num("vrhd", "dvrhd"), mp = this._num("vrm", "dvrm"), sp = this._num("vrs", "dvrs");
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
       if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
       const ocDots = $$("#vcp>div>div");
-      const ocVcr = ocDots.filter((d) => d.id === "vcr").length;
-      const oc = ocDots.length ? Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5) : 0;
+      let oc;
+      if (ocDots.length) {
+        const ocVcr = ocDots.filter((d) => d.id === "vcr").length;
+        oc = Math.round((ocDots.length - ocVcr) * 25 + ocVcr * 12.5);
+      } else {
+        const dvrc = document.getElementById("dvrc");
+        oc = dvrc ? parseInt(((_a = (dvrc.textContent || "").match(/\d+/)) == null ? void 0 : _a[0]) ?? "0") || 0 : 0;
+      }
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
       const allMkey = $$('[id^="mkey_"]');
@@ -895,7 +905,7 @@
   let lastSig = "";
   let stuckN = 0;
   function inBattle() {
-    return !!document.getElementById("vrhd");
+    return !!(document.getElementById("vrhd") || document.getElementById("dvrhd"));
   }
   function fingerprint(S) {
     const buffs = Object.entries(S.buff).filter(([, v]) => v.active).map(([k]) => k).join(",");
