@@ -376,6 +376,7 @@
         channeling: B.channeling.active,
         stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute("src") || "")),
         riddle: !!document.getElementById("riddlecounter"),
+        canContinue: !!document.getElementById("btcp"),
         gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
         cannonReady: !!$$("#pane_skill [onmouseover]").find(
           (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
@@ -445,6 +446,17 @@
       e.click();
       const m = document.getElementById("mkey_" + eid);
       return m ? Exec.attack(eid) : Exec.skill(id);
+    },
+    /** 胜利后继续下一波(GF/Arena 波次推进): battle.battle_continue() 优先, 退回点 #btcp */
+    continueBattle() {
+      var _a;
+      const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+      if ((_a = w.battle) == null ? void 0 : _a.battle_continue) {
+        w.battle.battle_continue();
+        return true;
+      }
+      const e = document.getElementById("btcp");
+      return e ? (e.click(), true) : false;
     }
   };
   class Brain {
@@ -469,6 +481,7 @@
           return (_a = document.querySelector(r.option)) == null ? void 0 : _a.click();
         } } : { type: "skip", note: "riddle留人工" };
       }
+      if (S.canContinue) return { type: "continue", exec: () => Exec.continueBattle() };
       if (!b.spark.active || b.spark.turns <= 2) {
         if (mp >= sparkCost) return A("spell", SK.Spark);
         if (!b.spark.active)

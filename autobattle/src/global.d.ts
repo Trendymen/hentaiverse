@@ -7,5 +7,5 @@ declare const GM_deleteValue: ((key: string) => void) | undefined;
 // 页面真实 window(Tampermonkey 沙箱外). 访问 HV 的全局 battle 对象需经此; DOM 操作仍用共享的 document.
 declare const unsafeWindow: Window &
   typeof globalThis & {
-    battle?: { commit_target?: (n: number) => void };
+    battle?: { commit_target?: (n: number) => void; battle_continue?: () => void };
   };

@@ -61,4 +61,15 @@ export const Exec = {
     const m = document.getElementById('mkey_' + eid);
     return m ? Exec.attack(eid) : Exec.skill(id);
   },
+  /** 胜利后继续下一波(GF/Arena 波次推进): battle.battle_continue() 优先, 退回点 #btcp */
+  continueBattle(): boolean {
+    const w =
+      typeof unsafeWindow !== 'undefined' ? unsafeWindow : (window as unknown as typeof unsafeWindow);
+    if (w.battle?.battle_continue) {
+      w.battle.battle_continue();
+      return true;
+    }
+    const e = document.getElementById('btcp');
+    return e ? (e.click(), true) : false;
+  },
 };

@@ -101,6 +101,7 @@ export class StateReader {
       channeling: B.channeling.active,
       stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute('src') || '')),
       riddle: !!document.getElementById('riddlecounter'),
+      canContinue: !!document.getElementById('btcp'),
       gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
       cannonReady: !!$$('#pane_skill [onmouseover]').find((e) =>
         /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),

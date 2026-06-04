@@ -66,6 +66,7 @@ export interface BattleState {
   channeling: boolean;
   stanceOn: boolean;
   riddle: boolean;
+  canContinue: boolean;
   gemReady: boolean;
   cannonReady: boolean;
   scrollReady: boolean;
@@ -74,7 +75,7 @@ export interface BattleState {
   _started: boolean;
 }
 
-export type ActionType = 'spell' | 'item' | 'attack' | 'stance' | 'defend' | 'cannon' | 'riddle' | 'skip';
+export type ActionType = 'spell' | 'item' | 'attack' | 'stance' | 'defend' | 'cannon' | 'riddle' | 'skip' | 'continue';
 
 /** 决策输出: 一个动作 */
 export interface Action {

@@ -37,6 +37,8 @@ export class Brain {
       const r = this.riddle();
       return r ? { type: 'riddle', option: r.option, exec: () => document.querySelector<HTMLElement>(r.option)?.click() } : { type: 'skip', note: 'riddle留人工' };
     }
+    // P0.5 胜利继续下一波: 清完怪后 HV 弹 #btcp("You are victorious"), 点它进下一波 → 连续刷(GF 波次推进)
+    if (S.canContinue) return { type: 'continue', exec: () => Exec.continueBattle() };
     // P1 Spark 零空窗(防一击致死) ①③
     if (!b.spark.active || b.spark.turns <= 2) {
       if (mp >= sparkCost) return A('spell', SK.Spark);
