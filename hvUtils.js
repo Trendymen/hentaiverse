@@ -1288,7 +1288,7 @@ const $equip = {
       'Voidseeker Shard': '虚空碎片', 'Aether Shard': '以太碎片', 'Featherweight Shard': '羽毛碎片', 'Amnesia Shard': '重铸碎片', 'Crystallized Phazon': '相位碎片(布)', 'Shade Fragment': '暗影碎片(轻)', 'Repurposed Actuator': '动力碎片(重)', 'Defense Matrix Modulator': '力场碎片(盾)',
       'Crystal of Vigor': '力量水晶', 'Crystal of Finesse': '灵巧水晶', 'Crystal of Swiftness': '敏捷水晶', 'Crystal of Fortitude': '体质水晶', 'Crystal of Cunning': '智力水晶', 'Crystal of Knowledge': '智慧水晶', 'Crystal of Flames': '火焰水晶', 'Crystal of Frost': '冰冻水晶', 'Crystal of Lightning': '闪电水晶', 'Crystal of Tempest': '疾风水晶', 'Crystal of Devotion': '神圣水晶', 'Crystal of Corruption': '暗黑水晶',
       "Voidseeker's Blessing": '虚空探索者的祝福', 'Suffused Aether': '弥漫的以太', 'Featherweight Charm': '轻如鸿毛', 'Infused Flames': '火焰附魔', 'Infused Frost': '冰霜附魔', 'Infused Lightning': '雷电附魔', 'Infused Storm': '风暴附魔', 'Infused Divinity': '神圣附魔', 'Infused Darkness': '黑暗附魔',
-      'Scrap Metal': '废金属', 'Scrap Wood': '废木料', 'Energy Cell': '能量电池',
+      'Scrap Metal': '金属废料', 'Scrap Wood': '木材废料', 'Energy Cell': '能量元',
     },
     _join: function (i) {
       const I = $equip.$i18n;
