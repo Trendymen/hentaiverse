@@ -211,7 +211,8 @@
       const s = document.createElement('style'); s.id = 'hb-hide';
       s.textContent = '.hvAATabmenu>span[name="Recovery"],.hvAATabmenu>span[name="Channel"],.hvAATabmenu>span[name="Buff"],.hvAATabmenu>span[name="Debuff"],.hvAATabmenu>span[name="Scroll"],.hvAATabmenu>span[name="Skill"],.hvAATabmenu>span[name="Rule"]{display:none!important}'
         + '.hvAAPauseUI,.pauseChange{display:none!important}' // 暂停统一到 B大脑 ⏸: 原版暂停按钮藏起(display:none 仍可被 _syncDisabled 联动 .click)
-        + '.encounterUI{display:none!important}'; // 去重: 隐藏 dodying 自带遭遇倒计时(与 hvUtils 那个重复, 留 hvUtils 功能更全的)
+        + '.encounterUI{display:none!important}' // 去重: 隐藏 dodying 自带遭遇倒计时(与 hvUtils 那个重复, 留 hvUtils 功能更全的)
+        + '#hvAATab-Main #attackStatus,#hvAATab-Main .battleOrder,#hvAATab-Main>div:has(>#infusionSwitch),#hvAATab-Main>div:has(>label[for="middleSkillCondition"]),#hvAATab-Main>div:has(>label[for="highSkillCondition"]),#hvAATab-Main>div:has(>#etherTap),#hvAATab-Main>div:has(>#turnOnSS),#hvAATab-Main>div:has(>#turnOffSS),#hvAATab-Main>div:has(>#defend),#hvAATab-Main>div:has(>#focus),#hvAATab-Main>div:has(>#autoPause){display:none!important}'; // Main tab 死配置(B大脑接管 taskList → 这些原版战斗决策全失效); 保留 autoFlee/精力保护/卡死刷新/战败退出等仍生效项
       (document.head || document.documentElement).appendChild(s);
     }
     _html() {
