@@ -380,6 +380,7 @@
         cannonReady: !!$$("#pane_skill [onmouseover]").find(
           (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
         ),
+        scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
         firstRound: this.prev._started !== true,
         lockedRedId: this.prev.lockedRedId,
         _started: true
@@ -489,7 +490,7 @@
       }
       if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
         return S.gemReady ? A("item", IT.manaGem) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
-      if (C.scrollFirst && (!b.spiritShield.active && !b.protection.active || S.firstRound))
+      if (C.scrollFirst && S.scrollReady && (!b.spiritShield.active && !b.protection.active || S.firstRound))
         return A("item", IT.scrollProt);
       if (!b.protection.active || b.protection.turns <= 1)
         return mp >= sparkCost ? A("spell", SK.Protection) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.scrollProt);
@@ -544,6 +545,7 @@
   }
   const brain = new Brain();
   let lastFp = "";
+  let actedAt = 0;
   let busyUntil = 0;
   let timer = null;
   function inBattle() {
@@ -551,7 +553,7 @@
   }
   function fingerprint(S) {
     const buffs = Object.entries(S.buff).filter(([, v]) => v.active).map(([k]) => k).join(",");
-    const foes = S.enemies.map((e) => e.eid).join(",");
+    const foes = S.enemies.map((e) => `${e.eid}:${Object.keys(e.debuff).filter((k) => e.debuff[k]).join("")}`).join(",");
     return [S.hp, S.mp, S.sp, S.overcharge, S.alive, foes, buffs, S.channeling ? "ch" : ""].join("|");
   }
   function tick() {
@@ -559,7 +561,9 @@
       if (config.get("enabled") && inBattle() && Date.now() >= busyUntil) {
         const S = reader.read();
         const fp = fingerprint(S);
-        if (fp !== lastFp) {
+        const changed = fp !== lastFp;
+        const stalled = Date.now() - actedAt > 2500;
+        if (changed || stalled) {
           const a = brain.decide(S);
           const action = a ? `${a.type}${a.id ? ":" + a.id : ""}` : "";
           bus.emit("hud:update", {
@@ -583,7 +587,8 @@
               } catch {
               }
             }, delay);
-            busyUntil = Date.now() + delay + 500;
+            busyUntil = Date.now() + delay + 600;
+            actedAt = Date.now();
           }
           lastFp = fp;
           reader.prev = S;
@@ -591,10 +596,13 @@
       }
     } catch {
     }
-    timer = setTimeout(tick, 700);
+    timer = setTimeout(tick, 500);
   }
   function startLoop() {
-    if (timer === null) tick();
+    if (timer === null) {
+      actedAt = Date.now();
+      tick();
+    }
   }
   let lastBattleResponse = null;
   function hookNet() {

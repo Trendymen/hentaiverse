@@ -105,6 +105,7 @@ export class StateReader {
       cannonReady: !!$$('#pane_skill [onmouseover]').find((e) =>
         /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
       ),
+      scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,
       lockedRedId: this.prev.lockedRedId,
       _started: true,

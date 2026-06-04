@@ -68,6 +68,7 @@ export interface BattleState {
   riddle: boolean;
   gemReady: boolean;
   cannonReady: boolean;
+  scrollReady: boolean;
   firstRound: boolean;
   lockedRedId: number | undefined;
   _started: boolean;

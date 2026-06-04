@@ -64,8 +64,8 @@ export class Brain {
     // P3 MP 熔断 ④(节流: 长效药冷却中改秘药)
     if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
       return S.gemReady ? A('item', IT.manaGem) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir);
-    // P4 卷轴一键铺墙(scrollFirst 关 → 走下面法术逐个补省卷轴)
-    if (C.scrollFirst && ((!b.spiritShield.active && !b.protection.active) || S.firstRound))
+    // P4 卷轴一键铺墙(scrollFirst 关 或 卷轴不在快捷栏 → 走下面法术逐个补)
+    if (C.scrollFirst && S.scrollReady && ((!b.spiritShield.active && !b.protection.active) || S.firstRound))
       return A('item', IT.scrollProt);
     // 双物理墙 ③
     if (!b.protection.active || b.protection.turns <= 1)
@@ -88,7 +88,7 @@ export class Brain {
     }
     // P10 回 HP(节流)
     if (hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
-    // P11 回 SP 喂鬥气(节流)
+    // P11 回 SP 喂斗气(节流)
     if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A('item', IT.sDraught);
     // P12 灵动架式开关(滞回)
     if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: 'stance', exec: Exec.stance };
