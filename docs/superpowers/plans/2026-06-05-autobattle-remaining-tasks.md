@@ -27,7 +27,8 @@
 
 | # | 议题 | 决策 | 依据 |
 |---|---|---|---|
-| D1 | 小马炮逻辑 | ✅ **已做**(commit `a6a8472`):cannonReady 改"未置灰才可放"、攒炮时架式让路、P15 加 `oc≥200`、executor 置灰不放不盖冷却、`OC_ON 0.4→0.5`、`cannonCdMs→1500` | HV wiki(架式 10%OC/回合、≥50% 才开)+ Special Skills 表(炮 200 斗气/50 回合)+ 实测炮按钮 DOM(`opacity:0.5`+`onclick=null`+参数 `0,8,50`) |
+| D1 | 小马炮逻辑 | ✅ commit `a6a8472`(cannonReady=未置灰才可放、攒炮架式让路、`oc≥200`、置灰不放不盖冷却、`OC_ON 0.4→0.5`、`cannonCdMs→1500`)+ ✅ commit `71beb11` 后续修:炮提到架式之前(P11.5)防"OC 到 200 被架式抢→来回开关";攒炮判据改用 `cannonReady`(冷却好)而非"在技能栏"(冷却期不空压架式) | HV wiki + Special Skills 表(炮 200/50)+ 实测炮按钮 DOM |
+| D5 | **OC 读数 bug(炮不放/架式乱抖的总根因)** | ✅ commit `71beb11`:reader 把 OC 从"量条宽 `bar/vcp×250`"(抄旧 B大脑,满 OC 也只算出 ~119 → `oc≥200` 永不成立 → 炮永不放、攒炮永真压架式)改为 **dodying 数点法** `(#vcp>div>div 数 − #vcp>div>div#vcr 数)×25` | dodying `hvAutoAttack.user.js:2666`;实测满 OC: 数点法=250、旧法=119 |
 | D2 | HUD 加"角色等级" | ❌ **不加**,保持现状(HP/MP/SP/OC + 战斗类型/轮数/回合/怪数/动作) | 原版 dodying/B大脑 HUD 均无玩家等级;玩家级战斗页 DOM 读不到(代价高) |
 | D3 | P5 Absorb 法系怪判定 | **战斗日志魔法伤害启发式**(原版无此逻辑,需新写) | 见 §2.1 |
 | D4 | XHR battle 响应解析 | **需一份真实样本**才能定字段结构;授权我在你战斗中读一次 `window.__hvab.getLastBattle()` | 见 §2.2;reference 也只抓不解析 |
@@ -52,12 +53,29 @@
 - **要做**:拿到真实 battle 响应 JSON 后,在 reader 用响应字段替换/校正 DOM 读法(buff turns、overcharge、怪物状态)。
 - **依据**:设计 §6 数据流、§10 开放细节("XHR 旁路解析出的 battle 响应字段结构 → M2 在 GrindFest 实测核对")。
 - **阻塞**:**必须先有一份真实样本**(战斗中 `window.__hvab.getLastBattle()` 输出)。用户授权可读一次,但需用户正处于战斗中。在此之前不能写解析(否则瞎猜字段=违反"绝不臆造")。
+- **额外坑(实测)**:`__hvab.getLastBattle` 挂在油猴**沙箱 window**,页面世界(含 chrome-devtools)读不到 → 读样本前需把 `main.ts` 的 `window.__hvab` 改挂 `unsafeWindow.__hvab`。
 
 ### 2.3 其它代码级遗留 〔低优先〕
 
 - `loop.ts:3`:回合触发机制 300ms 轮询 → 可升级 `MutationObserver` 精确监听(设计 §10)。〔优化,非阻塞〕
 - `reader.ts:_expire`:buff 剩余回合 DOM 读法待 GF 实测核对(与 2.2 一并解决更佳)。
 - `typecheck`:✅ 现已通过(依赖已 `npm install`,`tsc --noEmit` exit 0)——原审计的 TS2688 已解除。
+
+### 2.4 特殊近战技巧纳入决策(盾击 / 要害强击 / 最后的慈悲)〔待完成〕
+
+- **现状**:brain 进攻只有平砍 + 小马炮,**不用**这三个吃 OC 的特殊近战技巧(实测 `pane_skill`/`pane_quickbar` 已解锁):
+
+  | 技巧 | DBID | OC 消耗 | 冷却 | 效果 |
+  |---|---|---|---|---|
+  | 盾击 Shield Bash | 2201 | 25(1点) | 10 | 单体 + 晕眩 |
+  | 要害强击 Vital Strike | 2202 | 50(2点) | 10 | 单体高伤 |
+  | 最后的慈悲 Merciful Blow | 2203 | 100(4点) | 10 | 残血处决/补刀 |
+  | (小马炮 OFC) | 1111 | 200(8点) | 50 | 已接入 P11.5 |
+
+  实测 `onmouseover` 参数格式 = `[MP, OC点数, 冷却回合]`,每点 OC = 25。
+- **要做**(待用户定规则后):tables 加 `SK_SPECIAL`(2201/2202/2203);brain 在合适优先级插入(如残血红怪→慈悲、单体高价值→要害);各自加开关。
+- **核心设计张力**:它们都吃 OC,**会和攒小马炮抢 OC**。需先决定"攒炮模式下这些要不要也让路,还是允许用便宜的(盾击25/要害50)穿插"。**待用户定规则**(`AskUserQuestion` 已问,用户选"先标待完成")。
+- **阻塞**:无技术阻塞;等产品规则(OC 预算分配)。
 
 ---
 
