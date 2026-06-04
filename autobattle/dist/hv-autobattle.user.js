@@ -611,7 +611,7 @@
               } catch {
               }
             }, delay);
-            busyUntil = Date.now() + delay + 600;
+            busyUntil = Date.now() + delay + 150;
             actedAt = Date.now();
           }
           lastFp = fp;
@@ -620,7 +620,7 @@
       }
     } catch {
     }
-    timer = setTimeout(tick, 500);
+    timer = setTimeout(tick, 300);
   }
   function startLoop() {
     if (timer === null) {

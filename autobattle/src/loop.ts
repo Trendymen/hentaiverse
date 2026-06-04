@@ -61,7 +61,7 @@ function tick(): void {
               /* HV 处理中/元素未就绪 */
             }
           }, delay);
-          busyUntil = Date.now() + delay + 600; // 出招后短锁, 等服务器往返(防同回合连点)
+          busyUntil = Date.now() + delay + 150; // 出招后极短锁(仅覆盖 exec 执行那一下); 同回合重复主要靠下面的指纹去重, 锁短 = 换回合后响应快
           actedAt = Date.now();
         }
         lastFp = fp;
@@ -71,7 +71,7 @@ function tick(): void {
   } catch {
     /* tick 不能崩, 否则循环断 */
   }
-  timer = setTimeout(tick, 500);
+  timer = setTimeout(tick, 300); // 轮询更快 = 换回合后更早检测到新回合(原 500ms)
 }
 
 export function startLoop(): void {
