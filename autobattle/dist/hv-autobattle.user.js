@@ -444,6 +444,7 @@
   const SK = {
     Weaken: 212,
     Imperil: 213,
+    Cure: 311,
     Regen: 312,
     FullCure: 313,
     Protection: 411,
@@ -695,7 +696,7 @@
     /** 通用法术: 读 onclick 自动区分 friendly(touch_and_go 自动)/hostile(选中后对第一个活怪 commit) */
     skill(id) {
       const e = document.getElementById(String(id));
-      if (!e) return false;
+      if (!e || e.style.opacity === "0.5") return false;
       const oc = e.getAttribute("onclick") || "";
       e.click();
       if (/set_hostile_skill/.test(oc)) {
@@ -712,6 +713,12 @@
     /** 物品当前是否可点: 没货/冷却时 HV 不渲染该悬浮触发器. 用于决策前查库存, 避免选中点不出的药而空转(死循环根因之一) */
     itemAvailable(db) {
       return !!document.querySelector(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+    },
+    /** 法术当前是否可放: 对齐原版 hvAutoAttack isOn() — 冷却时 HV 把技能图标设 opacity:0.5(置灰), 非 0.5 即可放 */
+    skillReady(id) {
+      const e = document.getElementById(String(id));
+      if (!e) return false;
+      return e.style.opacity !== "0.5";
     },
     /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
     attack(n) {
@@ -800,8 +807,10 @@
         return S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
       }
       if (hp < PANIC || predicted < PANIC && hp < C.HP_HEAL * HM) {
-        if (mp >= C.MP_LOW * MM || ch) return A("spell", SK.FullCure);
-        return pickHeal() ?? (mp >= sparkCost ? A("spell", SK.Spark) : { type: "defend", exec: Exec.defend, note: "急救药耗尽+缺MP硬抗" });
+        const canCure = mp >= C.MP_LOW * MM || ch;
+        if (canCure && Exec.skillReady(SK.FullCure)) return A("spell", SK.FullCure);
+        if (canCure && Exec.skillReady(SK.Cure)) return A("spell", SK.Cure);
+        return pickHeal() ?? (Exec.skillReady(SK.Spark) && mp >= sparkCost ? A("spell", SK.Spark) : { type: "defend", exec: Exec.defend, note: "治疗冷却+急救药耗尽硬抗" });
       }
       if (ch && C.useChanneling !== false) {
         for (const q of CHANNEL_Q) {
@@ -883,6 +892,8 @@
   let turn = 0;
   let lastRound = -1;
   let timer = null;
+  let lastSig = "";
+  let stuckN = 0;
   function inBattle() {
     return !!document.getElementById("vrhd");
   }
@@ -899,7 +910,16 @@
         const changed = fp !== lastFp;
         const stalled = Date.now() - actedAt > 2500;
         if (changed || stalled) {
-          const a = brain.decide(S);
+          let a = brain.decide(S);
+          const sig = `${a.type}:${a.id ?? ""}`;
+          if (!changed && sig === lastSig) stuckN++;
+          else stuckN = 0;
+          lastSig = sig;
+          if (stuckN >= 2) {
+            const t = S.enemies.find((e) => e.alive);
+            a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: "安全网:上招放不出→强制平砍" } : { type: "defend", exec: () => Exec.defend(), note: "安全网:上招放不出→防御" };
+            stuckN = 0;
+          }
           if (S.roundNow !== lastRound) {
             turn = 0;
             lastRound = S.roundNow;

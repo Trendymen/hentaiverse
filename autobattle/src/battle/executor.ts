@@ -9,7 +9,7 @@ export const Exec = {
   /** 通用法术: 读 onclick 自动区分 friendly(touch_and_go 自动)/hostile(选中后对第一个活怪 commit) */
   skill(id: number): boolean {
     const e = document.getElementById(String(id));
-    if (!e) return false;
+    if (!e || e.style.opacity === '0.5') return false; // 冷却/不可放: HV 把技能图标置灰 opacity:0.5(对齐原版 isOn), 不点空按钮假装成功
     const oc = e.getAttribute('onclick') || '';
     e.click();
     if (/set_hostile_skill/.test(oc)) {
@@ -26,6 +26,12 @@ export const Exec = {
   /** 物品当前是否可点: 没货/冷却时 HV 不渲染该悬浮触发器. 用于决策前查库存, 避免选中点不出的药而空转(死循环根因之一) */
   itemAvailable(db: number): boolean {
     return !!document.querySelector(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+  },
+  /** 法术当前是否可放: 对齐原版 hvAutoAttack isOn() — 冷却时 HV 把技能图标设 opacity:0.5(置灰), 非 0.5 即可放 */
+  skillReady(id: number): boolean {
+    const e = document.getElementById(String(id));
+    if (!e) return false;
+    return e.style.opacity !== '0.5';
   },
   /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
   attack(n: number): boolean {

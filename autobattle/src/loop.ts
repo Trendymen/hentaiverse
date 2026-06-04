@@ -4,6 +4,7 @@
 import { config } from './core/config';
 import { reader } from './battle/reader';
 import { brain } from './battle/brain';
+import { Exec } from './battle/executor';
 import { actionLabel } from './battle/tables';
 import { bus } from './core/bus';
 import { logger } from './core/logger';
@@ -15,6 +16,8 @@ let busyUntil = 0;
 let turn = 0;
 let lastRound = -1;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let lastSig = ''; // 上一次决策动作签名(死循环安全网用)
+let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
 
 function inBattle(): boolean {
   return !!document.getElementById('vrhd');
@@ -40,7 +43,19 @@ function tick(): void {
       const changed = fp !== lastFp;
       const stalled = Date.now() - actedAt > 2500; // 2.5s 状态没推进 → 上一招可能无效, 强制重新决策换招(防自锁死)
       if (changed || stalled) {
-        const a = brain.decide(S);
+        let a = brain.decide(S);
+        // 死循环安全网: stalled(fp 没变=上招没推进)又决策同一招 → 判定该招放不出(法术冷却/物品没货/按钮缺), 连续 2 次强制平砍脱困
+        const sig = `${a.type}:${a.id ?? ''}`;
+        if (!changed && sig === lastSig) stuckN++;
+        else stuckN = 0;
+        lastSig = sig;
+        if (stuckN >= 2) {
+          const t = S.enemies.find((e) => e.alive);
+          a = t
+            ? { type: 'attack', id: t.eid, exec: () => Exec.attack(t.eid), note: '安全网:上招放不出→强制平砍' }
+            : { type: 'defend', exec: () => Exec.defend(), note: '安全网:上招放不出→防御' };
+          stuckN = 0;
+        }
         // 轮数变 → 回合计数归零(新一波从 T1 起)
         if (S.roundNow !== lastRound) {
           turn = 0;

@@ -60,8 +60,11 @@ export class Brain {
     // 血量健康(≥HP_HEAL)即便有红怪也不急救 —— 红怪单发 ≤BURST_EST, 健康血挨一发死不了, 不浪费顶级药.
     // (修: 91%血+红怪误触发 → 喝终极体力药; 且 Elixir 耗尽点不动 → 空转死循环. 喝药改降级链, 没货则火花/防御兜底)
     if (hp < PANIC || (predicted < PANIC && hp < C.HP_HEAL * HM)) {
-      if (mp >= C.MP_LOW * MM || ch) return A('spell', SK.FullCure);
-      return pickHeal() ?? (mp >= sparkCost ? A('spell', SK.Spark) : { type: 'defend', exec: Exec.defend, note: '急救药耗尽+缺MP硬抗' });
+      const canCure = mp >= C.MP_LOW * MM || ch;
+      // 完全治疗术冷却(opacity:0.5)→ 退普通治疗术 → 喝药 → 火花(可放才放)→ 防御; 不再死盯放不出的法术空转(对齐原版 isOn 可放性门)
+      if (canCure && Exec.skillReady(SK.FullCure)) return A('spell', SK.FullCure);
+      if (canCure && Exec.skillReady(SK.Cure)) return A('spell', SK.Cure);
+      return pickHeal() ?? (Exec.skillReady(SK.Spark) && mp >= sparkCost ? A('spell', SK.Spark) : { type: 'defend', exec: Exec.defend, note: '治疗冷却+急救药耗尽硬抗' });
     }
     // P2.5 Channeling 主动利用: 折扣窗口补最贵(保命已在前, 不抢)
     if (ch && C.useChanneling !== false) {
