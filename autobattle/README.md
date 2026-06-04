@@ -29,7 +29,9 @@ npm run typecheck  # tsc 类型检查
 ## 里程碑
 
 - **M1 地基** ✅ — 工程 / 构建(不压缩)/ core / UI 骨架 / document-start hook
-- M2 战斗内 — Reader + Brain(迁移现有 B大脑)+ Executor
-- M3 连刷 — 遭遇 / 竞技场 / GF
-- M4 保护后勤 — 精力 / 无响应 / 修复 / 库存 / 统计
-- M5 杂项打磨 — 告警 / 异世界 / 小马提醒 + UI 精修
+- **M2 战斗内** 🟡 基本完成 — Reader + Brain(16 级联 + 4 加固)+ Executor + tables + 战斗循环 + HUD 真实数据 + 战斗 tab 配置面板 + 小马炮 OC/冷却逻辑修复;**剩** Absorb 法系启发式 / XHR 响应解析收尾
+- **M3 连刷** 🟠 仅 GF 波次内续战 — 遭遇 / 竞技场(等级勾选)/ GF 场间连刷 + 精力阈值 + 连刷 tab **待做**(`engine/` 未建)
+- **M4 保护后勤** ❌ 未开始 — 精力 / 无响应 / 修复 / 库存 / 统计
+- **M5 杂项打磨** ❌ 未开始 — 告警 / 异世界 / 小马提醒 + UI 精修
+
+> 剩余工作清单 + 决策记录见 `../docs/superpowers/plans/2026-06-05-autobattle-remaining-tasks.md`
