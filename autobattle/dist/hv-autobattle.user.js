@@ -1089,8 +1089,10 @@
     constructor() {
       this.lowHpStreak = 0;
       this.charging = false;
+      this.mercifulTry = null;
+      this.mercifulBlockEid = -1;
     }
-    // 攒炮冲刺态(滞回): OC≥YIELD 进入关架式并保持, 放炮归0/跌破OC_OFF/炮不可用才退出 — 防架式在 YIELD 上下抖动
+    // 慈悲拉黑目标: 上次慈悲 OC 没降=没放出(HV 拒绝处决, 如世界树 boss 免疫处决) → 本段不再对它空点慈悲, 改要害磨; 目标死/不在则解除
     decide(S) {
       var _a;
       const C = config.all();
@@ -1099,6 +1101,12 @@
       const hasRed = S.enemies.some((e) => e.is_red_boss);
       if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
       else this.lowHpStreak = 0;
+      if (this.mercifulTry) {
+        const mt = this.mercifulTry;
+        this.mercifulBlockEid = S.enemies.some((e) => e.eid === mt.eid && e.alive) && oc >= mt.oc ? mt.eid : -1;
+        this.mercifulTry = null;
+      }
+      if (this.mercifulBlockEid >= 0 && !S.enemies.some((e) => e.eid === this.mercifulBlockEid && e.alive)) this.mercifulBlockEid = -1;
       const ranked = rankTargets(S.enemies, weightCfg(C));
       const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
       const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM);
@@ -1229,19 +1237,23 @@
       const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
       const execRed = selectRedTarget(S, ranked, "execute");
       if (execRed) {
-        if (C.useMercifulBlow && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+        if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+          this.mercifulTry = { eid: execRed.eid, oc };
           return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) };
-        if (C.useVitalStrike && execRed.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(已晕→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
+        }
+        if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(未流血→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
       }
       if (!saveOcForCannon) {
         const tgtSp = selectRedTarget(S, ranked, "execute");
         if (tgtSp) {
-          if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+          if (C.useMercifulBlow && tgtSp.eid !== this.mercifulBlockEid && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+            this.mercifulTry = { eid: tgtSp.eid, oc };
             return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
-          if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          }
+          if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
             return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(已晕→喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
-          if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+          if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
             return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
         }
         if (C.useVitalStrike && (hasRed || struggling || finalRound || pressure.level !== "low") && oc >= 50) {

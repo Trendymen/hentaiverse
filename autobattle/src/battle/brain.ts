@@ -21,6 +21,8 @@ function weightCfg(C: Config): WeightConfig {
 export class Brain {
   private lowHpStreak = 0; // 连续 hp<STRUGGLE_HP 的决策次数(达 STRUGGLE_STREAK 才判血线下降, 防单次瞬掉误触发)
   private charging = false; // 攒炮冲刺态(滞回): OC≥YIELD 进入关架式并保持, 放炮归0/跌破OC_OFF/炮不可用才退出 — 防架式在 YIELD 上下抖动
+  private mercifulTry: { eid: number; oc: number } | null = null; // 上次慈悲尝试(目标 eid + 当时 OC); 下回合验证有没有真放出(OC 降没降)
+  private mercifulBlockEid = -1; // 慈悲拉黑目标: 上次慈悲 OC 没降=没放出(HV 拒绝处决, 如世界树 boss 免疫处决) → 本段不再对它空点慈悲, 改要害磨; 目标死/不在则解除
 
   decide(S: BattleState): Action {
     const C = config.all();
@@ -35,6 +37,13 @@ export class Brain {
     // 血线下降去抖: 连续 STRUGGLE_STREAK 次 hp<STRUGGLE_HP 才判撑不住(放弃攒炮), 防单次瞬掉(挨发暴击又被拉回)误触发
     if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
     else this.lowHpStreak = 0;
+    // 慈悲去重退避: 上回合决策的慈悲若没真放出(目标还活 + OC 没降, 慈悲应耗100) → 拉黑该目标慈悲、改要害磨; 目标死/不在则解除. 治"对处决免疫的怪(如世界树boss)每回合空点刷屏".
+    if (this.mercifulTry) {
+      const mt = this.mercifulTry;
+      this.mercifulBlockEid = S.enemies.some((e) => e.eid === mt.eid && e.alive) && oc >= mt.oc ? mt.eid : -1;
+      this.mercifulTry = null;
+    }
+    if (this.mercifulBlockEid >= 0 && !S.enemies.some((e) => e.eid === this.mercifulBlockEid && e.alive)) this.mercifulBlockEid = -1;
     const ranked = rankTargets(S.enemies, weightCfg(C));
     const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
     const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM); // ②
@@ -214,23 +223,29 @@ export class Brain {
     //   盾击不破例(攒炮期红名靠盾战反击概率晕, 省 25 OC). 慈悲(斩杀线<25%+流血)优先于要害(已晕→喂流血), 都锁同一红怪.
     const execRed = selectRedTarget(S, ranked, 'execute');
     if (execRed) {
-      if (C.useMercifulBlow && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+      // 慈悲(斩杀线处决, 不受架式门槛限制): 加去重拉黑(放不出/处决免疫就不再空点) + 记录尝试供下回合验证 OC 降没降
+      if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+        this.mercifulTry = { eid: execRed.eid, oc };
         return { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) };
-      if (C.useVitalStrike && execRed.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-        return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(已晕→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
+      }
+      // 要害(喂流血): 只在红名"未流血"时喂一次 — 5道DoT够用, 反复要害(每次50OC)会把攒给慈悲(100)的OC耗光→斩杀线OC不足放不出慈悲(实测根因)
+      if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(未流血→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
     }
     if (!saveOcForCannon) {
       const tgtSp = selectRedTarget(S, ranked, 'execute'); // 锁定红怪(连招与处决都对它)
       // ── 红名处决连招(锁同一红怪串联, 优先于杂兵): 盾击晕 → 要害收割+5流血 → 慈悲25%处决 ──
       if (tgtSp) {
-        // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决
-        if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+        // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决. 同破例: 去重拉黑 + 记录尝试(防对处决免疫的怪空点)
+        if (C.useMercifulBlow && tgtSp.eid !== this.mercifulBlockEid && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+          this.mercifulTry = { eid: tgtSp.eid, oc };
           return { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
-        // 要害(连招第2步, 50 OC): 红名已晕 → 收割 + 5道流血(喂慈悲)
-        if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        }
+        // 要害(连招第2步, 50 OC): 红名已晕 → 收割+5道流血. 让位架式: 架式未开先攒OC开架式(+100%物理更值, 修"小局斗气全砸OC技不开架式")
+        if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
           return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(已晕→喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
-        // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩(武器自带晕眩时常已晕 → 直接跳要害)
-        if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+        // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩. 让位架式: 架式未开先攒OC开架式(架式开后靠反击+主动盾击晕)
+        if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
           return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
       }
       // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
