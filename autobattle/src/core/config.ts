@@ -24,10 +24,11 @@ export const DEFAULT_CONFIG = {
   HS_MIN_ENEMIES: 2,
   CANNON_MIN_ENEMIES: 4,
   CANNON_MIN_OC: 200, // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
-  CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认). loop 按回合追踪, 弃用 opacity 判冷却(OC<200 与冷却同为 opacity:0.5 无法区分)
+  CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
+  CANNON_YIELD_OC: 175, // 架式让位阈值: 仅 OC≥此值(接近200)才关架式冲刺; OC<此值架式常驻(ehwiki:+100%物理伤害+OC净涨)
   // ── M2 开关/节奏 ──
   useCannon: true,
-  cannonYieldStance: true, // 攒炮时架式让路: 架式每回合烧 10%OC, 一开就永远攒不到 200; 关掉它让 OC 爬满放炮
+  cannonYieldStance: true, // 架式临门让位(仅 OC≥CANNON_YIELD_OC): 架式烧10%OC但反击产更多→常驻净涨, 只在冲200那1-2回合关架式, 不全程压
   cannonCdMs: 1500, // 仅防"同回合重复点"的短保护; 真冷却(50回合)与 OC 门控靠按钮置灰检测, 不再用墙钟节流
   scrollFirst: true, // 起手/2墙缺优先卷轴(关=法术逐个补省卷轴)
   delayMin: 160,

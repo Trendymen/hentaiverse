@@ -127,11 +127,12 @@ export class Brain {
     //   排在架式之上: 否则 OC 攒到 200 那刻被 P12"开架式"抢走 → 架式烧回<200 → 炮放不出+架式来回开关.
     if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
       return { type: 'cannon', exec: Exec.cannon };
-    // P12 灵动架式开关(滞回) + 攒炮让路
-    //   攒炮模式: 炮在栏 + 不在冷却 + 够怪 + OC 没攒够 → 架式让路(开着就关止血/关着别开), 让 OC 爬到 200.
-    //   冷却中(cannonOnCd)不攒: 攒满也放不出 → 架式照常用; 这才是回合冷却追踪的价值(opacity 分不清冷却/OC不足).
+    // P12 灵动架式开关(滞回) + 临门让位
+    //   架式常驻为主(ehwiki:+100%物理伤害; 平砍+反击产OC > 架式烧10% → 净涨); 仅"临门一脚"让位:
+    //   炮在栏+不冷却+够怪+OC接近200(≥CANNON_YIELD_OC 且 <200) → 关架式冲刺1-2回合让 OC 冲到 200 放炮.
+    //   OC<CANNON_YIELD_OC 架式照常滞回常驻(不再全程压架式攒炮 — 日志实测全程架关=丢光+100%伤害).
     const chargingCannon =
-      C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC;
     if (chargingCannon) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
     } else {

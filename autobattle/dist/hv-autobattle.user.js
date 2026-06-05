@@ -148,11 +148,13 @@
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
-    // 小马炮放完后 50 回合冷却(实测确认). loop 按回合追踪, 弃用 opacity 判冷却(OC<200 与冷却同为 opacity:0.5 无法区分)
+    // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
+    CANNON_YIELD_OC: 175,
+    // 架式让位阈值: 仅 OC≥此值(接近200)才关架式冲刺; OC<此值架式常驻(ehwiki:+100%物理伤害+OC净涨)
     // ── M2 开关/节奏 ──
     useCannon: true,
     cannonYieldStance: true,
-    // 攒炮时架式让路: 架式每回合烧 10%OC, 一开就永远攒不到 200; 关掉它让 OC 爬满放炮
+    // 架式临门让位(仅 OC≥CANNON_YIELD_OC): 架式烧10%OC但反击产更多→常驻净涨, 只在冲200那1-2回合关架式, 不全程压
     cannonCdMs: 1500,
     // 仅防"同回合重复点"的短保护; 真冷却(50回合)与 OC 门控靠按钮置灰检测, 不再用墙钟节流
     scrollFirst: true,
@@ -171,8 +173,19 @@
     // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
     useShieldBash: true,
     // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
-    useMercifulBlow: false
+    useMercifulBlow: false,
     // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
+    // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
+    useTargetWeight: false,
+    // 总开关(默认关·灰度); 只控制 P16 是否按权重排序. 血条 bug 修复不受此控制
+    baseHpRatio: 1,
+    // 关键可调: >0 低血优先 / <0 高血优先
+    yggdrasilExtraWeight: -1e3,
+    // 内置: 世界树 boss 绝对优先
+    unreachableWeight: 1e3,
+    // 内置: 死怪垫底
+    // 内置 13 状态权重(reference 1067-1079 实测默认值). statusWeight 是 record, 将来若做面板可调需注意整体覆盖语义
+    statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 }
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 2;
@@ -511,6 +524,21 @@
     { key: "weaken", id: SK.Weaken, cfg: "useWeaken", img: /weaken/i },
     { key: "imperil", id: SK.Imperil, cfg: "useImperil", img: /imperil/i }
   ];
+  const STATUS_LIB = {
+    We: { cn: "虚弱", img: "weaken", name: "Weaken" },
+    Bl: { cn: "致盲", img: "blind", name: "Blind" },
+    Slo: { cn: "缓慢", img: "slow", name: "Slow" },
+    Si: { cn: "沉默", img: "silence", name: "Silence" },
+    Sle: { cn: "沉眠", img: "sleep", name: "Sleep" },
+    Im: { cn: "陷危", img: "imperil", name: "Imperil" },
+    PA: { cn: "破甲", img: "wpn_ap", name: "Penetrated Armor" },
+    BW: { cn: "流血", img: "wpn_bleed", name: "Bleeding Wound" },
+    Co: { cn: "混乱", img: "confuse", name: "Confuse" },
+    Dr: { cn: "枯竭", img: "drainhp", name: "Drain" },
+    MN: { cn: "魔磁网", img: "magnet", name: "MagNet" },
+    Stun: { cn: "眩晕", img: "wpn_stun", name: "Stunned" },
+    CM: { cn: "魔力合流", img: "coalescemana", name: "Coalesced Mana" }
+  };
   const CHANNEL_Q = [
     { id: SK.Spark, need: (b) => !b.spark.active || b.spark.turns <= 2 },
     { id: SK.SpiritShield, need: (b) => !b.spiritShield.active || b.spiritShield.turns <= 1 },
@@ -606,8 +634,9 @@
       this.roundNow = 0;
       this.roundAll = 0;
       this.takesMagic = false;
+      this.initHp = {};
     }
-    // 缓存: 最近敌方对我是否魔法伤害(读不到保留)
+    // 缓存: 怪初始 HP(键=字母 A-E, 对应 mkey/DOM idx; Spawned 行解析)
     /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
      *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
     _vital(...prefixes) {
@@ -668,11 +697,22 @@
       const type = last[1].replace(/ing$/i, "").toLowerCase();
       this.takesMagic = !/pierc|crush|slash/.test(type);
     }
+    /** 从 #textlog 解析 "Spawned Monster X: MID=N (Name) LV=N HP=N" 行 → 缓存每怪初始 HP.
+     *  GF 实测格式(2026-06-05): "Spawned Monster A: MID=325614 (Halo Effect) LV=398 HP=105710".
+     *  字母 A→mkey_1/idx0, B→mkey_2/idx1 …(letter=String.fromCharCode(65+idx)).
+     *  textlog 每波给一次且最新在顶部, 长回合可能被挤出末尾 → 解析到就更新, 没有则沿用; 新波同字母覆盖. */
+    _spawnHp() {
+      const tl = document.getElementById("textlog");
+      if (!tl) return;
+      const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
+      for (const m of [...(tl.textContent || "").matchAll(re)].reverse()) this.initHp[m[1]] = +m[2];
+    }
     read() {
       var _a;
       const C = config.all();
       this._round();
       this._enemyMagic();
+      this._spawnHp();
       const hp = this._vital("vrh", "dvrh"), mp = this._vital("vrm", "dvrm"), sp = this._vital("vrs", "dvrs");
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
@@ -689,25 +729,36 @@
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
       const allMkey = $$('[id^="mkey_"]');
-      const bloodImgs = $$(".btm4 > .btm5:nth-child(1) img");
       const enemies = allMkey.map((m, idx) => {
+        var _a2;
         const eid = +m.id.split("_")[1];
-        const dimg = $$(".btm6 img", m).map((i) => i.getAttribute("src") || "");
+        const dimgEl = $$(".btm6 img", m);
+        const dimg = dimgEl.map((i) => i.getAttribute("src") || "");
         const debuff = {};
         for (const d of DEBUFFS) debuff[d.key] = dimg.some((s) => d.img.test(s));
-        const bw = bloodImgs[idx] ? parseFloat(bloodImgs[idx].style.width || "120") : 120;
+        const status = {};
+        for (const k in STATUS_LIB) {
+          const sd = STATUS_LIB[k];
+          status[k] = dimg.some((s) => s.includes(sd.img)) || dimgEl.some((i) => (i.getAttribute("onmouseover") || "").includes(`set_infopane_effect('${sd.name}'`));
+        }
+        const bImg = m.querySelector(".btm4 > .btm5:nth-child(1) img");
+        const bw = bImg ? parseFloat(bImg.style.width || "120") : 120;
+        const hpPct = isNaN(bw) ? 100 : Math.round(bw / 120 * 100);
+        const dead = /opacity/.test(m.getAttribute("style") || "");
+        const init = this.initHp[String.fromCharCode(65 + idx)];
+        const hpNow = dead ? Infinity : init ? Math.floor(init * bw / 120 + 1) : hpPct;
         return {
           eid,
-          alive: !/opacity/.test(m.getAttribute("style") || ""),
+          alive: !dead,
           is_red_boss: !!$('.btm2[style*="background"]', m),
           debuff,
           penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
-          hpPct: isNaN(bw) ? 100 : Math.round(bw / 120 * 100),
-          // 当前 HP%(满血条 width=120)
+          hpPct,
           bleeding: $$("img", m).some((i) => /wpn_bleed/i.test(i.getAttribute("src") || "")),
-          // 流血图标(慈悲处决判据)
-          stunned: $$("img", m).some((i) => /stun/i.test(i.getAttribute("src") || ""))
-          // 晕眩图标(要害连招判据: 盾击晕眩→要害高伤)【src 待实测核对】
+          stunned: $$("img", m).some((i) => /stun/i.test(i.getAttribute("src") || "")),
+          hpNow,
+          name: (((_a2 = $(".btm3", m)) == null ? void 0 : _a2.textContent) || "").trim(),
+          status
         };
       }).filter((e) => e.alive);
       const lastDmg = typeof this.prev.hp === "number" && this.prev.hp > hp ? this.prev.hp - hp : 0;
@@ -841,6 +892,30 @@
       return e ? (e.click(), true) : false;
     }
   };
+  function computeFinWeight(e, hpMin, cfg) {
+    if (!e.alive || !isFinite(e.hpNow)) return cfg.unreachableWeight;
+    let w = cfg.baseHpRatio * Math.log10(e.hpNow / hpMin);
+    if (e.name.includes("Yggdrasil")) w += cfg.yggdrasilExtraWeight;
+    for (const k in cfg.statusWeight) if (e.status[k]) w += cfg.statusWeight[k];
+    return w;
+  }
+  function rankTargets(enemies, cfg) {
+    if (!cfg.enabled) {
+      return [...enemies].map((e) => ({ ...e, finWeight: e.eid })).sort((a, b) => a.finWeight - b.finWeight);
+    }
+    const liveHp = enemies.filter((e) => e.alive && isFinite(e.hpNow)).map((e) => e.hpNow);
+    const hpMin = liveHp.length ? Math.max(1, Math.min(...liveHp)) : 1;
+    return enemies.map((e) => ({ ...e, finWeight: computeFinWeight(e, hpMin, cfg) })).sort((a, b) => a.finWeight - b.finWeight);
+  }
+  function weightCfg(C) {
+    return {
+      baseHpRatio: C.baseHpRatio,
+      yggdrasilExtraWeight: C.yggdrasilExtraWeight,
+      unreachableWeight: C.unreachableWeight,
+      statusWeight: C.statusWeight,
+      enabled: C.useTargetWeight
+    };
+  }
   class Brain {
     decide(S) {
       const C = config.all();
@@ -915,7 +990,7 @@
       if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
       if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
-      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC;
       if (chargingCannon) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
@@ -945,8 +1020,9 @@
         if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
           return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
       }
-      const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
-      if (trash.length) return A("attack", trash.sort((a, c) => a.eid - c.eid)[0].eid);
+      const ranked = rankTargets(S.enemies, weightCfg(C));
+      const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
+      if (trash.length) return A("attack", trash[0].eid);
       if (tgt) {
         S.lockedRedId = tgt.eid;
         return A("attack", tgt.eid);
@@ -977,8 +1053,8 @@
   let timer = null;
   let lastSig = "";
   let stuckN = 0;
-  let cannonCdLeft = 0;
-  let inBattlePrev = false;
+  let cannonCd = Store.get("cannonCd", 0);
+  let cannonRoundSeen = Store.get("cannonRound", -1);
   function inBattle() {
     return !!document.getElementById("pane_vitals") || !!document.querySelector('[id^="vrh"],[id^="dvrh"]');
   }
@@ -989,20 +1065,20 @@
   }
   function tick() {
     try {
-      const nowIn = inBattle();
-      if (!nowIn) inBattlePrev = false;
-      if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
-        if (!inBattlePrev) {
-          cannonCdLeft = 0;
-          inBattlePrev = true;
-        }
+      if (config.get("enabled") && inBattle() && Date.now() >= busyUntil) {
         const S = reader.read();
         const fp = fingerprint(S);
         const changed = fp !== lastFp;
         const stalled = Date.now() - actedAt > 2500;
         if (changed || stalled) {
-          if (changed && cannonCdLeft > 0) cannonCdLeft--;
-          S.cannonOnCd = cannonCdLeft > 0;
+          if (changed) {
+            if (S.roundNow > 0 && cannonRoundSeen > 0 && S.roundNow < cannonRoundSeen) cannonCd = 0;
+            cannonRoundSeen = S.roundNow;
+            if (cannonCd > 0) cannonCd--;
+            Store.set("cannonCd", cannonCd);
+            Store.set("cannonRound", cannonRoundSeen);
+          }
+          S.cannonOnCd = cannonCd > 0;
           let a = brain.decide(S);
           const sig = `${a.type}:${a.id ?? ""}`;
           if (!changed && sig === lastSig) stuckN++;
@@ -1013,7 +1089,10 @@
             a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: "安全网:上招放不出→强制平砍" } : { type: "defend", exec: () => Exec.defend(), note: "安全网:上招放不出→防御" };
             stuckN = 0;
           }
-          if (a.type === "cannon") cannonCdLeft = config.get("CANNON_CD_TURNS");
+          if (a.type === "cannon") {
+            cannonCd = config.get("CANNON_CD_TURNS");
+            Store.set("cannonCd", cannonCd);
+          }
           if (S.roundNow !== lastRound) {
             turn = 0;
             lastRound = S.roundNow;
@@ -1039,7 +1118,7 @@
           const pct = (v, m) => m ? Math.min(100, Math.round(v / m * 100)) : 0;
           let note = "";
           if (a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
-            if (S.cannonOnCd) note = `炮:冷却剩${cannonCdLeft}回合`;
+            if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
             else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
           }
           logger.push({
@@ -1051,7 +1130,7 @@
             sp: pct(S.sp, S.maxSp || C.SPMAX),
             alive: S.alive,
             total: S.monsterTotal,
-            cannon: S.cannonOnCd ? `冷却${cannonCdLeft}` : S.overcharge >= C.CANNON_MIN_OC ? "可放" : "攒OC",
+            cannon: S.cannonOnCd ? `冷却${cannonCd}` : S.overcharge >= C.CANNON_MIN_OC ? "可放" : "攒OC",
             stance: S.stanceOn,
             action: actionLabel(a),
             note
