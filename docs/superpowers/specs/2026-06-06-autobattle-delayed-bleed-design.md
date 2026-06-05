@@ -89,16 +89,15 @@ shouldFeed(execRed, cfg):
      r = avg( samples.slice(-cfg.rateWindow) )
      if r > cfg.minRate:
         T = ceil((hp - 25) / r)               // 还需几回合到 25%
-        if T <= 0:     return true            // ② 单击跨窗(r 极大)→ 立刻喂
-        return T <= cfg.bleedTurns - cfg.safety   // ③ T≤4 才喂
+        return T <= cfg.bleedTurns - cfg.safety   // ② T≤4 才喂
      // r 太小/负 → 落兜底
-  return hp <= cfg.fallbackHpPct              // ④ 兜底血量窗口(缠杂兵/被动掉血场景)
+  return hp <= cfg.fallbackHpPct              // ③ 兜底血量窗口(缠杂兵/被动掉血场景)
 ```
 
 **边界逐条**
 - **样本不足**(刚锁红名、样本=0)→ 走兜底窗口 30%,已比旧"一晕就喂"保守得多。
 - **r 太小或负**(被动掉血、被治疗回血、血条读数抖动)→ 走兜底窗口,绝不会算出超大 T 卡死。
-- **单击跨窗**(要害本身把怪从 28%→20%)→ `T≤0` 立刻喂,喂完即 <25%+流血,下回合直接慈悲。
+- **单击跨窗**(平砍/要害一击把怪从 28%→20% 打穿斩杀线)→ 不在速率分支处理, 由首行 `hp<=25 return true` 在**下一回合**兜(届时 hp 已 ≤25, 喂完即 <25%+流血, 再下回合慈悲)。注: `hp>25 && r>minRate>0` 时 `T=ceil((hp-25)/r)` 恒 ≥1, 不存在 T≤0 情形, 故速率分支无需单独处理一击跨窗。
 - **血厚 boss 单回合掉幅 <1%**(hpPct 整数粒度读成 0)→ 被 `drop>0` 过滤 → 样本攒得慢 → 落兜底 30%(可接受的保守,兜底接住)。
 - **量纲统一**: 速率、T、斩杀线 25、兜底窗口全用 `hpPct`(0-100); **不用 `hpNow`** —— 它在 `initHp` 缺失时退化为 hpPct(reader.ts:184),量纲会在同一只怪生命周期内漂移。
 
@@ -135,10 +134,9 @@ function bleedCfg(C: Config): BleedTimerConfig {
 /** BleedTimer 喂入/判定输入(EnemyState 结构子集; EnemyState 鸭子类型可直接传) */
 export interface BleedFeedInput {
   eid: number;
-  is_red_boss: boolean;
+  is_red_boss: boolean;  // 语义标注; observe 收到的已是 filter(is_red_boss) 后的红名
   hpPct: number;
-  bleeding: boolean;
-  stunned: boolean;
+  // stunned/bleeding 不入此接口: 由 brain 两处要害分支的外层守卫把关(见 §3), BleedTimer 内部只用 hpPct/eid
 }
 
 /** BleedTimer 配置(brain 从 config 装配传入; 模块本身不碰单例) */
@@ -184,13 +182,15 @@ private hitRed<A extends Action>(eid: number, a: A): A {
 }
 ```
 
+> 上面只示范了**要害两处**。§8.2 清单里的 6 个 return(破例慈悲 + 破例要害 + 连招慈悲 + 连招要害 + 连招盾击 + 仅剩红怪平砍)**全部**改为经 `return this.hitRed(eid, action)` 返回 —— 慈悲/盾击/平砍三类同样套用(`hitRed` 是泛型 helper, spell/attack 两种 Action 都适配)。`castOnRed`(P13 减益)路径**绝不**套 hitRed。
+
 ### 8.2 noteActiveAttack 埋点清单(哪些 return 算"主动攻击红名")
 
 | 埋(真造成主动掉血) | 不埋(会污染样本 / 被动) |
 |---|---|
 | 破例线 慈悲(L229) / 要害(L233) | P13 红怪减益 `castOnRed`(L208) —— 减益不掉血,计入会拉低 r → 永不喂 |
 | 连招 慈悲(L242) / 要害(L246) / 盾击(L249) | 放炮 AOE(被动削红名) |
-| 仅剩红怪平砍(L276/L288) | 杂兵线、防御、治疗、补 buff |
+| 仅剩红怪平砍(L276) | 杂兵线、防御、治疗、补 buff |
 
 共 **6 个埋点**。漏埋只会让样本偏少 → 偏保守走兜底,不会崩。
 
@@ -228,7 +228,7 @@ observe(reds):                          // reds = 当前所有活红名快照
 - **不引入 vitest**: 项目 package.json 仅 dev/build/typecheck, 引入测试 runner 是另一个工程, 超出本次范围。`BleedTimer` 设计成纯输入可测(无 DOM/config 单例耦合), 未来若加 runner 可直接喂 `observe`/`noteActiveAttack` 序列断言。
 - **本次验证**:
   1. `npm run typecheck` 通过 + vscode-mcp-server diagnostics 清洁(改动文件)。
-  2. 复用 `loop.ts` 已有的 `[HVAB:foes]` 调试日志, 追加喂血判定字段(红名 `eid/hpPct/r/T/路径(速率or兜底)/shouldFeed 结果`)。
+  2. 喂血判定的诊断量(`r/T/路径(速率or兜底)/shouldFeed 结果`)是 BleedTimer 内部状态, loop 层的 `[HVAB:foes]` 取不到 → **就地打**: 在 `BleedTimer.shouldFeed` 内 `console.log('[HVAB:bleed]', { eid, hpPct, r, T, path, feed })`(仿现有 `[HVAB:eid0]` 就地日志范式), 不绕 loop / 不改 Action.note / 不暴露私有状态, 保持 BleedTimer 零外部耦合。
   3. GF 真机实测肉眼核对: 要害是否在接近 25% 才喂、流血是否覆盖到斩杀、慈悲是否顺利接上。
 
 ## 11. 风险与边界
