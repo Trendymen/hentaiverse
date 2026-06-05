@@ -92,9 +92,8 @@ export class Brain {
       return mp >= sparkCost ? A('spell', SK.Protection) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
     if (ssDown)
       return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
-    // P5 Absorb(仅法系怪; TODO: 接入"当前怪是否法系")
-    const isMagic = false;
-    if (isMagic && (!b.absorb.active || b.absorb.turns <= 1)) return A('spell', SK.Absorb);
+    // P5 Absorb(仅法系怪): 最近敌方对我造成魔法伤害 → 上吸收墙. useAbsorb 默认关(盾战物防为主).
+    if (C.useAbsorb && S.tookMagicDmg && (!b.absorb.active || b.absorb.turns <= 1)) return A('spell', SK.Absorb);
     // P7 Haste
     if (!b.haste.active || b.haste.turns <= 1) return A('spell', SK.Haste);
     // 重击波垫血(节流)

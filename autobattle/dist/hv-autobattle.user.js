@@ -161,8 +161,10 @@
     useWeaken: true,
     useImperil: true,
     // 红怪减益序列开关
-    useChanneling: true
+    useChanneling: true,
     // Channeling 主动利用
+    useAbsorb: false
+    // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 2;
@@ -277,7 +279,7 @@
     const p = el("div");
     p.appendChild(group("喝药线(低于即补)", pctRow("PANIC_RED", "急救血"), pctRow("HP_HEAL", "常规喝血"), pctRow("MP_LOW", "回蓝"), pctRow("SP_LOW", "喝灵力")));
     p.appendChild(group("灵动架式(斗气)", pctRow("OC_ON", "≥ 开"), pctRow("OC_OFF", "< 关")));
-    p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益")));
+    p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益"), swRow("useAbsorb", "法系怪吸收墙")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "觅心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
     return p;
@@ -449,6 +451,7 @@
     FullCure: 313,
     Protection: 411,
     Haste: 412,
+    Absorb: 421,
     Spark: 422,
     SpiritShield: 423,
     Heartseeker: 431
@@ -571,7 +574,9 @@
       this.maxSp = 0;
       this.roundNow = 0;
       this.roundAll = 0;
+      this.takesMagic = false;
     }
+    // 缓存: 最近敌方对我是否魔法伤害(读不到保留)
     /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
      *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
     _vital(...prefixes) {
@@ -621,10 +626,22 @@
         this.roundAll = +last[2];
       }
     }
+    /** 从 #textlog 最新一条"敌方对我伤害"判物理/魔法(物理 pierc/crush/slash, 否则魔法).
+     *  翻写自 dodying:4264-4280; 日志最新在末尾(与 _round 一致)故取最后一个匹配; 读不到保留上次缓存. */
+    _enemyMagic() {
+      const tl = document.getElementById("textlog");
+      if (!tl) return;
+      const ms = [...(tl.textContent || "").matchAll(/you for \d+ ([a-zA-Z]+) damage/g)];
+      const last = ms[ms.length - 1];
+      if (!last) return;
+      const type = last[1].replace(/ing$/i, "").toLowerCase();
+      this.takesMagic = !/pierc|crush|slash/.test(type);
+    }
     read() {
       var _a;
       const C = config.all();
       this._round();
+      this._enemyMagic();
       const hp = this._vital("vrh", "dvrh"), mp = this._vital("vrm", "dvrm"), sp = this._vital("vrs", "dvrs");
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
@@ -688,6 +705,7 @@
         stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute("src") || "")),
         riddle: !!document.getElementById("riddlecounter"),
         canContinue: !!document.getElementById("btcp"),
+        tookMagicDmg: this.takesMagic,
         roundNow: this.roundNow,
         roundAll: this.roundAll,
         monsterTotal: allMkey.length,
@@ -846,6 +864,7 @@
         return mp >= sparkCost ? A("spell", SK.Protection) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
       if (ssDown)
         return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
+      if (C.useAbsorb && S.tookMagicDmg && (!b.absorb.active || b.absorb.turns <= 1)) return A("spell", SK.Absorb);
       if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A("spell", SK.Regen);

@@ -34,6 +34,7 @@ export const DEFAULT_CONFIG = {
   useWeaken: true,
   useImperil: true, // 红怪减益序列开关
   useChanneling: true, // Channeling 主动利用
+  useAbsorb: false, // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
 };
 
 export type Config = typeof DEFAULT_CONFIG;

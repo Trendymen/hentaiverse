@@ -89,6 +89,7 @@ export interface BattleState {
   stanceOn: boolean;
   riddle: boolean;
   canContinue: boolean;
+  tookMagicDmg: boolean;
   roundNow: number;
   roundAll: number;
   monsterTotal: number;

@@ -13,6 +13,7 @@ export class StateReader {
   maxSp = 0;
   roundNow = 0;
   roundAll = 0;
+  takesMagic = false; // 缓存: 最近敌方对我是否魔法伤害(读不到保留)
 
   /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
    *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
@@ -67,9 +68,22 @@ export class StateReader {
     }
   }
 
+  /** 从 #textlog 最新一条"敌方对我伤害"判物理/魔法(物理 pierc/crush/slash, 否则魔法).
+   *  翻写自 dodying:4264-4280; 日志最新在末尾(与 _round 一致)故取最后一个匹配; 读不到保留上次缓存. */
+  private _enemyMagic(): void {
+    const tl = document.getElementById('textlog');
+    if (!tl) return;
+    const ms = [...(tl.textContent || '').matchAll(/you for \d+ ([a-zA-Z]+) damage/g)];
+    const last = ms[ms.length - 1];
+    if (!last) return;
+    const type = last[1].replace(/ing$/i, '').toLowerCase();
+    this.takesMagic = !/pierc|crush|slash/.test(type);
+  }
+
   read(): BattleState {
     const C = config.all();
     this._round(); // 更新轮数缓存
+    this._enemyMagic(); // 更新"最近敌方伤害是否魔法"缓存
     // HV 按状态/布局换 vital 数值 id: HP 实测 vrhd↔vrhb(截图证), 宽屏版加前缀 dvr*. 用前缀匹配兜住所有变体(修"切到 vrhb 态 HUD 全空+脚本停摆")
     const hp = this._vital('vrh', 'dvrh'),
       mp = this._vital('vrm', 'dvrm'),
@@ -153,6 +167,7 @@ export class StateReader {
       stanceOn: !!(stance && /spirit_a/.test(stance.getAttribute('src') || '')),
       riddle: !!document.getElementById('riddlecounter'),
       canContinue: !!document.getElementById('btcp'),
+      tookMagicDmg: this.takesMagic,
       roundNow: this.roundNow,
       roundAll: this.roundAll,
       monsterTotal: allMkey.length,
