@@ -153,13 +153,14 @@ export class Brain {
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
     // P15 OC 近战技 + 跨波攒炮预算(OC 跨波保留, 是稀缺资源, 要花在刀刃上).
-    //   攒炮模式 saveOcForCannon: 纯杂兵(无红名)+ 炮在栏不冷却 + 血线健康 + (本波怪还多≥4 OR 本波高密度) → 攒 OC 不花单体技.
-    //     高密度波(monsterTotal≥CANNON_MIN_ENEMIES)即使清到剩 2-3 杂兵也攒: 杂兵平砍清, OC 留给(本/下)波开炮 AOE(下波大概率也多).
-    //   非攒炮(有红名 / 力不从心 / 低密度波 / 炮冷却) → 用单体技减压: 慈悲处决红名, 要害秒怪, 盾击晕眩.
-    const struggling = hp < C.HP_HEAL * HM; // 力不从心(血线压力 → 杀怪减压优先于攒炮)
+    //   攒炮模式 saveOcForCannon: 炮在栏不冷却 + 血线健康 + (本波怪还多≥4 OR 本波高密度) → 攒 OC 不花单体技.
+    //     有红名也攒: 怪多时炮 AOE 清场+削红名最值(red boss 也吃炮伤), 总是先尝试攒炮.
+    //     高密度波(monsterTotal≥CANNON_MIN_ENEMIES)即使清到剩 2-3 杂兵也攒: 杂兵平砍清, OC 留给(本/下)波开炮 AOE.
+    //   放弃攒炮(血线下降 struggling / 低密度波 / 炮冷却) → 单体技减压: 慈悲处决红名, 要害秒怪降围殴, 盾击晕眩.
+    const struggling = hp < C.HP_HEAL * HM; // 血线下降(掉到健康线下 → 放弃攒炮, 单体技杀怪减压)
     const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES; // 高密度波(下波大概率也多 → 值得跨波攒炮)
     const saveOcForCannon =
-      C.useCannon && S.cannonExists && !S.cannonOnCd && !hasRed && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
+      C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
     if (!saveOcForCannon) {
       // 最后的慈悲(100 OC): 仅红名怪 25%+流血 处决(贵, 杂兵平砍即秒不值)
       const dying = S.enemies.find((e) => e.alive && e.is_red_boss && e.hpPct < 25 && e.bleeding);
