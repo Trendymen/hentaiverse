@@ -89,7 +89,9 @@ export class StateReader {
     const tl = document.getElementById('textlog');
     if (!tl) return;
     const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
-    for (const m of (tl.textContent || '').matchAll(re)) this.initHp[m[1]] = +m[2];
+    // textlog 顶新底旧(本文件 _round/_enemyMagic 注释的"末尾"措辞与此相反, 以 GF 实测 spec§2.4 为准).
+    // reverse: matchAll 按文本序(顶→底=新→旧), 反转后先写旧波、后写新波 → 同字母新波覆盖旧波(防 textlog 万一不清空时用错波次 HP).
+    for (const m of [...(tl.textContent || '').matchAll(re)].reverse()) this.initHp[m[1]] = +m[2];
   }
 
   read(): BattleState {

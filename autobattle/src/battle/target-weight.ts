@@ -22,7 +22,7 @@ export function rankTargets(enemies: WeightInput[], cfg: WeightConfig): RankedEn
       .sort((a, b) => a.finWeight - b.finWeight);
   }
   const liveHp = enemies.filter((e) => e.alive && isFinite(e.hpNow)).map((e) => e.hpNow);
-  const hpMin = liveHp.length ? Math.min(...liveHp) : 1;
+  const hpMin = liveHp.length ? Math.max(1, Math.min(...liveHp)) : 1; // 下界 1: 防血条解析失败(bw=0→hpNow=0)致 log10(_/0)=NaN 排序乱
   return enemies
     .map((e) => ({ ...e, finWeight: computeFinWeight(e, hpMin, cfg) }))
     .sort((a, b) => a.finWeight - b.finWeight);
