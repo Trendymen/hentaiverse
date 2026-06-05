@@ -327,6 +327,7 @@
     p.appendChild(group("喝药线(低于即补)", pctRow("PANIC_RED", "急救血"), pctRow("HP_HEAL", "常规喝血"), pctRow("MP_LOW", "回蓝"), pctRow("SP_LOW", "喝灵力")));
     p.appendChild(group("灵动架式(斗气)", pctRow("OC_ON", "≥ 开"), pctRow("OC_OFF", "< 关")));
     p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益"), swRow("useAbsorb", "法系怪吸收墙")));
+    p.appendChild(group("高压/塔楼", swRow("usePressureControl", "高压控制"), swRow("useSilence", "沉默"), swRow("useShadowVeil", "影纱"), pctRow("SP_RESERVE_RATIO", "SP预留")));
     p.appendChild(group("OC 近战技(非炮场景)", swRow("useVitalStrike", "要害强击"), swRow("useShieldBash", "盾击晕眩"), swRow("useMercifulBlow", "慈悲处决")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "穿心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
@@ -505,11 +506,15 @@
   const SK = {
     Weaken: 212,
     Imperil: 213,
+    Slow: 221,
+    Blind: 231,
+    Silence: 232,
     Cure: 311,
     Regen: 312,
     FullCure: 313,
     Protection: 411,
     Haste: 412,
+    ShadowVeil: 413,
     Absorb: 421,
     Spark: 422,
     SpiritShield: 423,
@@ -561,6 +566,13 @@
   const DEBUFFS = [
     { key: "weaken", id: SK.Weaken, cfg: "useWeaken", img: /weaken/i },
     { key: "imperil", id: SK.Imperil, cfg: "useImperil", img: /imperil/i }
+  ];
+  const CONTROL_DEBUFFS = [
+    { key: "weaken", status: "We", id: SK.Weaken, cfg: "useWeaken" },
+    { key: "silence", status: "Si", id: SK.Silence, cfg: "useSilence" },
+    { key: "imperil", status: "Im", id: SK.Imperil, cfg: "useImperil" },
+    { key: "blind", status: "Bl", id: SK.Blind, cfg: "useBlind" },
+    { key: "slow", status: "Slo", id: SK.Slow, cfg: "useSlow" }
   ];
   const STATUS_LIB = {
     We: { cn: "虚弱", img: "weaken", name: "Weaken" },
@@ -976,6 +988,83 @@
     const hpMin = liveHp.length ? Math.max(1, Math.min(...liveHp)) : 1;
     return enemies.map((e) => ({ ...e, finWeight: computeFinWeight(e, hpMin, cfg) })).sort((a, b) => a.finWeight - b.finWeight);
   }
+  function isYggdrasil(e) {
+    return (e.name || "").includes("Yggdrasil");
+  }
+  function hasDebuff(e, key, status) {
+    var _a, _b;
+    return Boolean(((_a = e.debuff) == null ? void 0 : _a[key]) || ((_b = e.status) == null ? void 0 : _b[status]));
+  }
+  function hasFutureRound(S) {
+    return S.roundAll === 0 || S.roundNow === 0 || S.roundNow < S.roundAll;
+  }
+  function assessPressure(S, C, memory) {
+    const HM = S.maxHp || C.HPMAX;
+    const SM = S.maxSp || C.SPMAX;
+    const spRatio = SM ? S.sp / SM : 1;
+    const tower = S.battleType === "塔楼";
+    const hasRed = S.enemies.some((e) => e.alive && e.is_red_boss);
+    const spReserveLow = spRatio < C.SP_RESERVE_RATIO;
+    const spCritical = spRatio < C.SP_LOW;
+    const manyEnemies = S.alive >= C.CONTROL_MIN_ENEMIES;
+    const heavy = S.lastDmg > 0.3 * HM;
+    const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
+    const high = spCritical || heavy || lowHp || tower && (manyEnemies || spReserveLow || hasRed);
+    const medium = high || tower || hasRed || manyEnemies || spReserveLow;
+    return {
+      level: high ? "high" : medium ? "medium" : "low",
+      spReserveLow,
+      spCritical,
+      tower,
+      hasRed
+    };
+  }
+  function selectRedTarget(S, ranked = [], need = "damage") {
+    const live = S.enemies.filter((e) => e.alive && e.is_red_boss);
+    if (!live.length) return null;
+    const ygg = live.find(isYggdrasil);
+    if (ygg) return ygg;
+    if (need === "execute") {
+      const ex = live.find((e) => e.hpPct < 25 && e.bleeding);
+      if (ex) return ex;
+    }
+    if (need === "control") {
+      const gap = live.find((e) => !hasDebuff(e, "weaken", "We") || !hasDebuff(e, "imperil", "Im"));
+      if (gap) return gap;
+    }
+    const locked = S.lockedRedId !== void 0 ? live.find((e) => e.eid === S.lockedRedId) : void 0;
+    if (locked) return locked;
+    return ranked.find((e) => e.alive && e.is_red_boss) || live.sort((a, b) => a.eid - b.eid)[0] || null;
+  }
+  function selectControlDebuff(S, C, ranked, pressure) {
+    if (!C.usePressureControl || pressure.level === "low") return null;
+    if (!pressure.tower && !pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
+    const live = ranked.filter((e) => e.alive);
+    if (!live.length) return null;
+    const highValue = live.filter((e) => e.is_red_boss || isYggdrasil(e));
+    const scope = pressure.level === "high" ? live : highValue.length ? highValue : live.slice(0, 1);
+    for (const d of CONTROL_DEBUFFS) {
+      if (!C[d.cfg]) continue;
+      if (d.key === "silence" && !(pressure.spReserveLow || pressure.level === "high")) continue;
+      if ((d.key === "blind" || d.key === "slow") && pressure.level !== "high") continue;
+      if (d.key === "imperil") {
+        const target2 = (highValue.length ? highValue : scope).find((e) => !hasDebuff(e, d.key, d.status));
+        if (target2) return { id: d.id, key: d.key, target: target2, note: `控:高价值陷危#${target2.eid}` };
+        continue;
+      }
+      const target = scope.find((e) => !hasDebuff(e, d.key, d.status));
+      if (!target) continue;
+      const label = d.key === "weaken" ? "全体虚弱" : d.key === "silence" ? "SP压沉默" : d.key;
+      return { id: d.id, key: d.key, target, note: `控:${label}#${target.eid}` };
+    }
+    return null;
+  }
+  function shouldSaveOcForCannon(S, C, pressure, struggling) {
+    if (!C.useCannon || !S.cannonExists || S.cannonOnCd || struggling) return false;
+    if (pressure.level === "high" || pressure.spReserveLow) return false;
+    if (S.alive >= C.CANNON_MIN_ENEMIES) return true;
+    return hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES;
+  }
   function weightCfg(C) {
     return {
       baseHpRatio: C.baseHpRatio,
@@ -999,6 +1088,8 @@
       const hasRed = S.enemies.some((e) => e.is_red_boss);
       if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
       else this.lowHpStreak = 0;
+      const ranked = rankTargets(S.enemies, weightCfg(C));
+      const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
       const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM);
       const predicted = hp - danger, PANIC = (hasRed ? C.PANIC_RED : C.PANIC_NORM) * HM;
       const mpFree = Math.max(0, mp - C.SPARK_RESERVE);
@@ -1014,6 +1105,8 @@
         }
         return null;
       };
+      const pickMana = () => S.gems.mp ? A("item", S.gems.mp) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
+      const pickSpirit = () => S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
       if (S.riddle) {
         const r = this.riddle();
         return r ? { type: "riddle", option: r.option, exec: () => {
@@ -1024,9 +1117,11 @@
       if (S.canContinue) return { type: "continue", exec: () => Exec.continueBattle() };
       if (!b.spark.active || b.spark.turns <= 2) {
         if (mp >= sparkCost && Exec.skillReady(SK.Spark)) return A("spell", SK.Spark);
+        if (b.spark.active && S.gems.mystic && !ch && C.useChanneling !== false)
+          return { type: "item", id: S.gems.mystic, note: "Mystic:开Channeling补Spark", exec: () => Exec.item(S.gems.mystic) };
         if (!b.spark.active)
           return hp < 0.6 * HM ? pickHeal() ?? { type: "defend", exec: Exec.defend, note: "Spark真空+急救药耗尽硬抗" } : { type: "defend", exec: Exec.defend, note: "Spark真空+缺MP硬抗" };
-        return S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+        return pickMana();
       }
       if (hp < PANIC || predicted < PANIC && hp < C.HP_HEAL * HM) {
         const canCure = mp >= C.MP_LOW * MM || ch;
@@ -1034,7 +1129,25 @@
         if (canCure && Exec.skillReady(SK.Cure)) return A("spell", SK.Cure);
         return pickHeal() ?? (Exec.skillReady(SK.Spark) && mp >= sparkCost ? A("spell", SK.Spark) : { type: "defend", exec: Exec.defend, note: "治疗冷却+急救药耗尽硬抗" });
       }
+      const shadowDown = !b.shadowVeil.active || b.shadowVeil.turns <= 1;
+      const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
+      const prDown = !b.protection.active || b.protection.turns <= 1;
+      const scrollCanCoverWalls = C.scrollFirst && S.scrollReady && ssDown && prDown;
       if (ch && C.useChanneling !== false) {
+        const channelFriendly = [
+          { id: SK.Spark, need: !b.spark.active || b.spark.turns <= 2 },
+          { id: SK.SpiritShield, need: !b.spiritShield.active || b.spiritShield.turns <= 1 },
+          { id: SK.Protection, need: !b.protection.active || b.protection.turns <= 1 },
+          { id: SK.ShadowVeil, need: C.useShadowVeil && shadowDown && !pressure.spReserveLow && (!C.shadowVeilPressureOnly || pressure.level !== "low") }
+        ];
+        for (const q of channelFriendly) {
+          if (q.need && Exec.skillReady(q.id)) return A("spell", q.id);
+        }
+        const control2 = selectControlDebuff(S, C, ranked, pressure);
+        if (control2 && Exec.skillReady(control2.id)) {
+          if (control2.target.is_red_boss) S.lockedRedId = control2.target.eid;
+          return { type: "spell", id: control2.id, note: `${control2.note}(Channeling)`, exec: () => Exec.castHostileOn(control2.id, control2.target.eid) };
+        }
         for (const q of CHANNEL_Q) {
           if (!q.need(b, S)) continue;
           if (!Exec.skillReady(q.id)) continue;
@@ -1046,17 +1159,20 @@
           return A("spell", q.id);
         }
       }
+      if (scrollCanCoverWalls) return A("item", IT.scrollProt);
+      const mysticControl = selectControlDebuff(S, C, ranked, pressure);
+      const mysticDefenseNeed = !scrollCanCoverWalls && (ssDown || prDown) && mp < sparkCost || C.useShadowVeil && shadowDown && pressure.level !== "low" && mpFree < C.MP_LOW * MM;
+      if (S.gems.mystic && !ch && C.useChanneling !== false && (mysticDefenseNeed || mysticControl && pressure.level !== "low"))
+        return { type: "item", id: S.gems.mystic, note: mysticDefenseNeed ? "Mystic:开Channeling补防御" : "Mystic:开Channeling控压", exec: () => Exec.item(S.gems.mystic) };
       if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
-        return S.gems.mp ? A("item", S.gems.mp) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
-      const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
-      const prDown = !b.protection.active || b.protection.turns <= 1;
-      if (C.scrollFirst && S.scrollReady && ssDown && prDown)
-        return A("item", IT.scrollProt);
+        return pickMana();
       if (prDown)
-        return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A("spell", SK.Protection) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+        return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A("spell", SK.Protection) : pickMana();
       if (ssDown)
-        return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A("spell", SK.SpiritShield) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+        return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A("spell", SK.SpiritShield) : pickMana();
       if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A("spell", SK.Absorb);
+      if (C.useShadowVeil && shadowDown && !pressure.spReserveLow && (!C.shadowVeilPressureOnly || pressure.level !== "low") && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(SK.ShadowVeil))
+        return { type: "spell", id: SK.ShadowVeil, note: `压:${pressure.level} 影纱`, exec: () => Exec.skill(SK.ShadowVeil) };
       if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if ((!b.regen.active || b.regen.turns <= 1) && Exec.skillReady(SK.Regen)) return A("spell", SK.Regen);
@@ -1065,7 +1181,14 @@
         if (!b.mpot.active) return A("item", IT.mDraught);
       }
       if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A("item", S.gems.hp) : A("item", IT.hDraught);
-      if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
+      const control = selectControlDebuff(S, C, ranked, pressure);
+      if (control && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(control.id)) {
+        if (control.target.is_red_boss) S.lockedRedId = control.target.eid;
+        return { type: "spell", id: control.id, note: `${control.note} 压:${pressure.level}`, exec: () => Exec.castHostileOn(control.id, control.target.eid) };
+      }
+      const spReserveNeed = sp < C.SP_RESERVE_RATIO * SM && (b.spiritShield.active || pressure.level !== "low");
+      if ((sp < C.SP_LOW * SM || spReserveNeed || sp < C.SP_LOW * SM && S.stanceOn) && !b.spot.active)
+        return { ...pickSpirit(), note: spReserveNeed ? "SP:预留不足" : "SP:低线" };
       if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
       const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
@@ -1077,7 +1200,7 @@
         if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: "stance", exec: Exec.stance };
         if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
       }
-      const tgt = this.lockTarget(S);
+      const tgt = selectRedTarget(S, ranked, "control");
       if (tgt == null ? void 0 : tgt.is_red_boss) {
         for (const d of DEBUFFS) {
           if (C[d.cfg] === false) continue;
@@ -1090,10 +1213,10 @@
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM) && Exec.skillReady(SK.Heartseeker))
         return A("spell", SK.Heartseeker);
       const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK;
-      const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES;
-      const saveOcForCannon = C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
+      const finalRound = !hasFutureRound(S);
+      const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
       if (!saveOcForCannon) {
-        const tgtSp = this.lockTarget(S);
+        const tgtSp = selectRedTarget(S, ranked, "execute");
         if (tgtSp) {
           if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
             return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
@@ -1102,18 +1225,19 @@
           if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
             return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
         }
-        if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
-          const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
-          if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
-            return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${struggling ? "力不从心" : "红名在场"}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+        if (C.useVitalStrike && (hasRed || struggling || finalRound || pressure.level !== "low") && oc >= 50) {
+          const stunTrash = ranked.find((e) => e.alive && e.stunned && !e.is_red_boss);
+          if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike)) {
+            const why = struggling ? "力不从心" : hasRed ? "红名在场" : finalRound ? "最终波" : "高压";
+            return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${why}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+          }
         }
         if (C.useShieldBash && oc >= 25) {
-          const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
+          const toStun = ranked.find((e) => e.alive && !e.is_red_boss && !e.stunned);
           if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
             return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
         }
       }
-      const ranked = rankTargets(S.enemies, weightCfg(C));
       const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) {
         const t = trash[0];
@@ -1128,8 +1252,7 @@
     }
     /** 锁定红怪(记忆目标优先, 否则首个活红怪) */
     lockTarget(S) {
-      const live = S.enemies.filter((e) => e.is_red_boss && e.alive);
-      return S.lockedRedId !== void 0 && live.find((e) => e.eid === S.lockedRedId) || live[0] || null;
+      return selectRedTarget(S, rankTargets(S.enemies, weightCfg(config.all())), "damage");
     }
     /** 定向红怪释放 hostile 减益 */
     castOnRed(id, tgt, S) {
@@ -1150,6 +1273,8 @@
   let timer = null;
   let lastSig = "";
   let lastInBattle = null;
+  let inBattleFalseStreak = 0;
+  const EXIT_FALSE_STREAK = 4;
   let stuckN = 0;
   let cannonCd = Store.get("cannonCd", 0);
   let cannonRoundSeen = Store.get("cannonRound", -1);
@@ -1166,9 +1291,15 @@
   }
   function tick() {
     const nowIn = inBattle();
-    if (nowIn !== lastInBattle) {
-      bus.emit("battle:active", nowIn);
-      lastInBattle = nowIn;
+    if (nowIn) {
+      inBattleFalseStreak = 0;
+      if (lastInBattle !== true) {
+        bus.emit("battle:active", true);
+        lastInBattle = true;
+      }
+    } else if (lastInBattle !== false && ++inBattleFalseStreak >= EXIT_FALSE_STREAK) {
+      bus.emit("battle:active", false);
+      lastInBattle = false;
     }
     try {
       if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
@@ -1355,7 +1486,6 @@
     root.appendChild(logView);
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
-    if (config.get("logOpen") && document.getElementById("pane_vitals")) toggleLog(logView, true);
     bus.on("battle:active", (active) => {
       if (active) {
         if (config.get("logOpen")) toggleLog(logView, true);

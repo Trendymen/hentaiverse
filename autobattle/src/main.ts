@@ -78,10 +78,9 @@ function mountUI(): void {
   document.body.appendChild(root);
 
   if (config.get('panelOpen')) togglePanel(panel, true);
-  // reload 后若记忆打开且当前在战斗 → 立即恢复日志窗口(不等首次 tick, 跨波丝滑); 非战斗页不开
-  if (config.get('logOpen') && document.getElementById('pane_vitals')) toggleLog(logView, true);
 
-  // 日志窗口随战斗开关(loop emit battle:active, 退出已去抖): 进战斗+记忆打开→自动开; 真退出战斗→关窗口+清记忆(用户选定)
+  // 日志窗口随战斗开关(loop emit battle:active, 退出已去抖): 进战斗+记忆打开→自动开(靠首次 tick, 不挂载主动开 —
+  //   挂载立即开会跟整页 reload 重建同帧→闪, 见 57f0504 无闪对比); 真退出战斗→关窗口+清记忆(用户选定)
   bus.on('battle:active', (active) => {
     if (active) {
       if (config.get('logOpen')) toggleLog(logView, true);
