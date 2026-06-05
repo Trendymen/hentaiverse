@@ -120,7 +120,8 @@ export const CHANNEL_Q: ChannelDef[] = [
   {
     id: SK.Heartseeker,
     need: (b, S) =>
-      (!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= config.get('HS_MIN_ENEMIES'),
+      (!b.heartseeker.active || b.heartseeker.turns <= 1) &&
+      (S.alive >= config.get('HS_MIN_ENEMIES') || S.enemies.some((e) => e.is_red_boss)),
   },
 ];
 

@@ -154,8 +154,8 @@ export class Brain {
         return this.castOnRed(d.id, tgt, S);
       }
     }
-    // P14 Heartseeker(持久战提暴)
-    if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
+    // P14 Heartseeker(持久战提暴; 多怪 或 有红名boss 都放 — 单 boss 血厚打最久最该提暴, HS_MIN_ENEMIES 只挡纯杂兵速清波)
+    if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
     // P15 OC 近战技 + 跨波攒炮预算(OC 跨波保留, 是稀缺资源, 要花在刀刃上).
     //   攒炮模式 saveOcForCannon: 炮在栏不冷却 + 血线健康 + (本波怪还多≥4 OR 本波高密度) → 攒 OC 不花单体技.
