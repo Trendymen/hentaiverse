@@ -152,20 +152,25 @@ export class Brain {
     // P14 Heartseeker(持久战提暴)
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
-    // P15 OC 特殊近战技(非炮场景才用 — 多怪攒炮时让路, 按用户定的 OC 预算规则).
-    //   炮场景 = 多怪 + 炮在栏 + 不在冷却(该攒炮, OC 留给炮) → 跳过本段.
-    //   冷却中(cannonOnCd)反而进本段: 炮放不出, OC 不必留 → 花在盾击/要害/慈悲(用 cannonExists 非 opacity, 炮死锁同源).
-    if (!(C.useCannon && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES)) {
-      // 最后的慈悲(100 OC, 残血处决): 仅【红名怪/强怪】HP<25% + 流血. 100 OC 昂贵, 杂兵 25% 血平砍即秒不值得 → 留给血厚红怪处决省回合
+    // P15 OC 近战技 + 跨波攒炮预算(OC 跨波保留, 是稀缺资源, 要花在刀刃上).
+    //   攒炮模式 saveOcForCannon: 纯杂兵(无红名)+ 炮在栏不冷却 + 血线健康 + (本波怪还多≥4 OR 本波高密度) → 攒 OC 不花单体技.
+    //     高密度波(monsterTotal≥CANNON_MIN_ENEMIES)即使清到剩 2-3 杂兵也攒: 杂兵平砍清, OC 留给(本/下)波开炮 AOE(下波大概率也多).
+    //   非攒炮(有红名 / 力不从心 / 低密度波 / 炮冷却) → 用单体技减压: 慈悲处决红名, 要害秒怪, 盾击晕眩.
+    const struggling = hp < C.HP_HEAL * HM; // 力不从心(血线压力 → 杀怪减压优先于攒炮)
+    const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES; // 高密度波(下波大概率也多 → 值得跨波攒炮)
+    const saveOcForCannon =
+      C.useCannon && S.cannonExists && !S.cannonOnCd && !hasRed && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
+    if (!saveOcForCannon) {
+      // 最后的慈悲(100 OC): 仅红名怪 25%+流血 处决(贵, 杂兵平砍即秒不值)
       const dying = S.enemies.find((e) => e.alive && e.is_red_boss && e.hpPct < 25 && e.bleeding);
       if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
         return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
       const tgtSp = this.lockTarget(S); // 红怪优先
-      // 要害强击(50 OC): 仅打【已晕眩的红名怪】(与慈悲一致, 50 OC 别浪费在平砍即秒的杂兵上). 红怪晕眩由盾击上 → 收割+5道流血喂慈悲
-      const stunnedTgt = tgtSp?.stunned ? tgtSp : null;
+      // 要害强击(50 OC): 红名已晕→收割喂流血; 【红名在场 或 力不从心】→ 秒已晕杂兵减围殴血线压力; 纯杂兵且血健康→不放(平砍清, 省 OC 攒炮)
+      const stunnedTgt = (tgtSp?.stunned ? tgtSp : null) || ((hasRed || struggling) ? S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss) : null);
       if (C.useVitalStrike && stunnedTgt && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
         return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunnedTgt.eid) };
-      // 盾击(25 OC): 给【未晕眩】目标上晕眩(连招第1步, 为要害铺垫; 已晕眩不重复). 优先红怪, 否则杂兵
+      // 盾击(25 OC): 给未晕眩目标上晕眩(红怪优先铺要害; 否则杂兵, 晕眩减伤 + 铺要害秒杂兵)
       const toStun = tgtSp && !tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
       if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
         return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
