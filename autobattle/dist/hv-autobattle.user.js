@@ -1274,8 +1274,6 @@
   let timer = null;
   let lastSig = "";
   let lastInBattle = null;
-  let inBattleFalseStreak = 0;
-  const EXIT_FALSE_STREAK = 4;
   let stuckN = 0;
   let cannonCd = Store.get("cannonCd", 0);
   let cannonRoundSeen = Store.get("cannonRound", -1);
@@ -1292,15 +1290,9 @@
   }
   function tick() {
     const nowIn = inBattle();
-    if (nowIn) {
-      inBattleFalseStreak = 0;
-      if (lastInBattle !== true) {
-        bus.emit("battle:active", true);
-        lastInBattle = true;
-      }
-    } else if (lastInBattle !== false && ++inBattleFalseStreak >= EXIT_FALSE_STREAK) {
-      bus.emit("battle:active", false);
-      lastInBattle = false;
+    if (nowIn !== lastInBattle) {
+      bus.emit("battle:active", nowIn);
+      lastInBattle = nowIn;
     }
     try {
       if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
@@ -1485,9 +1477,8 @@
     root.appendChild(hud);
     root.appendChild(panel);
     root.appendChild(logView);
-    if (config.get("panelOpen")) togglePanel(panel, true);
-    if (config.get("logOpen") && document.getElementById("pane_vitals")) toggleLog(logView, true);
     document.body.appendChild(root);
+    if (config.get("panelOpen")) togglePanel(panel, true);
     bus.on("battle:active", (active) => {
       if (active) {
         if (config.get("logOpen")) toggleLog(logView, true);
