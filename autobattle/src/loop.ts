@@ -136,6 +136,23 @@ function tick(): void {
           if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
           else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
         }
+        // debug 埋点(红名/boss 识别 + 晕眩/流血/减益): 配合"要害+慈悲破例靠盾战反击晕红名"验证 —
+        //   看 reader 认红名(is_red_boss)对不对 + 红名到底晕没晕(stunned)/有没有流血(bleeding) + 当回合决策. console 用 HVAB:foes 过滤. 验证后连同 mkey_0 埋点一并清.
+        {
+          const foes = S.enemies.filter((e) => e.alive);
+          const reds = foes.filter((e) => e.is_red_boss);
+          if (foes.length)
+            console.log(
+              `[HVAB:foes] ▶${actionLabel(a)} | 活${foes.length} 红${reds.length} | ` +
+                foes.map((e) => `#${e.eid}${e.is_red_boss ? '红' : ''}${e.stunned ? '晕' : ''}${e.bleeding ? '血' : ''}:${e.hpPct}%`).join(' ') +
+                (reds.length
+                  ? ' || ' +
+                    reds
+                      .map((e) => `红名#${e.eid}(${e.name || '?'}) ${e.hpPct}% ${e.stunned ? '已晕' : '未晕'} ${e.bleeding ? '流血' : '无血'} [${Object.keys(e.debuff || {}).filter((k) => e.debuff[k]).join(',') || '无减益'}]`)
+                      .join(' / ')
+                  : ''),
+            );
+        }
         logger.push({
           round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
           turn,
