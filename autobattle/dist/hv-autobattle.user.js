@@ -165,10 +165,10 @@
     // Channeling 主动利用
     useAbsorb: false,
     // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
-    useVitalStrike: false,
-    // 要害强击(默认关: castHostileOn 对 OC 技能的释放机制待战斗实测确认, 防死循环)
-    useShieldBash: false,
-    // 盾击(默认关: 同上, 待实测真实 onclick 释放方式)
+    useVitalStrike: true,
+    // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
+    useShieldBash: true,
+    // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
     useMercifulBlow: false
     // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
   };
@@ -751,7 +751,9 @@
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
         cannonReady: !!cannonEl && !cannonDimmed,
-        // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
+        // 未置灰 = OC≥200 且不冷却(实测: OC<200 也 opacity0.5+onclick=null, 与冷却无法区分) → 仅用于 OC≥200 时放炮判定
+        cannonExists: !!cannonEl,
+        // 炮在技能栏(不管置灰): 攒炮判定用此(OC<200 必置灰, 用 cannonReady 会攒炮死锁)
         scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
         firstRound: this.prev._started !== true,
         lockedRedId: this.prev.lockedRedId,
@@ -915,7 +917,7 @@
       if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
       if (C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
         return { type: "cannon", exec: Exec.cannon };
-      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
       if (chargingCannon) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {

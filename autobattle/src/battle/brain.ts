@@ -124,7 +124,7 @@ export class Brain {
     //   攒炮模式: 炮已冷却好(cannonReady)+ 够怪 + OC 没攒够 → 架式让路(开着就关止血/关着别开), 让 OC 爬到 200.
     //   ⚠用 cannonReady(冷却好)而非"在技能栏": 炮在50回合冷却中就不攒、架式照常用, 否则冷却期也压着架式空等→来回开关.
     const chargingCannon =
-      C.useCannon && C.cannonYieldStance && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      C.useCannon && C.cannonYieldStance && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
     if (chargingCannon) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
     } else {

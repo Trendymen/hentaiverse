@@ -35,8 +35,8 @@ export const DEFAULT_CONFIG = {
   useImperil: true, // 红怪减益序列开关
   useChanneling: true, // Channeling 主动利用
   useAbsorb: false, // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
-  useVitalStrike: false, // 要害强击(默认关: castHostileOn 对 OC 技能的释放机制待战斗实测确认, 防死循环)
-  useShieldBash: false, // 盾击(默认关: 同上, 待实测真实 onclick 释放方式)
+  useVitalStrike: true, // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
+  useShieldBash: true, // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
   useMercifulBlow: false, // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
 };
 

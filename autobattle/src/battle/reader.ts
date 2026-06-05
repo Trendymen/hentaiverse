@@ -182,7 +182,8 @@ export class StateReader {
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
-      cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
+      cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = OC≥200 且不冷却(实测: OC<200 也 opacity0.5+onclick=null, 与冷却无法区分) → 仅用于 OC≥200 时放炮判定
+      cannonExists: !!cannonEl, // 炮在技能栏(不管置灰): 攒炮判定用此(OC<200 必置灰, 用 cannonReady 会攒炮死锁)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,
       lockedRedId: this.prev.lockedRedId,
