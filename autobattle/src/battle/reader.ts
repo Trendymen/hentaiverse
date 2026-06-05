@@ -174,8 +174,9 @@ export class StateReader {
             dimg.some((s) => s.includes(sd.img)) ||
             dimgEl.some((i) => (i.getAttribute('onmouseover') || '').includes(`set_infopane_effect('${sd.name}`)); // 前缀匹配(去闭合'): 兼容叠加层数后缀如 'Penetrated Armor (x2)'(GF 实测)
         }
-        // 血条 per-mkey(修 index bug: 全局 .btm5:nth-child(1) img 每怪含 nbargreen+nbarfg 两 img → bloodImgs[idx] 错位)
-        const bImg = m.querySelector<HTMLImageElement>('.btm4 > .btm5:nth-child(1) img');
+        // 血条 per-mkey: HP 是红条 nbarred.png. 实测怪 .btm4 三条 .btm5: [0]nbardead 死亡条(平时 w 空, 受击短暂=损失量) / [1]nbarblue(alt=magic) / [2]nbarred(HP).
+        //   原 .btm5:nth-child(1) 命中第一条 nbardead → 读成乱码: 间歇挨打的怪≈满血, 狂揍的怪读到递减损失值(假血量). 实测 Drogon 真26%被读成94%. 直接按 src 选 nbarred.
+        const bImg = m.querySelector<HTMLImageElement>('.btm4 img[src*="nbarred"]');
         const bw = bImg ? parseFloat(bImg.style.width || '120') : 120;
         const hpPct = isNaN(bw) ? 100 : Math.round((bw / 120) * 100); // 满血条 width=120(GF 实测)
         const dead = /opacity/.test(m.getAttribute('style') || '');

@@ -820,7 +820,7 @@
           const sd = STATUS_LIB[k];
           status[k] = dimg.some((s) => s.includes(sd.img)) || dimgEl.some((i) => (i.getAttribute("onmouseover") || "").includes(`set_infopane_effect('${sd.name}`));
         }
-        const bImg = m.querySelector(".btm4 > .btm5:nth-child(1) img");
+        const bImg = m.querySelector('.btm4 img[src*="nbarred"]');
         const bw = bImg ? parseFloat(bImg.style.width || "120") : 120;
         const hpPct = isNaN(bw) ? 100 : Math.round(bw / 120 * 100);
         const dead = /opacity/.test(m.getAttribute("style") || "");
