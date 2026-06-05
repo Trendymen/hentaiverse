@@ -151,6 +151,8 @@
     // 连续几次决策跌破 STRUGGLE_HP 才放弃攒炮(去抖, 防单次瞬掉误触发)
     MP_LOW: 0.35,
     SP_LOW: 0.3,
+    SP_RESERVE_RATIO: 0.45,
+    // 高压/灵力盾场景的 SP 预留线: 不要求开架式也会补灵力
     OC_ON: 0.5,
     // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
@@ -182,6 +184,17 @@
     // Channeling 主动利用
     useAbsorb: false,
     // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
+    useShadowVeil: true,
+    // 高压影纱: 默认只在压力场景维护, 低压保留反击/OC收益
+    shadowVeilPressureOnly: true,
+    usePressureControl: true,
+    // 高压控制层: Weaken -> Silence -> 高价值 Imperil
+    CONTROL_MIN_ENEMIES: 4,
+    useSilence: true,
+    useBlind: false,
+    useSlow: false,
+    useSleep: false,
+    // 本轮只保留配置/ID, 不进默认自动链
     useVitalStrike: true,
     // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
     useShieldBash: true,
@@ -527,12 +540,13 @@
     spirit: 10007,
     // 灵力宝石 → SP
     mystic: 10008
-    // 神秘宝石 → HP/MP/SP
+    // 神秘宝石 → Channeling
   };
   const BUFF_IMG = {
     spark: "sparklife",
     spiritShield: "spiritshield",
     protection: "protection",
+    shadowVeil: "shadowveil",
     absorb: "absorb",
     haste: "haste",
     regen: "regen",
@@ -586,11 +600,16 @@
   const SK_CN = {
     212: "虚弱",
     213: "陷危",
+    221: "缓慢",
+    222: "沉眠",
+    231: "致盲",
+    232: "沉默",
     311: "治疗",
     312: "细胞活化",
     313: "完全治愈",
     411: "守护",
     412: "急速",
+    413: "影纱",
     421: "吸收",
     422: "生命火花",
     423: "灵力盾",
@@ -816,6 +835,7 @@
         spark: B.spark,
         spiritShield: B.spiritShield,
         protection: B.protection,
+        shadowVeil: B.shadowVeil,
         absorb: B.absorb,
         haste: B.haste,
         regen: B.regen,
@@ -826,7 +846,7 @@
         spot: B.spot
       };
       const gemAvail = (db) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
-      const pickGem = (own) => gemAvail(own) ? own : gemAvail(GEM.mystic) ? GEM.mystic : 0;
+      const pickGem = (own) => gemAvail(own) ? own : 0;
       return {
         hp,
         mp,
@@ -848,7 +868,7 @@
         roundAll: this.roundAll,
         monsterTotal: allMkey.length,
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
-        gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
+        gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit), mystic: gemAvail(GEM.mystic) ? GEM.mystic : 0 },
         cannonExists: !!cannonEl,
         // 炮在技能栏(攒炮/放炮/OC技能让路共用)
         cannonOnCd: false,
@@ -1268,7 +1288,7 @@
   function slowPoll() {
     ensureObserver();
     tick();
-    timer = setTimeout(slowPoll, 2e3);
+    timer = setTimeout(slowPoll, mo ? 2e3 : 300);
   }
   function startLoop() {
     if (timer === null) {
@@ -1335,6 +1355,7 @@
     root.appendChild(logView);
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
+    if (config.get("logOpen") && document.getElementById("pane_vitals")) toggleLog(logView, true);
     bus.on("battle:active", (active) => {
       if (active) {
         if (config.get("logOpen")) toggleLog(logView, true);
