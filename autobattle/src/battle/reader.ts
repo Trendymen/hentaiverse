@@ -2,7 +2,7 @@
 // XHR 旁路捕获已在 main.ts(document-start)完成; 本层以 DOM 解析为主数据源.
 import { config } from '../core/config';
 import { $, $$ } from '../core/dom';
-import { BUFF_IMG, DEBUFFS, SS_CN, GEM } from './tables';
+import { BUFF_IMG, DEBUFFS, SS_CN, GEM, STATUS_LIB } from './tables';
 import { IT } from './tables';
 import type { BattleState, BuffMap, BuffState, EnemyState } from '../types';
 
@@ -14,6 +14,7 @@ export class StateReader {
   roundNow = 0;
   roundAll = 0;
   takesMagic = false; // 缓存: 最近敌方对我是否魔法伤害(读不到保留)
+  initHp: Record<string, number> = {}; // 缓存: 怪初始 HP(键=字母 A-E, 对应 mkey/DOM idx; Spawned 行解析)
 
   /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
    *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
@@ -80,10 +81,22 @@ export class StateReader {
     this.takesMagic = !/pierc|crush|slash/.test(type);
   }
 
+  /** 从 #textlog 解析 "Spawned Monster X: MID=N (Name) LV=N HP=N" 行 → 缓存每怪初始 HP.
+   *  GF 实测格式(2026-06-05): "Spawned Monster A: MID=325614 (Halo Effect) LV=398 HP=105710".
+   *  字母 A→mkey_1/idx0, B→mkey_2/idx1 …(letter=String.fromCharCode(65+idx)).
+   *  textlog 每波给一次且最新在顶部, 长回合可能被挤出末尾 → 解析到就更新, 没有则沿用; 新波同字母覆盖. */
+  private _spawnHp(): void {
+    const tl = document.getElementById('textlog');
+    if (!tl) return;
+    const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
+    for (const m of (tl.textContent || '').matchAll(re)) this.initHp[m[1]] = +m[2];
+  }
+
   read(): BattleState {
     const C = config.all();
     this._round(); // 更新轮数缓存
     this._enemyMagic(); // 更新"最近敌方伤害是否魔法"缓存
+    this._spawnHp(); // 更新怪初始 HP 缓存(Spawned 行)
     // HV 按状态/布局换 vital 数值 id: HP 实测 vrhd↔vrhb(截图证), 宽屏版加前缀 dvr*. 用前缀匹配兜住所有变体(修"切到 vrhb 态 HUD 全空+脚本停摆")
     const hp = this._vital('vrh', 'dvrh'),
       mp = this._vital('vrm', 'dvrm'),
@@ -111,24 +124,41 @@ export class StateReader {
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;
 
     const allMkey = $$<HTMLElement>('[id^="mkey_"]');
-    // 怪血条 img(顺序同 mkey): style.width/120 = HP%(翻写 dodying countMonsterHP:3296). 【index 对应待 GF 核对】
-    const bloodImgs = $$<HTMLImageElement>('.btm4 > .btm5:nth-child(1) img');
     const enemies: EnemyState[] = allMkey
       .map((m, idx) => {
         const eid = +m.id.split('_')[1];
-        const dimg = $$<HTMLImageElement>('.btm6 img', m).map((i) => i.getAttribute('src') || '');
+        const dimgEl = $$<HTMLImageElement>('.btm6 img', m);
+        const dimg = dimgEl.map((i) => i.getAttribute('src') || '');
         const debuff: Record<string, boolean> = {};
         for (const d of DEBUFFS) debuff[d.key] = dimg.some((s) => d.img.test(s));
-        const bw = bloodImgs[idx] ? parseFloat(bloodImgs[idx].style.width || '120') : 120;
+        // 13 状态 flags: src 关键字 或 onmouseover 官方名(双保险, 翻写 dodying skillLib)
+        const status: Record<string, boolean> = {};
+        for (const k in STATUS_LIB) {
+          const sd = STATUS_LIB[k];
+          status[k] =
+            dimg.some((s) => s.includes(sd.img)) ||
+            dimgEl.some((i) => (i.getAttribute('onmouseover') || '').includes(`set_infopane_effect('${sd.name}'`));
+        }
+        // 血条 per-mkey(修 index bug: 全局 .btm5:nth-child(1) img 每怪含 nbargreen+nbarfg 两 img → bloodImgs[idx] 错位)
+        const bImg = m.querySelector<HTMLImageElement>('.btm4 > .btm5:nth-child(1) img');
+        const bw = bImg ? parseFloat(bImg.style.width || '120') : 120;
+        const hpPct = isNaN(bw) ? 100 : Math.round((bw / 120) * 100); // 满血条 width=120(GF 实测)
+        const dead = /opacity/.test(m.getAttribute('style') || '');
+        // 绝对 hpNow: initHp[字母] × width/120(翻写 dodying:3296); 初始HP缺失退化 hpPct(同基准排序仍对); 死怪 Infinity
+        const init = this.initHp[String.fromCharCode(65 + idx)];
+        const hpNow = dead ? Infinity : init ? Math.floor((init * bw) / 120 + 1) : hpPct;
         return {
           eid,
-          alive: !/opacity/.test(m.getAttribute('style') || ''),
+          alive: !dead,
           is_red_boss: !!$('.btm2[style*="background"]', m),
           debuff,
           penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
-          hpPct: isNaN(bw) ? 100 : Math.round((bw / 120) * 100), // 当前 HP%(满血条 width=120)
-          bleeding: $$<HTMLImageElement>('img', m).some((i) => /wpn_bleed/i.test(i.getAttribute('src') || '')), // 流血图标(慈悲处决判据)
-          stunned: $$<HTMLImageElement>('img', m).some((i) => /stun/i.test(i.getAttribute('src') || '')), // 晕眩图标(要害连招判据: 盾击晕眩→要害高伤)【src 待实测核对】
+          hpPct,
+          bleeding: $$<HTMLImageElement>('img', m).some((i) => /wpn_bleed/i.test(i.getAttribute('src') || '')),
+          stunned: $$<HTMLImageElement>('img', m).some((i) => /stun/i.test(i.getAttribute('src') || '')),
+          hpNow,
+          name: ($('.btm3', m)?.textContent || '').trim(),
+          status,
         };
       })
       .filter((e) => e.alive);
