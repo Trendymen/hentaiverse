@@ -216,7 +216,22 @@
     unreachableWeight: 1e3,
     // 内置: 死怪垫底
     // 内置 13 状态权重(reference 1067-1079 实测默认值). statusWeight 是 record, 将来若做面板可调需注意整体覆盖语义
-    statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 }
+    statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 },
+    // ── 要害延迟喂流血(BleedTimer; 详见 specs/2026-06-06-autobattle-delayed-bleed-design.md)──
+    useDelayedBleed: true,
+    // 延迟逻辑开关; false 退回旧"红名一晕就喂"(灰度可一键回滚)
+    BLEED_DURATION: 5,
+    // 流血持续回合 B(要害产的 DoT 覆盖窗口)
+    BLEED_SAFETY: 1,
+    // 安全余量; 要求 T ≤ B-safety(=4) 才喂, 留 1 回合冗余防 DoT 先过期
+    BLEED_FALLBACK_HP: 30,
+    // 无主动速率样本/速率太小时的兜底血量窗口(hpPct ≤ 此值就喂)
+    BLEED_RATE_WINDOW: 3,
+    // 速率移动平均窗口(最近 2-3 个主动样本)
+    BLEED_MIN_SAMPLES: 1,
+    // 走速率主路最少样本数, 不足走兜底
+    BLEED_MIN_RATE: 1
+    // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 3;
@@ -1006,6 +1021,72 @@
     const hpMin = liveHp.length ? Math.max(1, Math.min(...liveHp)) : 1;
     return enemies.map((e) => ({ ...e, finWeight: computeFinWeight(e, hpMin, cfg) })).sort((a, b) => a.finWeight - b.finWeight);
   }
+  const SAMPLE_CAP = 8;
+  const EXECUTE_HP = 25;
+  class BleedTimer {
+    constructor() {
+      this.reds = /* @__PURE__ */ new Map();
+      this.pendingActiveEid = null;
+    }
+    // 上回合主动攻击登记的红名 eid
+    /** 每回合 decide 开头无条件调一次. 兑现上回合主动样本 + cleanup 死红名 + 更新血量基线.
+     *  @param reds 当前所有活红名快照(已由 brain filter(is_red_boss)) */
+    observe(reds) {
+      const aliveEids = new Set(reds.map((e) => e.eid));
+      const stale = [];
+      for (const eid of this.reds.keys()) if (!aliveEids.has(eid)) stale.push(eid);
+      for (const eid of stale) this.reds.delete(eid);
+      for (const red of reds) {
+        const rec = this.reds.get(red.eid) ?? { lastHpPct: red.hpPct, activeDeltas: [] };
+        if (this.pendingActiveEid === red.eid) {
+          const drop = rec.lastHpPct - red.hpPct;
+          if (drop > 0) {
+            rec.activeDeltas.push(drop);
+            while (rec.activeDeltas.length > SAMPLE_CAP) rec.activeDeltas.shift();
+          }
+        }
+        rec.lastHpPct = red.hpPct;
+        this.reds.set(red.eid, rec);
+      }
+      this.pendingActiveEid = null;
+    }
+    /** brain 在"本回合决策 = 主动攻击该红名"的 return 分支(经 hitRed)登记归因.
+     *  下一回合 observe 时该 eid 的掉血才算主动样本. */
+    noteActiveAttack(eid) {
+      this.pendingActiveEid = eid;
+    }
+    /** 是否该现在喂要害. 只看血量/速率时机; stunned/!bleeding/oc 由 brain 外层守卫. */
+    shouldFeed(execRed, cfg) {
+      var _a;
+      if (!cfg.enabled) return true;
+      const hp = execRed.hpPct;
+      let path = "fallback";
+      let r = NaN;
+      let T = NaN;
+      let feed;
+      if (hp <= EXECUTE_HP) {
+        path = "execLine";
+        feed = true;
+      } else {
+        const samples = ((_a = this.reds.get(execRed.eid)) == null ? void 0 : _a.activeDeltas) ?? [];
+        if (samples.length >= cfg.minSamples) {
+          const win = samples.slice(-cfg.rateWindow);
+          r = win.reduce((a, b) => a + b, 0) / win.length;
+          if (r > cfg.minRate) {
+            path = "rate";
+            T = Math.ceil((hp - EXECUTE_HP) / r);
+            feed = T <= cfg.bleedTurns - cfg.safety;
+          } else {
+            feed = hp <= cfg.fallbackHpPct;
+          }
+        } else {
+          feed = hp <= cfg.fallbackHpPct;
+        }
+      }
+      console.log("[HVAB:bleed]", { eid: execRed.eid, hpPct: hp, r: Math.round(r * 10) / 10, T, path, feed });
+      return feed;
+    }
+  }
   function isYggdrasil(e) {
     return (e.name || "").includes("Yggdrasil");
   }
@@ -1089,14 +1170,31 @@
       enabled: C.useTargetWeight
     };
   }
+  function bleedCfg(C) {
+    return {
+      enabled: C.useDelayedBleed,
+      bleedTurns: C.BLEED_DURATION,
+      safety: C.BLEED_SAFETY,
+      fallbackHpPct: C.BLEED_FALLBACK_HP,
+      rateWindow: C.BLEED_RATE_WINDOW,
+      minSamples: C.BLEED_MIN_SAMPLES,
+      minRate: C.BLEED_MIN_RATE
+    };
+  }
   class Brain {
     constructor() {
       this.lowHpStreak = 0;
       this.charging = false;
       this.mercifulTry = null;
       this.mercifulBlockEid = -1;
+      this.bleedTimer = new BleedTimer();
     }
-    // 慈悲拉黑目标: 上次慈悲 OC 没降=没放出(HV 拒绝处决, 如世界树 boss 免疫处决) → 本段不再对它空点慈悲, 改要害磨; 目标死/不在则解除
+    // 要害延迟喂流血: 红名掉血速率追踪 + 喂血时机判定(跨回合状态)
+    /** 登记"本回合主动攻击了红名 eid"(供下回合算掉血样本)后原样返回 action. 只用于真造成主动掉血的红名 return. */
+    hitRed(eid, a) {
+      this.bleedTimer.noteActiveAttack(eid);
+      return a;
+    }
     decide(S) {
       var _a;
       const C = config.all();
@@ -1112,6 +1210,7 @@
       }
       if (this.mercifulBlockEid >= 0 && !S.enemies.some((e) => e.eid === this.mercifulBlockEid && e.alive)) this.mercifulBlockEid = -1;
       const ranked = rankTargets(S.enemies, weightCfg(C));
+      this.bleedTimer.observe(S.enemies.filter((e) => e.is_red_boss && e.alive));
       const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
       const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM);
       const predicted = hp - danger, PANIC = (hasRed ? C.PANIC_RED : C.PANIC_NORM) * HM;
@@ -1243,22 +1342,22 @@
       if (execRed) {
         if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
           this.mercifulTry = { eid: execRed.eid, oc };
-          return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) };
+          return this.hitRed(execRed.eid, { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) });
         }
-        if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(未流血→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
+        if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(execRed, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return this.hitRed(execRed.eid, { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(${execRed.hpPct}%·延迟喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) });
       }
       if (!saveOcForCannon) {
         const tgtSp = selectRedTarget(S, ranked, "execute");
         if (tgtSp) {
           if (C.useMercifulBlow && tgtSp.eid !== this.mercifulBlockEid && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
             this.mercifulTry = { eid: tgtSp.eid, oc };
-            return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
+            return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) });
           }
-          if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-            return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(已晕→喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+          if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+            return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(${tgtSp.hpPct}%·延迟喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) });
           if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-            return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
+            return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) });
         }
         if (C.useVitalStrike && (hasRed || struggling || finalRound || pressure.level !== "low") && oc >= 50) {
           const stunTrash = ranked.find((e) => e.alive && e.stunned && !e.is_red_boss);
@@ -1281,7 +1380,7 @@
       }
       if (tgt) {
         S.lockedRedId = tgt.eid;
-        return { type: "attack", id: tgt.eid, note: `平砍红名#${tgt.eid}(仅剩红怪,${tgt.hpPct}%)`, exec: () => Exec.attack(tgt.eid) };
+        return this.hitRed(tgt.eid, { type: "attack", id: tgt.eid, note: `平砍红名#${tgt.eid}(仅剩红怪,${tgt.hpPct}%)`, exec: () => Exec.attack(tgt.eid) });
       }
       return { type: "defend", exec: Exec.defend };
     }

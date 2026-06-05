@@ -67,7 +67,7 @@ export class Brain {
     if (this.mercifulBlockEid >= 0 && !S.enemies.some((e) => e.eid === this.mercifulBlockEid && e.alive)) this.mercifulBlockEid = -1;
     const ranked = rankTargets(S.enemies, weightCfg(C));
     // 要害延迟喂血: 每回合无条件喂入活红名快照(兑现上回合主动样本 + cleanup 死红名 + 更新血量基线)
-    this.bleedTimer.observe(S.enemies.filter((e) => e.is_red_boss));
+    this.bleedTimer.observe(S.enemies.filter((e) => e.is_red_boss && e.alive));
     const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
     const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM); // ②
     const predicted = hp - danger,
