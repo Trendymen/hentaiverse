@@ -671,12 +671,13 @@
       }
       return NaN;
     }
-    /** buff 剩余回合(【待 GF 实测核对读法】) */
+    /** buff 剩余回合: onmouseover set_infopane_effect('名','描述',第三参数) — 数字=回合, 'autocast'/字符串=游戏自动维持(常驻).
+     *  XHR /json 响应实测确认(pane_effects 字段, 也在 DOM): Regen 21 / Heartseeker 326 / Spark等 autocast. 原读 [id*=expire] 读不到才兜底 99. */
     _expire(img) {
-      var _a, _b;
-      const ex = (_a = img.parentElement) == null ? void 0 : _a.querySelector('[id*="expire"]');
-      const n = ex ? parseInt(((_b = (ex.textContent || "").match(/\d+/)) == null ? void 0 : _b[0]) ?? "") : NaN;
-      return isNaN(n) ? 99 : n;
+      var _a;
+      const mo = img.getAttribute("onmouseover") || "";
+      const p = (((_a = mo.match(/set_infopane_effect\('[^']*',\s*'[^']*',\s*([^)]+)\)/)) == null ? void 0 : _a[1]) || "").trim();
+      return /^\d+$/.test(p) ? parseInt(p) : 99;
     }
     /** 解析所有 buff 图标(含 channeling) */
     _buffs() {

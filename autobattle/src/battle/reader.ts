@@ -29,11 +29,12 @@ export class StateReader {
     return NaN;
   }
 
-  /** buff 剩余回合(【待 GF 实测核对读法】) */
+  /** buff 剩余回合: onmouseover set_infopane_effect('名','描述',第三参数) — 数字=回合, 'autocast'/字符串=游戏自动维持(常驻).
+   *  XHR /json 响应实测确认(pane_effects 字段, 也在 DOM): Regen 21 / Heartseeker 326 / Spark等 autocast. 原读 [id*=expire] 读不到才兜底 99. */
   private _expire(img: Element): number {
-    const ex = img.parentElement?.querySelector('[id*="expire"]');
-    const n = ex ? parseInt((ex.textContent || '').match(/\d+/)?.[0] ?? '') : NaN;
-    return isNaN(n) ? 99 : n;
+    const mo = img.getAttribute('onmouseover') || '';
+    const p = (mo.match(/set_infopane_effect\('[^']*',\s*'[^']*',\s*([^)]+)\)/)?.[1] || '').trim();
+    return /^\d+$/.test(p) ? parseInt(p) : 99; // 数字=剩余回合; 'autocast'/其他=游戏自动/常驻 → 99 不补
   }
 
   /** 解析所有 buff 图标(含 channeling) */
