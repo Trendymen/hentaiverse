@@ -19,6 +19,7 @@ function weightCfg(C: Config): WeightConfig {
 
 export class Brain {
   private lowHpStreak = 0; // 连续 hp<STRUGGLE_HP 的决策次数(达 STRUGGLE_STREAK 才判血线下降, 防单次瞬掉误触发)
+  private charging = false; // 攒炮冲刺态(滞回): OC≥YIELD 进入关架式并保持, 放炮归0/跌破OC_OFF/炮不可用才退出 — 防架式在 YIELD 上下抖动
 
   decide(S: BattleState): Action {
     const C = config.all();
@@ -136,10 +137,13 @@ export class Brain {
     //   架式常驻为主(ehwiki:+100%物理伤害; 平砍+反击产OC > 架式烧10% → 净涨); 仅"临门一脚"让位:
     //   炮在栏+不冷却+够怪+OC接近200(≥CANNON_YIELD_OC 且 <200) → 关架式冲刺1-2回合让 OC 冲到 200 放炮.
     //   OC<CANNON_YIELD_OC 架式照常滞回常驻(不再全程压架式攒炮 — 日志实测全程架关=丢光+100%伤害).
-    const chargingCannon =
-      C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC;
-    if (chargingCannon) {
-      if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
+    //   ⚠滞回防抖(GF 实测 66 次切架式 bug): 原 chargingCannon 每回合按 oc≥YIELD 重算 → 关架式后 OC 烧到<YIELD 又满足常驻开架式 → 175 上下反复横跳.
+    //   改 charging 状态滞回: OC≥YIELD 进入冲刺(关架式并保持), 放炮归0 / 跌破 OC_OFF / 炮不可用 才退出, 冲刺期只切一次架式.
+    const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
+    if (cannonCtx && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC) this.charging = true;
+    if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
+    if (this.charging) {
+      if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 冲刺期关架式(只切一次, 之后保持关攒到 200)
     } else {
       if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: 'stance', exec: Exec.stance };
       if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
