@@ -935,7 +935,7 @@
       }
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
-      if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+      if (!(C.useCannon && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES)) {
         const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
         if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
           return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };

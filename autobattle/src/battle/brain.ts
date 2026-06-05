@@ -145,8 +145,9 @@ export class Brain {
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
     // P15 OC 特殊近战技(非炮场景才用 — 多怪攒炮时让路, 按用户定的 OC 预算规则).
-    //   非炮场景 = 非"多怪+炮可用(攒炮中)"局面: 此时 OC 不必留给炮, 可花在这三个吃 OC 的技.
-    if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+    //   非炮场景 = 非"多怪+有炮(该攒炮)"局面. ⚠必须用 cannonExists 而非 cannonReady(与炮死锁同源):
+    //   攒炮时 OC<200 炮置灰 → cannonReady=false, 用它会误判"非炮场景"→ 要害偷 50 OC → 永远攒不到 200.
+    if (!(C.useCannon && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES)) {
       // 最后的慈悲(100 OC, 残血处决): 怪 HP<25% + 流血(对齐原版 dodying:3811). 处决优先于要害/盾击
       const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
       if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
