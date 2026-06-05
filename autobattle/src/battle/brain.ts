@@ -113,12 +113,12 @@ export class Brain {
       return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     // P5 Absorb(仅法系怪): 最近敌方对我造成魔法伤害 → 上吸收墙. useAbsorb 默认关(盾战物防为主).
     if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A('spell', SK.Absorb); // 加 skillReady(冷却检测): Absorb 放了进冷却就别反复决策(根治法吸死循环)
-    // P7 Haste
-    if (!b.haste.active || b.haste.turns <= 1) return A('spell', SK.Haste);
+    // P7 Haste(加 skillReady 守卫: MP不够/冷却时别硬决策放不出的法术→死磕安全网)
+    if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A('spell', SK.Haste);
     // 重击波垫血(节流)
     if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
-    // P8 Regen(细胞活化, 持续回血). 御谜士祝福只增伤(+10/20%)+答题瞬间一次性回复, 不持续回血 → 祝福期间仍需 Regen(撤销原误判跳过)
-    if (!b.regen.active || b.regen.turns <= 1) return A('spell', SK.Regen);
+    // P8 Regen(细胞活化, 持续回血). 祝福只增伤不持续回血→祝福期仍需 Regen. 加 skillReady 守卫: MP不够别硬放(GF日志R28: 反复硬放Regen→烧光MP→Spark真空瘫痪10回合)
+    if ((!b.regen.active || b.regen.turns <= 1) && Exec.skillReady(SK.Regen)) return A('spell', SK.Regen);
     // P9 回 MP(节流: manapot 在=刚喝长效药冷却中不重复喝; Gem 不受冷却)
     if (mpFree < C.MP_LOW * MM) {
       if (S.gems.mp) return A('item', S.gems.mp);
@@ -159,7 +159,7 @@ export class Brain {
       }
     }
     // P14 Heartseeker(持久战提暴; 多怪 或 有红名boss 都放 — 单 boss 血厚打最久最该提暴, HS_MIN_ENEMIES 只挡纯杂兵速清波)
-    if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM))
+    if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM) && Exec.skillReady(SK.Heartseeker))
       return A('spell', SK.Heartseeker);
     // P15 OC 近战技 + 跨波攒炮预算(OC 跨波保留, 是稀缺资源, 要花在刀刃上).
     //   攒炮模式 saveOcForCannon: 炮在栏不冷却 + 血线健康 + (本波怪还多≥4 OR 本波高密度) → 攒 OC 不花单体技.

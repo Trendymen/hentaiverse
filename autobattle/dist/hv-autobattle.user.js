@@ -1012,9 +1012,9 @@
       if (ssDown)
         return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
       if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A("spell", SK.Absorb);
-      if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
+      if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
-      if (!b.regen.active || b.regen.turns <= 1) return A("spell", SK.Regen);
+      if ((!b.regen.active || b.regen.turns <= 1) && Exec.skillReady(SK.Regen)) return A("spell", SK.Regen);
       if (mpFree < C.MP_LOW * MM) {
         if (S.gems.mp) return A("item", S.gems.mp);
         if (!b.mpot.active) return A("item", IT.mDraught);
@@ -1041,7 +1041,7 @@
           return this.castOnRed(d.id, tgt, S);
         }
       }
-      if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM))
+      if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM) && Exec.skillReady(SK.Heartseeker))
         return A("spell", SK.Heartseeker);
       const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK;
       const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES;
