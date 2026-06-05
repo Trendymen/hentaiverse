@@ -70,6 +70,8 @@ export interface EnemyState {
   is_red_boss: boolean;
   debuff: Record<string, boolean>;
   penArmor: boolean;
+  hpPct: number; // 当前 HP%(血条 width/120)
+  bleeding: boolean; // 是否流血(wpn_bleed; 慈悲处决判据)
 }
 
 /** 一回合战斗状态快照 */

@@ -111,18 +111,23 @@ export class StateReader {
     const stance = document.getElementById('ckey_spirit') as HTMLImageElement | null;
 
     const allMkey = $$<HTMLElement>('[id^="mkey_"]');
+    // 怪血条 img(顺序同 mkey): style.width/120 = HP%(翻写 dodying countMonsterHP:3296). 【index 对应待 GF 核对】
+    const bloodImgs = $$<HTMLImageElement>('.btm4 > .btm5:nth-child(1) img');
     const enemies: EnemyState[] = allMkey
-      .map((m) => {
+      .map((m, idx) => {
         const eid = +m.id.split('_')[1];
         const dimg = $$<HTMLImageElement>('.btm6 img', m).map((i) => i.getAttribute('src') || '');
         const debuff: Record<string, boolean> = {};
         for (const d of DEBUFFS) debuff[d.key] = dimg.some((s) => d.img.test(s));
+        const bw = bloodImgs[idx] ? parseFloat(bloodImgs[idx].style.width || '120') : 120;
         return {
           eid,
           alive: !/opacity/.test(m.getAttribute('style') || ''),
           is_red_boss: !!$('.btm2[style*="background"]', m),
           debuff,
           penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
+          hpPct: isNaN(bw) ? 100 : Math.round((bw / 120) * 100), // 当前 HP%(满血条 width=120)
+          bleeding: $$<HTMLImageElement>('img', m).some((i) => /wpn_bleed/i.test(i.getAttribute('src') || '')), // 流血图标(慈悲处决判据)
         };
       })
       .filter((e) => e.alive);

@@ -147,6 +147,10 @@ export class Brain {
     // P15 OC 特殊近战技(非炮场景才用 — 多怪攒炮时让路, 按用户定的 OC 预算规则).
     //   非炮场景 = 非"多怪+炮可用(攒炮中)"局面: 此时 OC 不必留给炮, 可花在这三个吃 OC 的技.
     if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+      // 最后的慈悲(100 OC, 残血处决): 怪 HP<25% + 流血(对齐原版 dodying:3811). 处决优先于要害/盾击
+      const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
+      if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+        return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
       const tgtSp = this.lockTarget(S); // 红怪优先
       // 要害强击(50 OC): 对红怪单体高伤
       if (C.useVitalStrike && tgtSp && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
@@ -155,7 +159,6 @@ export class Brain {
       const stunT = S.enemies.find((e) => !e.is_red_boss && e.alive);
       if (C.useShieldBash && stunT && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
         return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, stunT.eid) };
-      // 最后的慈悲(100 OC, 残血处决): 待 reader 加怪 HP% 后接(useMercifulBlow 默认关)
     }
     // P16 破甲滚雪球平砍: 先清最弱杂兵, 仅剩红怪锁定持续平砍
     const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);

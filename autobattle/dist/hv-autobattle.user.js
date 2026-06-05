@@ -466,7 +466,10 @@
   const SK_SPECIAL = {
     shieldBash: 2201,
     // 25 OC(1点), 单体+晕眩
-    vitalStrike: 2202
+    vitalStrike: 2202,
+    // 50 OC(2点), 单体高伤
+    mercifulBlow: 2203
+    // 100 OC(4点), 残血处决
   };
   const IT = {
     hDraught: 11191,
@@ -684,17 +687,23 @@
       const B = this._buffs();
       const stance = document.getElementById("ckey_spirit");
       const allMkey = $$('[id^="mkey_"]');
-      const enemies = allMkey.map((m) => {
+      const bloodImgs = $$(".btm4 > .btm5:nth-child(1) img");
+      const enemies = allMkey.map((m, idx) => {
         const eid = +m.id.split("_")[1];
         const dimg = $$(".btm6 img", m).map((i) => i.getAttribute("src") || "");
         const debuff = {};
         for (const d of DEBUFFS) debuff[d.key] = dimg.some((s) => d.img.test(s));
+        const bw = bloodImgs[idx] ? parseFloat(bloodImgs[idx].style.width || "120") : 120;
         return {
           eid,
           alive: !/opacity/.test(m.getAttribute("style") || ""),
           is_red_boss: !!$('.btm2[style*="background"]', m),
           debuff,
-          penArmor: dimg.some((s) => /penetrat|bleed/i.test(s))
+          penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
+          hpPct: isNaN(bw) ? 100 : Math.round(bw / 120 * 100),
+          // 当前 HP%(满血条 width=120)
+          bleeding: $$("img", m).some((i) => /wpn_bleed/i.test(i.getAttribute("src") || ""))
+          // 流血图标(慈悲处决判据)
         };
       }).filter((e) => e.alive);
       const lastDmg = typeof this.prev.hp === "number" && this.prev.hp > hp ? this.prev.hp - hp : 0;
@@ -923,6 +932,9 @@
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
       if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+        const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
+        if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+          return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
         const tgtSp = this.lockTarget(S);
         if (C.useVitalStrike && tgtSp && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
           return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
