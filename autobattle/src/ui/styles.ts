@@ -10,9 +10,10 @@ export const CSS = `
 .hvab-bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:7px;transition:width .25s}
 #hvab-hp{background:#4caf50}#hvab-mp{background:#3b82f6}#hvab-sp{background:#ef4444}#hvab-oc{background:#f59e0b}
 .hvab-bar span{position:absolute;inset:0;text-align:center;font:10px/14px monospace;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.7)}
-#hvab-panel{margin-top:8px;background:rgba(22,24,36,.94);backdrop-filter:blur(8px);border:1px solid rgba(120,140,200,.3);border-radius:12px;padding:8px 10px;display:none}
+#hvab-panel{margin-top:8px;background:rgba(22,24,36,.94);backdrop-filter:blur(8px);border:1px solid rgba(120,140,200,.3);border-radius:12px;padding:8px 10px;display:none;max-height:calc(100vh - 200px);overflow-y:auto;overscroll-behavior:contain}
+#hvab-panel::-webkit-scrollbar{width:6px}#hvab-panel::-webkit-scrollbar-thumb{background:rgba(120,140,200,.45);border-radius:3px}#hvab-panel::-webkit-scrollbar-track{background:transparent}
 #hvab-panel.open{display:block}
-.hvab-tabs{display:flex;gap:4px;margin-bottom:8px}
+.hvab-tabs{display:flex;gap:4px;position:sticky;top:0;z-index:2;margin:-8px -10px 8px;padding:8px 10px;background:rgba(22,24,36,.97)}
 .hvab-tab{flex:1;cursor:pointer;border:0;border-radius:6px;padding:4px 0;font-size:11px;background:rgba(255,255,255,.08);color:#bcd}
 .hvab-tab.active{background:#3a7;color:#fff}
 .hvab-tabpane{display:none}
