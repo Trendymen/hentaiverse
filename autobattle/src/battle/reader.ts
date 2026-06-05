@@ -139,7 +139,7 @@ export class StateReader {
           const sd = STATUS_LIB[k];
           status[k] =
             dimg.some((s) => s.includes(sd.img)) ||
-            dimgEl.some((i) => (i.getAttribute('onmouseover') || '').includes(`set_infopane_effect('${sd.name}'`));
+            dimgEl.some((i) => (i.getAttribute('onmouseover') || '').includes(`set_infopane_effect('${sd.name}`)); // 前缀匹配(去闭合'): 兼容叠加层数后缀如 'Penetrated Armor (x2)'(GF 实测)
         }
         // 血条 per-mkey(修 index bug: 全局 .btm5:nth-child(1) img 每怪含 nbargreen+nbarfg 两 img → bloodImgs[idx] 错位)
         const bImg = m.querySelector<HTMLImageElement>('.btm4 > .btm5:nth-child(1) img');
