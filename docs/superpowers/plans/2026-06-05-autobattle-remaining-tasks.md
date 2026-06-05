@@ -137,5 +137,6 @@
 
 1. **§2.1 Absorb 启发式**(不碰 HV,可立即做)
 2. **§2.2 XHR 解析**(等用户进战斗,读一次样本后做;顺带解决 §2.3 buff 回合读法)
-3. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
-4. M4 → M5
+3. **§2.3优化和2.4 特殊近战技巧纳入决策**
+4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
+5. M4 → M5
