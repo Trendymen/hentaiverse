@@ -267,6 +267,5 @@ asyncOnIdle (:395)                         ← 非战斗页空闲入口
    - 战前 `checkBattleReady`(精力 + 遭遇优先级)。
 4. **连刷 tab**:`panel.ts` 填 `farmPane()` — 遭遇开关 / 竞技场等级勾选(1~500/RB/GF)/ GF 开关+次数 / 精力阈值 / 战前恢复。
 5. **实测核对**:GF 一场→下一场衔接、token 每日刷新、精力读数、遭遇冷却。
-6. **红线**:无无人值守全自动 bot;小马题不自动提交;半自动定位(`@connect` 跨站仅遭遇用)。
 
 > 阻塞已全部解除(endpoint/参数/选择器/状态机均落实)。下一步可进入 `writing-plans` 把 §9 拆成 bite-sized TDD 步骤。

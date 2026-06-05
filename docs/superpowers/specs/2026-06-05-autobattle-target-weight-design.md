@@ -15,7 +15,7 @@
 - ③ 配置暴露: 内置默认 + 关键可调(总开关 + `baseHpRatio`)
 - 架构: 方案 C(分层模块, reader 出原始数据 / target-weight 纯函数算权重 / brain 薄调用)
 
-**约束**: 仅中文 UI; tsc strict; 打包不压缩可调试; 忠实翻写 dodying 但可裁掉范围技等盾战用不上的部分; 半自动红线(不做无人值守全自动, 红怪决策可控不乱跳)。
+**约束**: 仅中文 UI; tsc strict; 打包不压缩可调试; 忠实翻写 dodying 但可裁掉范围技等盾战用不上的部分;
 
 ## 2. 实测发现(2026-06-05 GF 真机 chrome-devtools, `?s=Battle&ss=ar` 竞技场 5 怪)
 
@@ -163,7 +163,7 @@ if (trash.length) return A('attack', trash[0].eid);    // 权重最优杂兵
 ```
 `import { rankTargets } from './target-weight'`。
 
-### 6.3 协调裁决(守半自动红线)
+### 6.3 协调裁决
 **权重只接管"杂兵平砍选谁", 红怪线全部不动**:
 - `lockTarget`(红怪锁定)、P13 红怪减益、P15 红怪 OC 技、P16 尾部"仅剩红怪锁定持续平砍"(brain.ts:168-171) —— **零改动**。红怪是定向输出, 不能因血量/状态在多红怪间乱跳。
 - 不学 dodying"全体统一排序": Yggdrasil 若是**非红杂兵**, `name` 权重 -1000 让 P16 优先砍它(保留 dodying 意图); 若是红怪则归 `lockTarget`。

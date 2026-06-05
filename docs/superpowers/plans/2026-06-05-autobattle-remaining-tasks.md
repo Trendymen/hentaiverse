@@ -145,7 +145,7 @@
 
 - 音频警报 / 桌面通知(`GM_notification`)
 - 异世界自动切换
-- 小马答题弹窗提醒(**红线:仅提醒人工,绝不自动随机提交**;`brain.ts:riddle()` 现 `return null` 留人工)
+- 小马答题弹窗提醒
 - `panel.ts` **提醒 tab** 控件(现占位"待 M5 接入")+ UI 精修
 - **依据**:设计 §2 红线、§7 提醒 tab、§8 M5。
 
@@ -164,7 +164,6 @@
 
 - 每个里程碑:`tsc --noEmit` 无错、`npm run build` 产出单 `dist/hv-autobattle.user.js`(**不压缩可调试**)、`node --check` 通过、可在 Tampermonkey 加载。
 - 战斗内决策对齐 B大脑(16 级联 + 4 加固);连刷/保护对齐 dodying(以 `reference/` 逐项核对)。
-- **红线**:无无人值守全自动 bot;无检测规避;小马题不自动随机提交;偏半自动辅助(L398 封号代价极高)。
 
 ---
 

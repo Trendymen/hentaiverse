@@ -825,8 +825,6 @@ Expected: 无输出(语法 OK)。
 
 为 L398 PFUDOR 单手虚空盾战定制的现代化半自动辅助。TypeScript + vite-plugin-monkey 工程,产物为单文件、不压缩、可调试。
 
-> ⚠️ 半自动辅助。禁止无人值守挂机/检测规避(封号红线)。小马图默认不自动答题。
-
 ## 开发
 
 ```bash
@@ -872,4 +870,3 @@ git commit -m "feat(autobattle): M1 地基构建产物 + README(空界面可挂�
 - 产物未压缩(多行可读、变量名保留)、`node --check` 通过、`==UserScript==` 头含 `document-start` + 三 match + 六 grant。
 - 浏览器加载后右下 HUD + 四 tab 抽屉空壳可见可交互,开关状态持久化,`window.__hvab.getLastBattle()` 可调用(hook 生效)。
 - 旧焊接版完整保留在 `reference/`,翻写底本就位。
-- 红线守住:M1 不含任何自动出招/连刷/答题逻辑,纯地基。
