@@ -72,6 +72,7 @@ export interface EnemyState {
   penArmor: boolean;
   hpPct: number; // 当前 HP%(血条 width/120)
   bleeding: boolean; // 是否流血(wpn_bleed; 慈悲处决判据)
+  stunned: boolean; // 是否晕眩(要害连招判据: 盾击晕眩→要害高伤)
 }
 
 /** 一回合战斗状态快照 */

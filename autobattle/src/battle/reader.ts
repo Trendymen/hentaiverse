@@ -128,6 +128,7 @@ export class StateReader {
           penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
           hpPct: isNaN(bw) ? 100 : Math.round((bw / 120) * 100), // 当前 HP%(满血条 width=120)
           bleeding: $$<HTMLImageElement>('img', m).some((i) => /wpn_bleed/i.test(i.getAttribute('src') || '')), // 流血图标(慈悲处决判据)
+          stunned: $$<HTMLImageElement>('img', m).some((i) => /stun/i.test(i.getAttribute('src') || '')), // 晕眩图标(要害连招判据: 盾击晕眩→要害高伤)【src 待实测核对】
         };
       })
       .filter((e) => e.alive);

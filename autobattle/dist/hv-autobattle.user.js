@@ -702,8 +702,10 @@
           penArmor: dimg.some((s) => /penetrat|bleed/i.test(s)),
           hpPct: isNaN(bw) ? 100 : Math.round(bw / 120 * 100),
           // 当前 HP%(满血条 width=120)
-          bleeding: $$("img", m).some((i) => /wpn_bleed/i.test(i.getAttribute("src") || ""))
+          bleeding: $$("img", m).some((i) => /wpn_bleed/i.test(i.getAttribute("src") || "")),
           // 流血图标(慈悲处决判据)
+          stunned: $$("img", m).some((i) => /stun/i.test(i.getAttribute("src") || ""))
+          // 晕眩图标(要害连招判据: 盾击晕眩→要害高伤)【src 待实测核对】
         };
       }).filter((e) => e.alive);
       const lastDmg = typeof this.prev.hp === "number" && this.prev.hp > hp ? this.prev.hp - hp : 0;
@@ -936,11 +938,12 @@
         if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
           return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
         const tgtSp = this.lockTarget(S);
-        if (C.useVitalStrike && tgtSp && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
-        const stunT = S.enemies.find((e) => !e.is_red_boss && e.alive);
-        if (C.useShieldBash && stunT && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-          return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, stunT.eid) };
+        const stunnedTgt = tgtSp && tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && e.stunned);
+        if (C.useVitalStrike && stunnedTgt && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunnedTgt.eid) };
+        const toStun = tgtSp && !tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
+        if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+          return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
       }
       const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) return A("attack", trash.sort((a, c) => a.eid - c.eid)[0].eid);
