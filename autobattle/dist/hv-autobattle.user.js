@@ -979,7 +979,7 @@
       }
       if (S.canContinue) return { type: "continue", exec: () => Exec.continueBattle() };
       if (!b.spark.active || b.spark.turns <= 2) {
-        if (mp >= sparkCost) return A("spell", SK.Spark);
+        if (mp >= sparkCost && Exec.skillReady(SK.Spark)) return A("spell", SK.Spark);
         if (!b.spark.active)
           return hp < 0.6 * HM ? pickHeal() ?? { type: "defend", exec: Exec.defend, note: "Spark真空+急救药耗尽硬抗" } : { type: "defend", exec: Exec.defend, note: "Spark真空+缺MP硬抗" };
         return S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
@@ -993,6 +993,7 @@
       if (ch && C.useChanneling !== false) {
         for (const q of CHANNEL_Q) {
           if (!q.need(b, S)) continue;
+          if (!Exec.skillReady(q.id)) continue;
           if (q.hostile) {
             const t = this.lockTarget(S);
             if (t) return this.castOnRed(q.id, t, S);
@@ -1008,9 +1009,9 @@
       if (C.scrollFirst && S.scrollReady && ssDown && prDown)
         return A("item", IT.scrollProt);
       if (prDown)
-        return mp >= sparkCost ? A("spell", SK.Protection) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+        return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A("spell", SK.Protection) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
       if (ssDown)
-        return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+        return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A("spell", SK.SpiritShield) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
       if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A("spell", SK.Absorb);
       if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
@@ -1038,6 +1039,7 @@
           if (C[d.cfg] === false) continue;
           if (tgt.debuff[d.key]) continue;
           if (!(ch || mpFree >= C.MP_LOW * MM)) break;
+          if (!Exec.skillReady(d.id)) continue;
           return this.castOnRed(d.id, tgt, S);
         }
       }

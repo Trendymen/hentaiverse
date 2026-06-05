@@ -68,7 +68,7 @@ export class Brain {
     if (S.canContinue) return { type: 'continue', exec: () => Exec.continueBattle() };
     // P1 Spark 零空窗(防一击致死) ①③
     if (!b.spark.active || b.spark.turns <= 2) {
-      if (mp >= sparkCost) return A('spell', SK.Spark);
+      if (mp >= sparkCost && Exec.skillReady(SK.Spark)) return A('spell', SK.Spark);
       if (!b.spark.active)
         return hp < 0.6 * HM
           ? (pickHeal() ?? { type: 'defend', exec: Exec.defend, note: 'Spark真空+急救药耗尽硬抗' })
@@ -89,6 +89,7 @@ export class Brain {
     if (ch && C.useChanneling !== false) {
       for (const q of CHANNEL_Q) {
         if (!q.need(b, S)) continue;
+        if (!Exec.skillReady(q.id)) continue; // 耗蓝技能统一守卫: 置灰(冷却)跳过试队列下一个
         if (q.hostile) {
           const t = this.lockTarget(S);
           if (t) return this.castOnRed(q.id, t, S);
@@ -108,9 +109,9 @@ export class Brain {
       return A('item', IT.scrollProt);
     // 单墙法术补(MP 不足: Gem 回蓝 → 秘药兜底)
     if (prDown)
-      return mp >= sparkCost ? A('spell', SK.Protection) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
+      return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A('spell', SK.Protection) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     if (ssDown)
-      return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
+      return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A('spell', SK.SpiritShield) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     // P5 Absorb(仅法系怪): 最近敌方对我造成魔法伤害 → 上吸收墙. useAbsorb 默认关(盾战物防为主).
     if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A('spell', SK.Absorb); // 加 skillReady(冷却检测): Absorb 放了进冷却就别反复决策(根治法吸死循环)
     // P7 Haste(加 skillReady 守卫: MP不够/冷却时别硬决策放不出的法术→死磕安全网)
@@ -155,6 +156,7 @@ export class Brain {
         if (C[d.cfg] === false) continue; // 控制台开关
         if (tgt.debuff[d.key]) continue; // 已挂该减益
         if (!(ch || mpFree >= C.MP_LOW * MM)) break; // MP 不够: 整块让位给输出
+        if (!Exec.skillReady(d.id)) continue; // 耗蓝技能统一守卫: 减益置灰(冷却)跳过试下一个
         return this.castOnRed(d.id, tgt, S);
       }
     }
