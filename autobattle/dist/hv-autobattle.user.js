@@ -1220,7 +1220,7 @@
     };
     XMLHttpRequest.prototype.send = function(body) {
       this.addEventListener("load", () => {
-        if (/Battle|api/i.test(this.__url || "")) lastBattleResponse = this.responseText;
+        if (/\/json|Battle|api/i.test(this.__url || "")) lastBattleResponse = this.responseText;
       });
       return xs.call(this, body);
     };
@@ -1230,7 +1230,7 @@
         const first = args[0];
         const url = typeof first === "string" ? first : first instanceof Request ? first.url : String(first);
         return f.apply(window, args).then((rp) => {
-          if (/Battle|api/i.test(url)) {
+          if (/\/json|Battle|api/i.test(url)) {
             rp.clone().text().then((t) => {
               lastBattleResponse = t;
             }).catch(() => {

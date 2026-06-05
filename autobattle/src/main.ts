@@ -21,7 +21,7 @@ function hookNet(): void {
   };
   XMLHttpRequest.prototype.send = function (this: XMLHttpRequest & { __url?: string }, body?: Document | XMLHttpRequestBodyInit | null) {
     this.addEventListener('load', () => {
-      if (/Battle|api/i.test(this.__url || '')) lastBattleResponse = this.responseText;
+      if (/\/json|Battle|api/i.test(this.__url || '')) lastBattleResponse = this.responseText; // HV 战斗 endpoint 实测 = POST /json(原 /Battle|api/ 不匹配 → 捕获不到)
     });
     return xs.call(this, body);
   };
@@ -32,7 +32,7 @@ function hookNet(): void {
       const first = args[0];
       const url = typeof first === 'string' ? first : first instanceof Request ? first.url : String(first);
       return f.apply(window, args).then((rp) => {
-        if (/Battle|api/i.test(url)) {
+        if (/\/json|Battle|api/i.test(url)) {
           rp.clone()
             .text()
             .then((t) => {
