@@ -116,8 +116,8 @@ export class Brain {
     if (!b.haste.active || b.haste.turns <= 1) return A('spell', SK.Haste);
     // 重击波垫血(节流)
     if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
-    // P8 Regen(御谜士祝福期间跳过 — 祝福自带强力回复, 不浪费 Regen 的 MP)
-    if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A('spell', SK.Regen);
+    // P8 Regen(细胞活化, 持续回血). 御谜士祝福只增伤(+10/20%)+答题瞬间一次性回复, 不持续回血 → 祝福期间仍需 Regen(撤销原误判跳过)
+    if (!b.regen.active || b.regen.turns <= 1) return A('spell', SK.Regen);
     // P9 回 MP(节流: manapot 在=刚喝长效药冷却中不重复喝; Gem 不受冷却)
     if (mpFree < C.MP_LOW * MM) {
       if (S.gems.mp) return A('item', S.gems.mp);
