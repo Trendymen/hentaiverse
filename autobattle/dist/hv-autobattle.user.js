@@ -163,8 +163,14 @@
     // 红怪减益序列开关
     useChanneling: true,
     // Channeling 主动利用
-    useAbsorb: false
+    useAbsorb: false,
     // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
+    useVitalStrike: true,
+    // 要害强击(非炮场景对红怪单体高伤)
+    useShieldBash: true,
+    // 盾击(非炮场景晕眩杂兵)
+    useMercifulBlow: false
+    // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 2;
@@ -280,6 +286,7 @@
     p.appendChild(group("喝药线(低于即补)", pctRow("PANIC_RED", "急救血"), pctRow("HP_HEAL", "常规喝血"), pctRow("MP_LOW", "回蓝"), pctRow("SP_LOW", "喝灵力")));
     p.appendChild(group("灵动架式(斗气)", pctRow("OC_ON", "≥ 开"), pctRow("OC_OFF", "< 关")));
     p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益"), swRow("useAbsorb", "法系怪吸收墙")));
+    p.appendChild(group("OC 近战技(非炮场景)", swRow("useVitalStrike", "要害强击"), swRow("useShieldBash", "盾击晕眩"), swRow("useMercifulBlow", "慈悲处决(待HP%)")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "觅心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
     return p;
@@ -456,6 +463,11 @@
     SpiritShield: 423,
     Heartseeker: 431
   };
+  const SK_SPECIAL = {
+    shieldBash: 2201,
+    // 25 OC(1点), 单体+晕眩
+    vitalStrike: 2202
+  };
   const IT = {
     hDraught: 11191,
     hPotion: 11195,
@@ -517,7 +529,10 @@
     421: "吸收",
     422: "生命火花",
     423: "灵力盾",
-    431: "穿心"
+    431: "穿心",
+    2201: "盾击",
+    2202: "要害强击",
+    2203: "最后的慈悲"
   };
   const IT_CN = {
     11191: "体力长效药",
@@ -894,6 +909,14 @@
       }
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
+      if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+        const tgtSp = this.lockTarget(S);
+        if (C.useVitalStrike && tgtSp && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+        const stunT = S.enemies.find((e) => !e.is_red_boss && e.alive);
+        if (C.useShieldBash && stunT && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+          return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, stunT.eid) };
+      }
       const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) return A("attack", trash.sort((a, c) => a.eid - c.eid)[0].eid);
       if (tgt) {

@@ -1,6 +1,6 @@
 // 决策大脑: 16 级联 + 4 致命加固. 翻写自 reference/hv_brain_modern.user.js:128-187
 import { config } from '../core/config';
-import { SK, IT, DEBUFFS, CHANNEL_Q } from './tables';
+import { SK, SK_SPECIAL, IT, DEBUFFS, CHANNEL_Q } from './tables';
 import { Exec, lastCannon } from './executor';
 import type { Action, ActionType, BattleState, EnemyState } from '../types';
 
@@ -144,6 +144,19 @@ export class Brain {
     // P14 Heartseeker(持久战提暴)
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
+    // P15 OC 特殊近战技(非炮场景才用 — 多怪攒炮时让路, 按用户定的 OC 预算规则).
+    //   非炮场景 = 非"多怪+炮可用(攒炮中)"局面: 此时 OC 不必留给炮, 可花在这三个吃 OC 的技.
+    if (!(C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES)) {
+      const tgtSp = this.lockTarget(S); // 红怪优先
+      // 要害强击(50 OC): 对红怪单体高伤
+      if (C.useVitalStrike && tgtSp && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+      // 盾击(25 OC): 杂兵晕眩控制
+      const stunT = S.enemies.find((e) => !e.is_red_boss && e.alive);
+      if (C.useShieldBash && stunT && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+        return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, stunT.eid) };
+      // 最后的慈悲(100 OC, 残血处决): 待 reader 加怪 HP% 后接(useMercifulBlow 默认关)
+    }
     // P16 破甲滚雪球平砍: 先清最弱杂兵, 仅剩红怪锁定持续平砍
     const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
     if (trash.length) return A('attack', trash.sort((a, c) => a.eid - c.eid)[0].eid);

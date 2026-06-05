@@ -17,6 +17,13 @@ export const SK = {
   Heartseeker: 431,
 } as const;
 
+/** OC 特殊近战技(吃 OC; 每点 OC=25). 实测 pane_skill onmouseover 参数 [MP, OC点数, 冷却] */
+export const SK_SPECIAL = {
+  shieldBash: 2201, // 25 OC(1点), 单体+晕眩
+  vitalStrike: 2202, // 50 OC(2点), 单体高伤
+  mercifulBlow: 2203, // 100 OC(4点), 残血处决
+} as const;
+
 /** 物品 DBID (91=长效Draught 95=药水 99=秘药) */
 export const IT = {
   hDraught: 11191,
@@ -96,6 +103,7 @@ export const cannonBtn = (): HTMLElement | undefined =>
 export const SK_CN: Record<number, string> = {
   212: '虚弱', 213: '陷危', 311: '治疗', 312: '细胞活化', 313: '完全治愈',
   411: '守护', 412: '急速', 421: '吸收', 422: '生命火花', 423: '灵力盾', 431: '穿心',
+  2201: '盾击', 2202: '要害强击', 2203: '最后的慈悲',
 };
 /** 物品 DBID → 中文名 */
 export const IT_CN: Record<number, string> = {

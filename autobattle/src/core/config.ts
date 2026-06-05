@@ -35,6 +35,9 @@ export const DEFAULT_CONFIG = {
   useImperil: true, // 红怪减益序列开关
   useChanneling: true, // Channeling 主动利用
   useAbsorb: false, // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
+  useVitalStrike: true, // 要害强击(非炮场景对红怪单体高伤)
+  useShieldBash: true, // 盾击(非炮场景晕眩杂兵)
+  useMercifulBlow: false, // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
 };
 
 export type Config = typeof DEFAULT_CONFIG;
