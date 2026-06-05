@@ -104,6 +104,7 @@ function mountUI(): void {
 
 // ── 入口 ──
 hookNet(); // document-start: 立即 hook, 早于一切业务请求
+window.addEventListener('beforeunload', () => logger.flush()); // reload/关页前落盘: 通用兜底所有未落盘缓冲(continue/手动刷新/GF跳轮/退出皆 reload)
 onReady(() => {
   mountUI(); // body 就绪后挂载 UI
   startLoop(); // 启动战斗轮询(内部判断 enabled/inBattle, 暂停时不出招)
