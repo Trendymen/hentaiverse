@@ -49,7 +49,6 @@ function hookNet(): void {
 // 挂载现代界面(右下常驻 HUD + 抽屉)
 function mountUI(): void {
   if (document.getElementById('hvab-root')) return;
-  console.log('[hvab-dbg] mountUI: logOpen=', config.get('logOpen'), 'inBattle=', !!document.getElementById('pane_vitals'), 't=', Date.now() % 100000); // 临时诊断: reload 后挂载时 logOpen 值(被清了没)
   const root = el('div', { id: 'hvab-root' });
   const style = el('style');
   style.textContent = CSS;
@@ -70,7 +69,6 @@ function mountUI(): void {
       const open = logView.style.display !== 'flex';
       toggleLog(logView, open);
       config.set('logOpen', open); // 点📋 = 记忆打开/关闭状态
-      console.log('[hvab-dbg] 📋 click → logOpen=', open); // 临时诊断
     },
   );
 
@@ -80,16 +78,17 @@ function mountUI(): void {
   document.body.appendChild(root);
 
   if (config.get('panelOpen')) togglePanel(panel, true);
+  // reload 后无条件立即恢复日志窗口(if logOpen, 不查 inBattle): 跟 HUD 一样首帧出现, 不等 battle:active(那要等战斗 DOM ready~308ms→延迟出现=闪).
+  //   配合 loop 退出去抖(reload 后短暂 inBattle=false 不清 logOpen) → 既不闪又跨波显示.
+  if (config.get('logOpen')) toggleLog(logView, true);
 
-  // 日志窗口随战斗开关(loop emit battle:active): 进战斗+记忆打开→自动开; 退出战斗→关窗口+清记忆(用户选定). 回退 0267a59 不闪版
+  // 日志窗口随战斗开关(loop emit battle:active, 退出去抖): 战斗中进/退驱动; 真退出战斗→关窗口+清记忆(用户选定)
   bus.on('battle:active', (active) => {
-    console.log('[hvab-dbg] on battle:active', active, 'logOpen=', config.get('logOpen')); // 临时诊断
     if (active) {
       if (config.get('logOpen')) toggleLog(logView, true);
     } else {
       toggleLog(logView, false);
       config.set('logOpen', false);
-      console.log('[hvab-dbg] → 退出战斗判定, 清 logOpen=false'); // 临时诊断: 谁清的 logOpen
     }
   });
 }

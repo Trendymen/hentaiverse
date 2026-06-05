@@ -19,6 +19,8 @@ let lastRound = -1;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let lastSig = ''; // 上一次决策动作签名(死循环安全网用)
 let lastInBattle: boolean | null = null; // 上一 tick 是否在战斗(初始 null → 首次 tick 必 emit 当前态, 同步 reload 后日志窗口); 检测进/退战斗驱动 battle:active
+let inBattleFalseStreak = 0; // inBattle 连续 false 次数(退出去抖)
+const EXIT_FALSE_STREAK = 4; // 连续 4 次 inBattle=false 才判真退出 — 防 reload 后战斗 DOM 延迟~308ms 的短暂 false 误清 logOpen(诊断确认的根因)
 let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
 // 小马炮冷却跨波/轮持续(HV 跳轮 reload 内存全失), 故持久化到 Store: cannonCd=剩余冷却回合, cannonRound=上次轮(检测重开 GrindFest)
 let cannonCd = Store.get<number>('cannonCd', 0);
@@ -47,12 +49,19 @@ function fingerprint(S: BattleState): string {
 }
 
 function tick(): void {
-  // 日志窗口联动: 检测进/退战斗(独立于 enabled — 暂停脚本也要随战斗开关日志窗口). 回退到 0267a59 原始逻辑(去抖会引入跨波闪烁, 用户实测对比确认)
+  // 日志窗口联动: 检测进/退战斗(独立于 enabled). 退出去抖: 连续 N 次 false 才算真退出.
+  //   诊断确认根因: reload 后战斗 DOM(#pane_vitals)延迟~308ms 才 ready, 首次 tick inBattle=false 会误判退出→清 logOpen→跨波不显示.
+  //   去抖让这段短暂 false 不触发退出(配合 main 挂载时无条件立即开 → 既不闪又跨波显示).
   const nowIn = inBattle();
-  if (nowIn !== lastInBattle) {
-    console.log('[hvab-dbg] loop battle:active emit =', nowIn, '(was', lastInBattle, ') t=', Date.now() % 100000); // 临时诊断: 看 nowIn 序列(是否有短暂 false)
-    bus.emit('battle:active', nowIn);
-    lastInBattle = nowIn;
+  if (nowIn) {
+    inBattleFalseStreak = 0;
+    if (lastInBattle !== true) {
+      bus.emit('battle:active', true);
+      lastInBattle = true;
+    }
+  } else if (lastInBattle !== false && ++inBattleFalseStreak >= EXIT_FALSE_STREAK) {
+    bus.emit('battle:active', false);
+    lastInBattle = false;
   }
   try {
     if (config.get('enabled') && nowIn && Date.now() >= busyUntil) {
