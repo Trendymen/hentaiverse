@@ -649,6 +649,35 @@
         return a.type;
     }
   }
+  function asGlobal(re) {
+    const flags = re.flags.includes("g") ? re.flags : `${re.flags}g`;
+    return new RegExp(re.source, flags);
+  }
+  function textlogMatchesNewestFirst(text, re) {
+    return [...text.matchAll(asGlobal(re))];
+  }
+  function latestTextlogMatch(text, re) {
+    return textlogMatchesNewestFirst(text, re)[0];
+  }
+  function parseLatestRound(text) {
+    let m = latestTextlogMatch(text, /Round\s*(\d+)\s*\/\s*(\d+)/i);
+    if (!m) m = latestTextlogMatch(text, /[(（][^)）]{0,8}?(\d+)\s*\/\s*(\d+)[^)）]{0,8}?[)）]/);
+    return m ? { roundNow: +m[1], roundAll: +m[2] } : null;
+  }
+  function parseLatestEnemyMagic(text) {
+    const m = latestTextlogMatch(text, /you for \d+ ([a-zA-Z]+) damage/i);
+    if (!m) return null;
+    const type = m[1].replace(/ing$/i, "").toLowerCase();
+    return !/pierc|crush|slash/.test(type);
+  }
+  function parseSpawnHp(text) {
+    const out = {};
+    const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
+    for (const m of textlogMatchesNewestFirst(text, re)) {
+      if (out[m[1]] === void 0) out[m[1]] = +m[2];
+    }
+    return out;
+  }
   class StateReader {
     constructor() {
       this.prev = {};
@@ -677,8 +706,8 @@
      *  XHR /json 响应实测确认(pane_effects 字段, 也在 DOM): Regen 21 / Heartseeker 326 / Spark等 autocast. 原读 [id*=expire] 读不到才兜底 99. */
     _expire(img) {
       var _a;
-      const mo = img.getAttribute("onmouseover") || "";
-      const p = (((_a = mo.match(/set_infopane_effect\('[^']*',\s*'[^']*',\s*([^)]+)\)/)) == null ? void 0 : _a[1]) || "").trim();
+      const mo2 = img.getAttribute("onmouseover") || "";
+      const p = (((_a = mo2.match(/set_infopane_effect\('[^']*',\s*'[^']*',\s*([^)]+)\)/)) == null ? void 0 : _a[1]) || "").trim();
       return /^\d+$/.test(p) ? parseInt(p) : 99;
     }
     /** 解析所有 buff 图标(含 channeling) */
@@ -702,25 +731,19 @@
     _round() {
       const tl = document.getElementById("textlog");
       if (!tl) return;
-      const txt = tl.textContent || "";
-      let ms = [...txt.matchAll(/Round\s*(\d+)\s*\/\s*(\d+)/gi)];
-      if (!ms.length) ms = [...txt.matchAll(/[(（][^)）]{0,8}?(\d+)\s*\/\s*(\d+)[^)）]{0,8}?[)）]/g)];
-      const last = ms[ms.length - 1];
-      if (last) {
-        this.roundNow = +last[1];
-        this.roundAll = +last[2];
+      const parsed = parseLatestRound(tl.textContent || "");
+      if (parsed) {
+        this.roundNow = parsed.roundNow;
+        this.roundAll = parsed.roundAll;
       }
     }
     /** 从 #textlog 最新一条"敌方对我伤害"判物理/魔法(物理 pierc/crush/slash, 否则魔法).
-     *  翻写自 dodying:4264-4280; 日志最新在末尾(与 _round 一致)故取最后一个匹配; 读不到保留上次缓存. */
+     *  翻写自 dodying:4264-4280; GF 实测 textlog 顶新底旧, 故取第一个匹配; 读不到保留上次缓存. */
     _enemyMagic() {
       const tl = document.getElementById("textlog");
       if (!tl) return;
-      const ms = [...(tl.textContent || "").matchAll(/you for \d+ ([a-zA-Z]+) damage/g)];
-      const last = ms[ms.length - 1];
-      if (!last) return;
-      const type = last[1].replace(/ing$/i, "").toLowerCase();
-      this.takesMagic = !/pierc|crush|slash/.test(type);
+      const takesMagic = parseLatestEnemyMagic(tl.textContent || "");
+      if (takesMagic !== null) this.takesMagic = takesMagic;
     }
     /** 从 #textlog 解析 "Spawned Monster X: MID=N (Name) LV=N HP=N" 行 → 缓存每怪初始 HP.
      *  GF 实测格式(2026-06-05): "Spawned Monster A: MID=325614 (Halo Effect) LV=398 HP=105710".
@@ -729,8 +752,7 @@
     _spawnHp() {
       const tl = document.getElementById("textlog");
       if (!tl) return;
-      const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
-      for (const m of [...(tl.textContent || "").matchAll(re)].reverse()) this.initHp[m[1]] = +m[2];
+      Object.assign(this.initHp, parseSpawnHp(tl.textContent || ""));
     }
     read() {
       var _a;
@@ -1111,6 +1133,9 @@
   let stuckN = 0;
   let cannonCd = Store.get("cannonCd", 0);
   let cannonRoundSeen = Store.get("cannonRound", -1);
+  function nextCannonCooldown(actionType, execResult, currentCd, cooldownTurns) {
+    return actionType === "cannon" && execResult === true ? cooldownTurns : currentCd;
+  }
   function inBattle() {
     return !!document.getElementById("pane_vitals") || !!document.querySelector('[id^="vrh"],[id^="dvrh"]');
   }
@@ -1154,10 +1179,6 @@
               const t = live.length ? live[stuckN % live.length] : null;
               a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: `安全网:换目标#${t.eid}(连续${stuckN}次放不出·退避重试)` } : { type: "defend", exec: () => Exec.defend(), note: "安全网:无活怪→防御" };
             }
-          }
-          if (a.type === "cannon") {
-            cannonCd = config.get("CANNON_CD_TURNS");
-            Store.set("cannonCd", cannonCd);
           }
           if (S.roundNow !== lastRound) {
             turn = 0;
@@ -1207,9 +1228,15 @@
             const delay = dMin + Math.random() * Math.max(1, dMax - dMin);
             const fn = a.exec;
             setTimeout(() => {
+              let result = void 0;
               try {
-                fn();
+                result = fn();
               } catch {
+              }
+              const nextCd = nextCannonCooldown(a.type, result, cannonCd, config.get("CANNON_CD_TURNS"));
+              if (nextCd !== cannonCd) {
+                cannonCd = nextCd;
+                Store.set("cannonCd", cannonCd);
               }
             }, delay);
             busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5e3) : 0);
@@ -1221,12 +1248,32 @@
       }
     } catch {
     }
-    timer = setTimeout(tick, 300);
+  }
+  let mo = null;
+  let debTimer = null;
+  function scheduleTick() {
+    if (debTimer) clearTimeout(debTimer);
+    debTimer = setTimeout(tick, 80);
+  }
+  function ensureObserver() {
+    const root = document.getElementById("battle_main");
+    if (root && !mo) {
+      mo = new MutationObserver(scheduleTick);
+      mo.observe(root, { childList: true, subtree: true, characterData: true });
+    } else if (!root && mo) {
+      mo.disconnect();
+      mo = null;
+    }
+  }
+  function slowPoll() {
+    ensureObserver();
+    tick();
+    timer = setTimeout(slowPoll, 2e3);
   }
   function startLoop() {
     if (timer === null) {
       actedAt = Date.now();
-      tick();
+      slowPoll();
     }
   }
   let lastBattleResponse = null;

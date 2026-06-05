@@ -9,7 +9,7 @@ import { actionLabel } from './battle/tables';
 import { bus } from './core/bus';
 import { logger } from './core/logger';
 import { Store } from './core/store';
-import type { BattleState } from './types';
+import type { ActionType, BattleState } from './types';
 
 let lastFp = '';
 let actedAt = 0;
@@ -23,6 +23,10 @@ let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出�
 // 小马炮冷却跨波/轮持续(HV 跳轮 reload 内存全失), 故持久化到 Store: cannonCd=剩余冷却回合, cannonRound=上次轮(检测重开 GrindFest)
 let cannonCd = Store.get<number>('cannonCd', 0);
 let cannonRoundSeen = Store.get<number>('cannonRound', -1);
+
+export function nextCannonCooldown(actionType: ActionType, execResult: unknown, currentCd: number, cooldownTurns: number): number {
+  return actionType === 'cannon' && execResult === true ? cooldownTurns : currentCd;
+}
 
 function inBattle(): boolean {
   // 用战斗 vital 容器判定(#pane_vitals 的 id 不随状态变, 最稳); 兜底任何 HP 数值变体(vrhd/vrhb/宽屏 dvrh*).
@@ -86,7 +90,6 @@ function tick(): void {
               : { type: 'defend', exec: () => Exec.defend(), note: '安全网:无活怪→防御' };
           }
         }
-        if (a.type === 'cannon') { cannonCd = config.get('CANNON_CD_TURNS'); Store.set('cannonCd', cannonCd); } // 放炮 → 50 回合冷却(持久化跨波/轮)
         // 轮数变 → 回合计数归零(新一波从 T1 起)
         if (S.roundNow !== lastRound) {
           turn = 0;
@@ -140,10 +143,16 @@ function tick(): void {
           const delay = dMin + Math.random() * Math.max(1, dMax - dMin);
           const fn = a.exec;
           setTimeout(() => {
+            let result: boolean | void = undefined;
             try {
-              fn();
+              result = fn();
             } catch {
               /* HV 处理中/元素未就绪 */
+            }
+            const nextCd = nextCannonCooldown(a.type, result, cannonCd, config.get('CANNON_CD_TURNS'));
+            if (nextCd !== cannonCd) {
+              cannonCd = nextCd;
+              Store.set('cannonCd', cannonCd);
             }
           }, delay);
           busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5000) : 0); // 出招后极短锁; 连续放不出(stuckN>1)指数退避减速(stuckN×500, 上限5s), 防网络卡时 300ms 疯狂刷屏
@@ -156,12 +165,41 @@ function tick(): void {
   } catch {
     /* tick 不能崩, 否则循环断 */
   }
-  timer = setTimeout(tick, 300); // 轮询更快 = 换回合后更早检测到新回合
+}
+
+// ── 驱动: MutationObserver(观察 #battle_main 战斗区, DOM 渲染即精确触发) + 慢轮询兜底(2s) ──
+//   #battle_main = 实测的 vitals/effects/monster/textlog 共同祖先(#csp>#mainpane>#battle_main>{#battle_left, #battle_right}).
+//   observer 负责快(战斗内 ajax 局部更新即触发, 不等 300ms 周期; 网络卡 DOM 不变就不触发 → R32 刷屏天然消失);
+//   慢轮询兜底(2s)处理: 战斗↔非战斗切换(挂/断 observer) + observer 漏 + 上招放不出 DOM 不变的死等(配 stalled 2.5s + 退避).
+let mo: MutationObserver | null = null;
+let debTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleTick(): void {
+  if (debTimer) clearTimeout(debTimer); // debounce 80ms: 一个 /json 响应同时更新多 pane → 多次 mutation 合并成一次 tick(等这批 DOM 全更新完再读, 数据一致)
+  debTimer = setTimeout(tick, 80);
+}
+
+function ensureObserver(): void {
+  const root = document.getElementById('battle_main');
+  if (root && !mo) {
+    mo = new MutationObserver(scheduleTick);
+    mo.observe(root, { childList: true, subtree: true, characterData: true });
+  } else if (!root && mo) {
+    mo.disconnect();
+    mo = null; // 退出战斗/换波 reload → 断开(reload 后脚本重启会重挂)
+  }
+}
+
+function slowPoll(): void {
+  // 慢轮询兜底(2s): 挂/断 observer + observer 漏/死等时兜底触发(tick 内有 busy锁+指纹去重+enabled/inBattle 守卫, 重复调用无副作用)
+  ensureObserver();
+  tick();
+  timer = setTimeout(slowPoll, 2000);
 }
 
 export function startLoop(): void {
   if (timer === null) {
     actedAt = Date.now();
-    tick();
+    slowPoll(); // 启动慢轮询兜底(内含 ensureObserver 挂 observer); observer 负责快速精确触发, 慢轮询只兜底
   }
 }
