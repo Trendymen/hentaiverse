@@ -175,7 +175,6 @@ export class StateReader {
       roundAll: this.roundAll,
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
-      gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
       gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
       cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),

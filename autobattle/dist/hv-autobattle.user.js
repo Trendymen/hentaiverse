@@ -475,9 +475,7 @@
     mDraught: 11291,
     mElixir: 11299,
     sDraught: 11391,
-    scrollProt: 13111,
-    manaGem: 10008
-    // Mystic Gem(神秘宝石, 回 HP/MP/SP)实测背包 id=10008; 旧值 10006 在背包不存在 → gemReady 永远 false、宝石永远点不出
+    scrollProt: 13111
   };
   const GEM = {
     health: 10005,
@@ -556,6 +554,9 @@
     13111: "保护卷轴",
     12601: "黑暗魔药",
     12501: "神圣魔药",
+    10005: "生命宝石",
+    10006: "魔力宝石",
+    10007: "灵力宝石",
     10008: "神秘宝石"
   };
   const SS_CN = {
@@ -737,7 +738,6 @@
         roundAll: this.roundAll,
         monsterTotal: allMkey.length,
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
-        gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
         gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
         cannonReady: !!cannonEl && !cannonDimmed,
         // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
