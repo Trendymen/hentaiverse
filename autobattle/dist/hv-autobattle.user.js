@@ -881,10 +881,12 @@
       const r = Number.isNaN(id) ? (c.click(), true) : Exec.skill(id);
       return r;
     },
-    /** hostile 定向: 选中技能后 commit 指定红怪 eid(修"打第一个怪"); 找不到 eid 退回通用 skill */
+    /** hostile 定向: 选中技能后 commit 指定红怪 eid(修"打第一个怪"); 找不到 eid 退回通用 skill.
+     *  GF 实测确认: 技能元素 id=DBID(2201/2202/2203), onclick=lock_action+set_hostile_skill(无 touch_and_go),
+     *  靠 commit_target 释放 → 真出招+真消耗 OC(盾击 crit 102413 秒杂兵, OC 138→100). 同红怪减益机制. */
     castHostileOn(id, eid) {
       const e = document.getElementById(String(id));
-      if (!e) return false;
+      if (!e || e.style.opacity === "0.5") return false;
       e.click();
       const m = document.getElementById("mkey_" + eid);
       return m ? Exec.attack(eid) : Exec.skill(id);
