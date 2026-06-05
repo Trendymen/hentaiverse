@@ -103,7 +103,7 @@
 
 ### 2.7 待真机实测(M2 唯一剩余阻塞)
 
-- **三个 OC 近战技 `castHostileOn` 释放机制**(最高优先):盾击/要害/慈悲默认关,因 `castHostileOn` 对 OC 技的释放(点了 OC 消不消耗、出不出招)未真机验证。需开开关 + GF 实测确认能放出后才正式启用——**这是整套 OC 连招/攒炮逻辑唯一未验证的环节**。
+- **三个 OC 近战技 `castHostileOn` 释放机制 ✅ 已验证**(commit `8df9804`):GF 实测点 `2201`+`commit_target` 真放出盾击(crit 102413,`Cut Down has been defeated`,OC 138→100 真消耗)。技能元素 `id=DBID`、`onclick=lock_action+set_hostile_skill`(无 touch_and_go,靠 commit_target 释放),与红怪减益同机制;castHostileOn 已加 opacity 守卫。**释放机制确认可用**;剩"实战观察决策优先级/攒炮节奏是否如预期"(装最新 build 开三开关跑一轮)。
 - **目标权重真机核对**:开 `useTargetWeight` 看 P16 选目标;死怪 `nbardead` / 红怪 Yggdrasil 名 / 长回合 Spawned 缓存沿用 / 连刷换波 initHp 覆盖 / hpNow 数值核对(spec §10)。
 - **textlog 顺序遗留**:`_round`/`_enemyMagic` 注释"末尾"vs 实测"顶新底旧",靠每轮清空侥幸正确,待核统一(`_spawnHp` 已 reverse 防御)。
 
