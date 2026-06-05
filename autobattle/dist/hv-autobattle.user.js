@@ -165,10 +165,10 @@
     // Channeling 主动利用
     useAbsorb: false,
     // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
-    useVitalStrike: true,
-    // 要害强击(非炮场景对红怪单体高伤)
-    useShieldBash: true,
-    // 盾击(非炮场景晕眩杂兵)
+    useVitalStrike: false,
+    // 要害强击(默认关: castHostileOn 对 OC 技能的释放机制待战斗实测确认, 防死循环)
+    useShieldBash: false,
+    // 盾击(默认关: 同上, 待实测真实 onclick 释放方式)
     useMercifulBlow: false
     // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
   };
@@ -479,6 +479,16 @@
     manaGem: 10008
     // Mystic Gem(神秘宝石, 回 HP/MP/SP)实测背包 id=10008; 旧值 10006 在背包不存在 → gemReady 永远 false、宝石永远点不出
   };
+  const GEM = {
+    health: 10005,
+    // 生命宝石 → HP
+    mana: 10006,
+    // 魔力宝石 → MP
+    spirit: 10007,
+    // 灵力宝石 → SP
+    mystic: 10008
+    // 神秘宝石 → HP/MP/SP
+  };
   const BUFF_IMG = {
     spark: "sparklife",
     spiritShield: "spiritshield",
@@ -546,7 +556,7 @@
     13111: "保护卷轴",
     12601: "黑暗魔药",
     12501: "神圣魔药",
-    10008: "魔力宝石"
+    10008: "神秘宝石"
   };
   const SS_CN = {
     gr: "压榨界",
@@ -704,6 +714,8 @@
         mpot: B.mpot,
         spot: B.spot
       };
+      const gemAvail = (db) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+      const pickGem = (own) => gemAvail(own) ? own : gemAvail(GEM.mystic) ? GEM.mystic : 0;
       return {
         hp,
         mp,
@@ -726,6 +738,7 @@
         monsterTotal: allMkey.length,
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
+        gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
         cannonReady: !!cannonEl && !cannonDimmed,
         // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
         scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
@@ -850,7 +863,7 @@
         if (mp >= sparkCost) return A("spell", SK.Spark);
         if (!b.spark.active)
           return hp < 0.6 * HM ? pickHeal() ?? { type: "defend", exec: Exec.defend, note: "Spark真空+急救药耗尽硬抗" } : { type: "defend", exec: Exec.defend, note: "Spark真空+缺MP硬抗" };
-        return S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
+        return S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
       }
       if (hp < PANIC || predicted < PANIC && hp < C.HP_HEAL * HM) {
         const canCure = mp >= C.MP_LOW * MM || ch;
@@ -870,25 +883,25 @@
         }
       }
       if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
-        return S.gemReady ? A("item", IT.manaGem) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
+        return S.gems.mp ? A("item", S.gems.mp) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
       const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
       const prDown = !b.protection.active || b.protection.turns <= 1;
       if (C.scrollFirst && S.scrollReady && ssDown && prDown)
         return A("item", IT.scrollProt);
       if (prDown)
-        return mp >= sparkCost ? A("spell", SK.Protection) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
+        return mp >= sparkCost ? A("spell", SK.Protection) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
       if (ssDown)
-        return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gemReady ? A("item", IT.manaGem) : A("item", IT.mElixir);
-      if (C.useAbsorb && S.tookMagicDmg && (!b.absorb.active || b.absorb.turns <= 1)) return A("spell", SK.Absorb);
+        return mp >= sparkCost ? A("spell", SK.SpiritShield) : S.gems.mp ? A("item", S.gems.mp) : A("item", IT.mElixir);
+      if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A("spell", SK.Absorb);
       if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
       if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A("spell", SK.Regen);
       if (mpFree < C.MP_LOW * MM) {
-        if (S.gemReady) return A("item", IT.manaGem);
+        if (S.gems.mp) return A("item", S.gems.mp);
         if (!b.mpot.active) return A("item", IT.mDraught);
       }
-      if (hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
-      if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A("item", IT.sDraught);
+      if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A("item", S.gems.hp) : A("item", IT.hDraught);
+      if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
       if (C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
         return { type: "cannon", exec: Exec.cannon };
       const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;

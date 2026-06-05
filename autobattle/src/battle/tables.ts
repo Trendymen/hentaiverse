@@ -40,6 +40,14 @@ export const IT = {
   manaGem: 10008, // Mystic Gem(神秘宝石, 回 HP/MP/SP)实测背包 id=10008; 旧值 10006 在背包不存在 → gemReady 永远 false、宝石永远点不出
 } as const;
 
+/** 战斗掉落宝石 powerup DBID(翻写自 dodying reference:908-911). 各对口 + 神秘回三样 */
+export const GEM = {
+  health: 10005, // 生命宝石 → HP
+  mana: 10006, // 魔力宝石 → MP
+  spirit: 10007, // 灵力宝石 → SP
+  mystic: 10008, // 神秘宝石 → HP/MP/SP
+} as const;
+
 /** buff 图标 src 关键字(用于 #pane_effects>img 匹配) */
 export const BUFF_IMG: Record<string, string> = {
   spark: 'sparklife',
@@ -110,7 +118,7 @@ export const IT_CN: Record<number, string> = {
   11191: '体力长效药', 11195: '体力药水', 11199: '终极体力药',
   11291: '法力长效药', 11295: '法力药水', 11299: '终极法力药',
   11391: '灵力长效药', 11395: '灵力药水',
-  13111: '保护卷轴', 12601: '黑暗魔药', 12501: '神圣魔药', 10008: '魔力宝石',
+  13111: '保护卷轴', 12601: '黑暗魔药', 12501: '神圣魔药', 10008: '神秘宝石',
 };
 /** URL ss 参数 → 战斗类型中文 */
 export const SS_CN: Record<string, string> = {

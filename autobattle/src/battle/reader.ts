@@ -2,7 +2,7 @@
 // XHR 旁路捕获已在 main.ts(document-start)完成; 本层以 DOM 解析为主数据源.
 import { config } from '../core/config';
 import { $, $$ } from '../core/dom';
-import { BUFF_IMG, DEBUFFS, SS_CN } from './tables';
+import { BUFF_IMG, DEBUFFS, SS_CN, GEM } from './tables';
 import { IT } from './tables';
 import type { BattleState, BuffMap, BuffState, EnemyState } from '../types';
 
@@ -151,6 +151,9 @@ export class StateReader {
       spot: B.spot,
     };
 
+    // 宝石按需对口: 缺啥用对应宝石, 没对口专用的用神秘宝石(回三样)兜底; 都没=0
+    const gemAvail = (db: number) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
+    const pickGem = (own: number) => (gemAvail(own) ? own : gemAvail(GEM.mystic) ? GEM.mystic : 0);
     return {
       hp,
       mp,
@@ -173,6 +176,7 @@ export class StateReader {
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gemReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.manaGem})"]`),
+      gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
       cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = 不在 50 回合冷却(brain 再叠加 OC≥200 才放)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,

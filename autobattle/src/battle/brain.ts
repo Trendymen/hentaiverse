@@ -54,7 +54,7 @@ export class Brain {
         return hp < 0.6 * HM
           ? (pickHeal() ?? { type: 'defend', exec: Exec.defend, note: 'Spark真空+急救药耗尽硬抗' })
           : { type: 'defend', exec: Exec.defend, note: 'Spark真空+缺MP硬抗' };
-      return S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
+      return S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     }
     // P2 承伤预测式急救: 仅"当前血已破红线(hp<PANIC)" 或 "预测下一发致命且当前血本就不健康(hp<HP_HEAL)" 才救.
     // 血量健康(≥HP_HEAL)即便有红怪也不急救 —— 红怪单发 ≤BURST_EST, 健康血挨一发死不了, 不浪费顶级药.
@@ -80,7 +80,7 @@ export class Brain {
     }
     // P3 MP 熔断 ④(节流: 长效药冷却中改秘药)
     if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
-      return S.gemReady ? A('item', IT.manaGem) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir);
+      return S.gems.mp ? A('item', S.gems.mp) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir);
     // 物理双墙状态(缺失或剩 ≤1 回合视为需补)
     const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
     const prDown = !b.protection.active || b.protection.turns <= 1;
@@ -89,11 +89,11 @@ export class Brain {
       return A('item', IT.scrollProt);
     // 单墙法术补(MP 不足: Gem 回蓝 → 秘药兜底)
     if (prDown)
-      return mp >= sparkCost ? A('spell', SK.Protection) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
+      return mp >= sparkCost ? A('spell', SK.Protection) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     if (ssDown)
-      return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gemReady ? A('item', IT.manaGem) : A('item', IT.mElixir);
+      return mp >= sparkCost ? A('spell', SK.SpiritShield) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
     // P5 Absorb(仅法系怪): 最近敌方对我造成魔法伤害 → 上吸收墙. useAbsorb 默认关(盾战物防为主).
-    if (C.useAbsorb && S.tookMagicDmg && (!b.absorb.active || b.absorb.turns <= 1)) return A('spell', SK.Absorb);
+    if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A('spell', SK.Absorb); // 加 skillReady(冷却检测): Absorb 放了进冷却就别反复决策(根治法吸死循环)
     // P7 Haste
     if (!b.haste.active || b.haste.turns <= 1) return A('spell', SK.Haste);
     // 重击波垫血(节流)
@@ -102,13 +102,13 @@ export class Brain {
     if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A('spell', SK.Regen);
     // P9 回 MP(节流: manapot 在=刚喝长效药冷却中不重复喝; Gem 不受冷却)
     if (mpFree < C.MP_LOW * MM) {
-      if (S.gemReady) return A('item', IT.manaGem);
+      if (S.gems.mp) return A('item', S.gems.mp);
       if (!b.mpot.active) return A('item', IT.mDraught);
     }
     // P10 回 HP(节流)
-    if (hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
+    if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A('item', S.gems.hp) : A('item', IT.hDraught);
     // P11 回 SP 喂斗气(节流)
-    if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return A('item', IT.sDraught);
+    if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A('item', S.gems.sp) : A('item', IT.sDraught);
     // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): cannonReady=按钮未置灰=不在50回合冷却(实测置灰只代表冷却);
     //   再叠加 OC≥200(炮耗8点斗气=200). 若排在 P12 之后, OC 攒到 200 那刻会被 P12"开架式"抢走, 架式又把 OC 烧回<200,
     //   结果炮放不出、架式来回开关(=你看到的现象). 放到架式之前根治; survival(P1-P11)仍在其上, 不抢救命.
