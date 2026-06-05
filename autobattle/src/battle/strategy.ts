@@ -1,0 +1,121 @@
+import type { Config } from '../core/config';
+import { CONTROL_DEBUFFS } from './tables';
+import type { BattleState, EnemyState } from '../types';
+
+export type PressureLevel = 'low' | 'medium' | 'high';
+
+export interface BrainMemory {
+  lowHpStreak: number;
+}
+
+export interface Pressure {
+  level: PressureLevel;
+  spReserveLow: boolean;
+  spCritical: boolean;
+  tower: boolean;
+  hasRed: boolean;
+}
+
+export interface RankedEnemy extends EnemyState {
+  finWeight: number;
+}
+
+export interface ControlChoice {
+  id: number;
+  key: string;
+  target: EnemyState;
+  note: string;
+}
+
+function isYggdrasil(e: EnemyState): boolean {
+  return (e.name || '').includes('Yggdrasil');
+}
+
+function hasDebuff(e: EnemyState, key: string, status: string): boolean {
+  return Boolean(e.debuff?.[key] || e.status?.[status]);
+}
+
+export function hasFutureRound(S: BattleState): boolean {
+  return S.roundAll === 0 || S.roundNow === 0 || S.roundNow < S.roundAll;
+}
+
+export function assessPressure(S: BattleState, C: Config, memory: BrainMemory): Pressure {
+  const HM = S.maxHp || C.HPMAX;
+  const SM = S.maxSp || C.SPMAX;
+  const spRatio = SM ? S.sp / SM : 1;
+  const tower = S.battleType === '塔楼';
+  const hasRed = S.enemies.some((e) => e.alive && e.is_red_boss);
+  const spReserveLow = spRatio < C.SP_RESERVE_RATIO;
+  const spCritical = spRatio < C.SP_LOW;
+  const manyEnemies = S.alive >= C.CONTROL_MIN_ENEMIES;
+  const heavy = S.lastDmg > 0.3 * HM;
+  const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
+  const high = spCritical || heavy || lowHp || (tower && (manyEnemies || spReserveLow || hasRed));
+  const medium = high || tower || hasRed || manyEnemies || spReserveLow;
+
+  return {
+    level: high ? 'high' : medium ? 'medium' : 'low',
+    spReserveLow,
+    spCritical,
+    tower,
+    hasRed,
+  };
+}
+
+export function selectRedTarget(S: BattleState, ranked: RankedEnemy[] = [], need: 'control' | 'damage' | 'execute' = 'damage'): EnemyState | null {
+  const live = S.enemies.filter((e) => e.alive && e.is_red_boss);
+  if (!live.length) return null;
+
+  const ygg = live.find(isYggdrasil);
+  if (ygg) return ygg;
+
+  if (need === 'execute') {
+    const ex = live.find((e) => e.hpPct < 25 && e.bleeding);
+    if (ex) return ex;
+  }
+
+  if (need === 'control') {
+    const gap = live.find((e) => !hasDebuff(e, 'weaken', 'We') || !hasDebuff(e, 'imperil', 'Im'));
+    if (gap) return gap;
+  }
+
+  const locked = S.lockedRedId !== undefined ? live.find((e) => e.eid === S.lockedRedId) : undefined;
+  if (locked) return locked;
+
+  return ranked.find((e) => e.alive && e.is_red_boss) || live.sort((a, b) => a.eid - b.eid)[0] || null;
+}
+
+export function selectControlDebuff(S: BattleState, C: Config, ranked: RankedEnemy[], pressure: Pressure): ControlChoice | null {
+  if (!C.usePressureControl || pressure.level === 'low') return null;
+  if (!pressure.tower && !pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
+
+  const live = ranked.filter((e) => e.alive);
+  if (!live.length) return null;
+
+  const highValue = live.filter((e) => e.is_red_boss || isYggdrasil(e));
+  const scope = pressure.level === 'high' ? live : highValue.length ? highValue : live.slice(0, 1);
+
+  for (const d of CONTROL_DEBUFFS) {
+    if (!C[d.cfg]) continue;
+    if (d.key === 'silence' && !(pressure.spReserveLow || pressure.level === 'high')) continue;
+    if ((d.key === 'blind' || d.key === 'slow') && pressure.level !== 'high') continue;
+    if (d.key === 'imperil') {
+      const target = (highValue.length ? highValue : scope).find((e) => !hasDebuff(e, d.key, d.status));
+      if (target) return { id: d.id, key: d.key, target, note: `控:高价值陷危#${target.eid}` };
+      continue;
+    }
+    const target = scope.find((e) => !hasDebuff(e, d.key, d.status));
+    if (!target) continue;
+    const label = d.key === 'weaken' ? '全体虚弱' : d.key === 'silence' ? 'SP压沉默' : d.key;
+    return { id: d.id, key: d.key, target, note: `控:${label}#${target.eid}` };
+  }
+
+  return null;
+}
+
+export function shouldSaveOcForCannon(S: BattleState, C: Config, pressure: Pressure, struggling: boolean): boolean {
+  if (!C.useCannon || !S.cannonExists || S.cannonOnCd || struggling) return false;
+  if (pressure.level === 'high' || pressure.spReserveLow) return false;
+  if (S.alive >= C.CANNON_MIN_ENEMIES) return true;
+  return hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES;
+}

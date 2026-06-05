@@ -1161,8 +1161,9 @@
       }
       if (scrollCanCoverWalls) return A("item", IT.scrollProt);
       const mysticControl = selectControlDebuff(S, C, ranked, pressure);
-      const mysticDefenseNeed = !scrollCanCoverWalls && (ssDown || prDown) && mp < sparkCost || C.useShadowVeil && shadowDown && pressure.level !== "low" && mpFree < C.MP_LOW * MM;
-      if (S.gems.mystic && !ch && C.useChanneling !== false && (mysticDefenseNeed || mysticControl && pressure.level !== "low"))
+      const mysticDefenseNeed = !scrollCanCoverWalls && (ssDown || prDown) && mp < sparkCost || C.useShadowVeil && shadowDown && !pressure.spReserveLow && pressure.level !== "low" && mpFree < C.MP_LOW * MM;
+      const mysticControlNeed = mysticControl && pressure.level !== "low" && (!pressure.spReserveLow || mysticControl.key !== "imperil");
+      if (S.gems.mystic && !ch && C.useChanneling !== false && (mysticDefenseNeed || mysticControlNeed))
         return { type: "item", id: S.gems.mystic, note: mysticDefenseNeed ? "Mystic:开Channeling补防御" : "Mystic:开Channeling控压", exec: () => Exec.item(S.gems.mystic) };
       if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
         return pickMana();
@@ -1197,7 +1198,7 @@
       if (this.charging) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
-        if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: "stance", exec: Exec.stance };
+        if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: "stance", exec: Exec.stance };
         if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
       }
       const tgt = selectRedTarget(S, ranked, "control");

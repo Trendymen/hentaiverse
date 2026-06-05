@@ -22,10 +22,11 @@ const { actionLabel } = await import('../src/battle/tables');
 // ── 状态构造器 ──
 const b = (active = true, turns = 99) => ({ active, turns });
 const enemy = (eid: number, o: Record<string, unknown> = {}) => ({
-  eid, alive: true, is_red_boss: false, debuff: {}, penArmor: false, hpPct: 100, bleeding: false, stunned: false, ...o,
+  eid, alive: true, is_red_boss: false, debuff: {}, penArmor: false, hpPct: 100, bleeding: false, stunned: false,
+  hpNow: 10000, name: `Monster ${eid}`, status: {}, ...o,
 });
 const walls = (o: Record<string, unknown> = {}) => ({
-  spark: b(), spiritShield: b(), protection: b(), absorb: b(false, 0), haste: b(), regen: b(),
+  spark: b(), spiritShield: b(), protection: b(), shadowVeil: b(false, 0), absorb: b(false, 0), haste: b(), regen: b(),
   heartseeker: b(), blessing: b(false, 0), hpot: b(false, 0), mpot: b(false, 0), spot: b(false, 0), ...o,
 });
 const many = (n: number, o: Record<string, unknown> = {}) => Array.from({ length: n }, (_, i) => enemy(i + 1, o));
@@ -35,7 +36,7 @@ const base = (): Record<string, unknown> => ({
   enemies: [enemy(1)], alive: 1, maxHp: 24232, maxMp: 2002, maxSp: 1470,
   buff: walls(), channeling: false, stanceOn: false, riddle: false, canContinue: false, tookMagicDmg: false,
   roundNow: 1, roundAll: 10, monsterTotal: 1, battleType: '竞技场',
-  gems: { hp: 0, mp: 0, sp: 0 }, cannonExists: true, cannonOnCd: false, scrollReady: false,
+  gems: { hp: 0, mp: 0, sp: 0, mystic: 0 }, cannonExists: true, cannonOnCd: false, scrollReady: false,
   firstRound: false, lockedRedId: undefined, _started: true,
 });
 
@@ -47,6 +48,9 @@ function run(name: string, opts: { cd?: number[]; stock?: number[]; cfg?: Record
   STOCK = new Set((opts.stock || []).map(String));
   config.set('useMercifulBlow', false); // 每轮先复位易污染的开关
   config.set('useAbsorb', false);
+  config.set('usePressureControl', false);
+  config.set('useShadowVeil', false);
+  config.set('useSilence', true);
   for (const [k, v] of Object.entries(opts.cfg || {})) config.set(k as never, v as never);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const a = brain.decide(opts.state as any);
@@ -73,3 +77,7 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = many(4); s.alive = 4; s.monsterTotal = 4; s.overcharge = 200; s.cannonOnCd = true; s.stanceOn = true; (s.enemies as Record<string, unknown>[])[0].stunned = true; run('⑬4怪+OC200+炮冷却中(架开)', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, debuff: { weaken: true, imperil: true } })]; s.overcharge = 50; run('⑭已减益未晕眩红怪+OC50[应盾击]', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 20, bleeding: true, debuff: { weaken: true, imperil: true } })]; s.overcharge = 100; run('⑯红名残血+流血+OC100[慈悲]', { cfg: { useMercifulBlow: true }, state: s }); }
+{ const s = base(); s.mp = 120; (s.buff as Record<string, unknown>).spark = { active: true, turns: 1 }; s.gems = { hp: 0, mp: 0, sp: 0, mystic: 10008 }; run('⑰Spark快断+缺MP+Mystic', { cfg: { useChanneling: true }, state: s }); }
+{ const s = base(); s.battleType = '塔楼'; s.enemies = many(4, { status: { We: true } }); s.alive = 4; s.monsterTotal = 4; run('⑱塔楼多怪+缺影纱', { cfg: { usePressureControl: true, useShadowVeil: true }, state: s }); }
+{ const s = base(); s.battleType = '塔楼'; s.enemies = many(4); s.alive = 4; s.monsterTotal = 4; (s.buff as Record<string, unknown>).shadowVeil = { active: true, turns: 5 }; run('⑲塔楼多怪[先虚弱]', { cfg: { usePressureControl: true, useShadowVeil: true }, state: s }); }
+{ const s = base(); s.roundNow = 10; s.roundAll = 10; s.enemies = [enemy(1, { stunned: true, hpNow: 5000 }), enemy(2, { stunned: true, hpNow: 1000 })]; s.alive = 2; s.monsterTotal = 4; s.overcharge = 50; run('⑳最终波2怪+OC50[不攒炮]', { state: s }); }

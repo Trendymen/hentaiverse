@@ -211,6 +211,7 @@ export class StateReader {
       spark: B.spark,
       spiritShield: B.spiritShield,
       protection: B.protection,
+      shadowVeil: B.shadowVeil,
       absorb: B.absorb,
       haste: B.haste,
       regen: B.regen,
@@ -221,9 +222,9 @@ export class StateReader {
       spot: B.spot,
     };
 
-    // 宝石按需对口: 缺啥用对应宝石, 没对口专用的用神秘宝石(回三样)兜底; 都没=0
+    // 宝石按需对口: 恢复只用对应专用宝石; 神秘宝石单独暴露给 Channeling 策略层, 不再伪装成恢复兜底.
     const gemAvail = (db: number) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
-    const pickGem = (own: number) => (gemAvail(own) ? own : gemAvail(GEM.mystic) ? GEM.mystic : 0);
+    const pickGem = (own: number) => (gemAvail(own) ? own : 0);
     return {
       hp,
       mp,
@@ -245,7 +246,7 @@ export class StateReader {
       roundAll: this.roundAll,
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
-      gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
+      gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit), mystic: gemAvail(GEM.mystic) ? GEM.mystic : 0 },
       cannonExists: !!cannonEl, // 炮在技能栏(攒炮/放炮/OC技能让路共用)
       cannonOnCd: false, // 50 回合冷却由 loop 按回合追踪注入(reader 读不到冷却)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),

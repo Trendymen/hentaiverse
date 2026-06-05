@@ -17,7 +17,7 @@
 | 里程碑 | 状态 | 说明 |
 |---|---|---|
 | M1 地基 | ✅ 完成 | 工程/构建(不压缩)/core/UI 骨架/document-start hook |
-| M2 战斗内 | 🟢 C-layered 前置清理中 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度; castHostileOn / XHR / `_expire` 阻塞已解除, 当前先做 C-layered P0 前置清理(§2.7) |
+| M2 战斗内 | 🟢 C-layered 核心已接入 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度; castHostileOn / XHR / `_expire` 阻塞已解除; C-layered P0 + Mystic split / Shadow Veil / Silence / 压力层已接入, 剩真机观察 |
 | M3 连刷 | 🟠 仅 GF 波次内续战 | `engine/` 未建;遭遇/竞技场/精力/连刷 tab 全缺(见 §3) |
 | M4 保护后勤 | ❌ 未开始 | `engine/{stamina,watchdog,supply,stats}.ts` 全缺(见 §4) |
 | M5 杂项打磨 | ❌ 未开始 | 告警/通知/异世界/小马提醒 + 提醒 tab + UI 精修(见 §5) |
@@ -96,13 +96,19 @@
 
 ### 2.7 C-layered P0 前置清理 / 观察项
 
-- **P0 当前优先**:
+- **P0 已完成**:
   1. `loop.ts` 小马炮冷却落点:只在 `Exec.cannon()` 实际返回 `true` 后写 `cannonCd=50`,避免决策为 cannon 但执行失败时误盖冷却。
   2. `reader.ts` 统一 textlog 最新行读取:GF 实测 DOM textlog 顶新底旧, `_round()` / `_enemyMagic()` / `_spawnHp()` 共用同一 helper。
   3. `scripts/drive-brain.mts` 更新慈悲样本:非红残血+流血不触发慈悲,红名残血+流血才触发慈悲。
+- **C-layered 主体已接入**:
+  1. Mystic Gem 独立为 Channeling 触发器,不再作为 HP/MP/SP 恢复兜底。
+  2. Shadow Veil 进入高压防御层,低压默认不维护以保留反击/OC。
+  3. 高压控制层接入 Weaken -> Silence -> 高价值 Imperil,由塔楼/红怪/多怪/SP压力门控。
+  4. SP reserve 可在非架式时补灵力;最终波不为下一波攒炮,非红 OC 技按 ranked 选目标。
 
 - **三个 OC 近战技 `castHostileOn` 释放机制 ✅ 已验证**(commit `8df9804`):GF 实测点 `2201`+`commit_target` 真放出盾击(crit 102413,`Cut Down has been defeated`,OC 138→100 真消耗)。技能元素 `id=DBID`、`onclick=lock_action+set_hostile_skill`(无 touch_and_go,靠 commit_target 释放),与红怪减益同机制;castHostileOn 已加 opacity 守卫。**释放机制确认可用**;剩"实战观察决策优先级/攒炮节奏是否如预期"(装最新 build 开三开关跑一轮)。
 - **目标权重真机核对**:开 `useTargetWeight` 看 P16 选目标;死怪 `nbardead` / 红怪 Yggdrasil 名 / 长回合 Spawned 缓存沿用 / 连刷换波 initHp 覆盖 / hpNow 数值核对(spec §10)。
+- **C-layered 真机观察**:Mystic 使用后是否稳定读到 Channeling;Shadow Veil 图标关键字/剩余回合;Silence ID/冷却;高压控制是否拖慢低压场;最终波 OC 技日志是否符合预期。
 
 ---
 
@@ -163,7 +169,7 @@
 ## 8. 建议实施顺序
 
 1. ~~§2.1 Absorb 启发式~~ ✅ / ~~§2.4 OC 近战技~~ ✅ / ~~§2.5 目标权重~~ ✅ / ~~§2.6 OC 经济+UI~~ ✅
-2. **§2.7 C-layered P0 前置清理**:cannon 冷却落点 / textlog 最新行 / drive-brain 样本 / 本文件同步
-3. **C-layered 主体**:Mystic split → Shadow Veil → Silence/压力层 → OC/红怪目标预算
+2. ~~§2.7 C-layered P0 前置清理~~ ✅ / ~~C-layered 主体(Mystic/Shadow Veil/Silence/压力/OC预算)~~ ✅
+3. **C-layered 真机观察微调**:Mystic/Channeling、Shadow Veil、Silence 命中/冷却、低压拖慢、最终波 OC
 4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
 5. M4 → M5

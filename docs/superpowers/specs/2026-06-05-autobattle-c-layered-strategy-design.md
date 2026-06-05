@@ -1,7 +1,7 @@
 # autobattle C-layered 盾战决策大脑设计
 
 > 日期: 2026-06-05
-> 状态: 设计文档已更新, 先执行 P0 前置清理, 再进入 C-layered 主体实现
+> 状态: P0 前置清理已完成;C-layered 主体(Mystic split / Shadow Veil / Silence / 压力层 / OC预算)已接入, 待真机观察微调
 > 前置: `docs/superpowers/specs/2026-06-05-autobattle-target-weight-design.md` 已实现到当前源码
 
 ## 1. 目标
@@ -41,8 +41,9 @@
 - `getRangeCenterID()` 适合旧范围技/脚本大系统, 当前只保留"按排序挑目标"的思想。
 - Sleep 不作为默认高压策略, 因为本项目目标是高防单手盾战, 需要保留反击和 OC。
 
-### 2.3 当前源码事实
+### 2.3 设计前源码事实
 
+- 本节记录设计时的源码起点;当前实现状态见 §16。
 - `brain.ts` 已有 P0-P16 线性优先级, 且 `target-weight.ts` 已接入 P16 杂兵平砍。
 - `reader.ts` 当前仍把 Mystic Gem 当成 HP/MP/SP 的兜底恢复宝石: `pickGem(own) ? own : GEM.mystic`。
 - `tables.ts` 当前缺 `ShadowVeil=413`, 缺 `Slow=221`、`Blind=231`、`Silence=232`, `BUFF_IMG` 也没有 `shadowVeil`。
@@ -461,6 +462,15 @@ cd autobattle && npm run build
 | cannon 执行失败误盖冷却 | 中 | P0 改为执行成功后才落 `cannonCd`; 脚本回归覆盖 false/true |
 | textlog 新旧顺序被不同 reader 方法各自解释 | 中 | P0 统一 reader helper; 顶新底旧作为当前 GF 实测默认 |
 
-## 16. Review 结论
+## 16. 实现状态
 
-这份设计聚焦在 M2 战斗决策, 不扩散到连刷后勤。核心改造点都有明确数据来源和降级路径。下一步先执行 P0 前置清理, 再按数据层 -> helper -> brain 接入 -> UI/log/验证的顺序实施 C-layered 主体。
+- P0 前置清理完成:cannon 冷却落点、textlog 最新行 helper、drive-brain 样本、remaining-tasks 同步。
+- 数据层完成:Mystic 独立字段、Shadow Veil buff/技能、Silence/Blind/Slow/Sleep id/config。
+- 策略层完成:`strategy.ts` 提供 pressure、control debuff、red target、cannon OC budget helper。
+- brain 接入完成:Mystic 触发 Channeling、Shadow Veil 高压维护、Weaken/Silence 压力控制、SP reserve、最终波不攒炮、非红 OC 技按 ranked 选目标。
+- 回归完成:`drive-c-layered.mts` 覆盖 Mystic/影纱/沉默/最终波OC/SP预留;`drive-brain.mts` 补可读样本。
+- 剩余风险:真机确认 Mystic 后 Channeling 读取、Shadow Veil 图标、Silence 置灰/命中、低压拖慢和最终波 OC 日志。
+
+## 17. Review 结论
+
+这份设计聚焦在 M2 战斗决策, 不扩散到连刷后勤。核心改造点都有明确数据来源和降级路径。当前实现已完成主体闭环, 下一步以真机日志观察和阈值微调为主, 再进入 M3 连刷。

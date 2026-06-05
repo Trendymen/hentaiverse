@@ -5,6 +5,7 @@ import { SK, SK_SPECIAL, IT, DEBUFFS, CHANNEL_Q } from './tables';
 import { Exec } from './executor';
 import { rankTargets } from './target-weight';
 import type { Action, ActionType, BattleState, EnemyState, WeightConfig } from '../types';
+import { assessPressure, hasFutureRound, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
 
 /** 从 config 装配 target-weight 所需的 WeightConfig(模块只认参数, 不碰单例) */
 function weightCfg(C: Config): WeightConfig {
@@ -34,6 +35,8 @@ export class Brain {
     // 血线下降去抖: 连续 STRUGGLE_STREAK 次 hp<STRUGGLE_HP 才判撑不住(放弃攒炮), 防单次瞬掉(挨发暴击又被拉回)误触发
     if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
     else this.lowHpStreak = 0;
+    const ranked = rankTargets(S.enemies, weightCfg(C));
+    const pressure = assessPressure(S, C, { lowHpStreak: this.lowHpStreak });
     const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM); // ②
     const predicted = hp - danger,
       PANIC = (hasRed ? C.PANIC_RED : C.PANIC_NORM) * HM;
@@ -58,6 +61,8 @@ export class Brain {
       }
       return null;
     };
+    const pickMana = (): Action => (S.gems.mp ? A('item', S.gems.mp) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir));
+    const pickSpirit = (): Action => (S.gems.sp ? A('item', S.gems.sp) : A('item', IT.sDraught));
 
     // P0 小马图: 留人工
     if (S.riddle) {
@@ -69,11 +74,13 @@ export class Brain {
     // P1 Spark 零空窗(防一击致死) ①③
     if (!b.spark.active || b.spark.turns <= 2) {
       if (mp >= sparkCost && Exec.skillReady(SK.Spark)) return A('spell', SK.Spark);
+      if (b.spark.active && S.gems.mystic && !ch && C.useChanneling !== false)
+        return { type: 'item', id: S.gems.mystic, note: 'Mystic:开Channeling补Spark', exec: () => Exec.item(S.gems.mystic) };
       if (!b.spark.active)
         return hp < 0.6 * HM
           ? (pickHeal() ?? { type: 'defend', exec: Exec.defend, note: 'Spark真空+急救药耗尽硬抗' })
           : { type: 'defend', exec: Exec.defend, note: 'Spark真空+缺MP硬抗' };
-      return S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
+      return pickMana();
     }
     // P2 承伤预测式急救: 仅"当前血已破红线(hp<PANIC)" 或 "预测下一发致命且当前血本就不健康(hp<HP_HEAL)" 才救.
     // 血量健康(≥HP_HEAL)即便有红怪也不急救 —— 红怪单发 ≤BURST_EST, 健康血挨一发死不了, 不浪费顶级药.
@@ -85,8 +92,26 @@ export class Brain {
       if (canCure && Exec.skillReady(SK.Cure)) return A('spell', SK.Cure);
       return pickHeal() ?? (Exec.skillReady(SK.Spark) && mp >= sparkCost ? A('spell', SK.Spark) : { type: 'defend', exec: Exec.defend, note: '治疗冷却+急救药耗尽硬抗' });
     }
+    const shadowDown = !b.shadowVeil.active || b.shadowVeil.turns <= 1;
+    const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
+    const prDown = !b.protection.active || b.protection.turns <= 1;
+    const scrollCanCoverWalls = C.scrollFirst && S.scrollReady && ssDown && prDown;
     // P2.5 Channeling 主动利用: 折扣窗口补最贵(保命已在前, 不抢)
     if (ch && C.useChanneling !== false) {
+      const channelFriendly: { id: number; need: boolean }[] = [
+        { id: SK.Spark, need: !b.spark.active || b.spark.turns <= 2 },
+        { id: SK.SpiritShield, need: !b.spiritShield.active || b.spiritShield.turns <= 1 },
+        { id: SK.Protection, need: !b.protection.active || b.protection.turns <= 1 },
+        { id: SK.ShadowVeil, need: C.useShadowVeil && shadowDown && !pressure.spReserveLow && (!C.shadowVeilPressureOnly || pressure.level !== 'low') },
+      ];
+      for (const q of channelFriendly) {
+        if (q.need && Exec.skillReady(q.id)) return A('spell', q.id);
+      }
+      const control = selectControlDebuff(S, C, ranked, pressure);
+      if (control && Exec.skillReady(control.id)) {
+        if (control.target.is_red_boss) S.lockedRedId = control.target.eid;
+        return { type: 'spell', id: control.id, note: `${control.note}(Channeling)`, exec: () => Exec.castHostileOn(control.id, control.target.eid) };
+      }
       for (const q of CHANNEL_Q) {
         if (!q.need(b, S)) continue;
         if (!Exec.skillReady(q.id)) continue; // 耗蓝技能统一守卫: 置灰(冷却)跳过试队列下一个
@@ -98,22 +123,28 @@ export class Brain {
         return A('spell', q.id);
       }
     }
+    // 双墙都缺且有卷轴: 卷轴不耗 MP, 先于 Mystic/MP 熔断, 一键补两墙.
+    if (scrollCanCoverWalls) return A('item', IT.scrollProt);
+    const mysticControl = selectControlDebuff(S, C, ranked, pressure);
+    const mysticDefenseNeed =
+      (!scrollCanCoverWalls && (ssDown || prDown) && mp < sparkCost) ||
+      (C.useShadowVeil && shadowDown && !pressure.spReserveLow && pressure.level !== 'low' && mpFree < C.MP_LOW * MM);
+    const mysticControlNeed = mysticControl && pressure.level !== 'low' && (!pressure.spReserveLow || mysticControl.key !== 'imperil');
+    if (S.gems.mystic && !ch && C.useChanneling !== false && (mysticDefenseNeed || mysticControlNeed))
+      return { type: 'item', id: S.gems.mystic, note: mysticDefenseNeed ? 'Mystic:开Channeling补防御' : 'Mystic:开Channeling控压', exec: () => Exec.item(S.gems.mystic) };
     // P3 MP 熔断 ④(节流: 长效药冷却中改秘药)
     if (mp < C.MP_FUSE * MM && !ch && (b.spark.turns <= 2 || b.spiritShield.turns <= 2 || b.protection.turns <= 2))
-      return S.gems.mp ? A('item', S.gems.mp) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir);
-    // 物理双墙状态(缺失或剩 ≤1 回合视为需补)
-    const ssDown = !b.spiritShield.active || b.spiritShield.turns <= 1;
-    const prDown = !b.protection.active || b.protection.turns <= 1;
-    // P4 守护卷轴只在"两墙都缺"时一键补(省回合); 墙在/只缺一墙 → 跳过走法术单补, 不再因 firstRound 无脑铺(防有墙还浪费卷轴/打断手动守护)
-    if (C.scrollFirst && S.scrollReady && ssDown && prDown)
-      return A('item', IT.scrollProt);
+      return pickMana();
     // 单墙法术补(MP 不足: Gem 回蓝 → 秘药兜底)
     if (prDown)
-      return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A('spell', SK.Protection) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
+      return mp >= sparkCost && Exec.skillReady(SK.Protection) ? A('spell', SK.Protection) : pickMana();
     if (ssDown)
-      return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A('spell', SK.SpiritShield) : S.gems.mp ? A('item', S.gems.mp) : A('item', IT.mElixir);
+      return mp >= sparkCost && Exec.skillReady(SK.SpiritShield) ? A('spell', SK.SpiritShield) : pickMana();
     // P5 Absorb(仅法系怪): 最近敌方对我造成魔法伤害 → 上吸收墙. useAbsorb 默认关(盾战物防为主).
     if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A('spell', SK.Absorb); // 加 skillReady(冷却检测): Absorb 放了进冷却就别反复决策(根治法吸死循环)
+    // P6 Shadow Veil: 仅高压/显式开启维护, 低压不主动牺牲反击与 OC 收益.
+    if (C.useShadowVeil && shadowDown && !pressure.spReserveLow && (!C.shadowVeilPressureOnly || pressure.level !== 'low') && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(SK.ShadowVeil))
+      return { type: 'spell', id: SK.ShadowVeil, note: `压:${pressure.level} 影纱`, exec: () => Exec.skill(SK.ShadowVeil) };
     // P7 Haste(加 skillReady 守卫: MP不够/冷却时别硬决策放不出的法术→死磕安全网)
     if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A('spell', SK.Haste);
     // 重击波垫血(节流)
@@ -127,8 +158,16 @@ export class Brain {
     }
     // P10 回 HP(节流)
     if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A('item', S.gems.hp) : A('item', IT.hDraught);
+    // P10.5 高压控制: Weaken → Silence → 高价值 Imperil, 用 SP 压力本身触发沉默减压.
+    const control = selectControlDebuff(S, C, ranked, pressure);
+    if (control && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(control.id)) {
+      if (control.target.is_red_boss) S.lockedRedId = control.target.eid;
+      return { type: 'spell', id: control.id, note: `${control.note} 压:${pressure.level}`, exec: () => Exec.castHostileOn(control.id, control.target.eid) };
+    }
     // P11 回 SP 喂斗气(节流)
-    if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A('item', S.gems.sp) : A('item', IT.sDraught);
+    const spReserveNeed = sp < C.SP_RESERVE_RATIO * SM && (b.spiritShield.active || pressure.level !== 'low');
+    if ((sp < C.SP_LOW * SM || spReserveNeed || (sp < C.SP_LOW * SM && S.stanceOn)) && !b.spot.active)
+      return { ...pickSpirit(), note: spReserveNeed ? 'SP:预留不足' : 'SP:低线' };
     // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): 不在 50 回合冷却(loop 按回合追踪 cannonOnCd) + OC≥200(炮耗8点斗气).
     //   弃用 opacity 判: OC<200 与冷却同为 opacity:0.5 无法区分(炮死锁根因), 改用回合冷却 + OC 数值.
     //   排在架式之上: 否则 OC 攒到 200 那刻被 P12"开架式"抢走 → 架式烧回<200 → 炮放不出+架式来回开关.
@@ -146,11 +185,11 @@ export class Brain {
     if (this.charging) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 冲刺期关架式(只切一次, 之后保持关攒到 200)
     } else {
-      if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn) return { type: 'stance', exec: Exec.stance };
+      if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: 'stance', exec: Exec.stance };
       if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
     }
     // P13 红怪减益序列(表驱动 Weaken→Imperil; 定向 commit 红怪)
-    const tgt = this.lockTarget(S);
+    const tgt = selectRedTarget(S, ranked, 'control');
     if (tgt?.is_red_boss) {
       for (const d of DEBUFFS) {
         if (C[d.cfg] === false) continue; // 控制台开关
@@ -169,11 +208,10 @@ export class Brain {
     //     高密度波(monsterTotal≥CANNON_MIN_ENEMIES)即使清到剩 2-3 杂兵也攒: 杂兵平砍清, OC 留给(本/下)波开炮 AOE.
     //   放弃攒炮(血线下降 struggling / 低密度波 / 炮冷却) → 单体技减压: 慈悲处决红名, 要害秒怪降围殴, 盾击晕眩.
     const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK; // 血线下降去抖: 连续 STRUGGLE_STREAK 次跌破 STRUGGLE_HP(默认 50%×2 次)才放弃攒炮
-    const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES; // 高密度波(下波大概率也多 → 值得跨波攒炮)
-    const saveOcForCannon =
-      C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
+    const finalRound = !hasFutureRound(S);
+    const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
     if (!saveOcForCannon) {
-      const tgtSp = this.lockTarget(S); // 锁定红怪(连招与处决都对它)
+      const tgtSp = selectRedTarget(S, ranked, 'execute'); // 锁定红怪(连招与处决都对它)
       // ── 红名处决连招(锁同一红怪串联, 优先于杂兵): 盾击晕 → 要害收割+5流血 → 慈悲25%处决 ──
       if (tgtSp) {
         // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决
@@ -187,13 +225,15 @@ export class Brain {
           return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
       }
       // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
-      if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
-        const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
-        if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${struggling ? '力不从心' : '红名在场'}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+      if (C.useVitalStrike && (hasRed || struggling || finalRound || pressure.level !== 'low') && oc >= 50) {
+        const stunTrash = ranked.find((e) => e.alive && e.stunned && !e.is_red_boss);
+        if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike)) {
+          const why = struggling ? '力不从心' : hasRed ? '红名在场' : finalRound ? '最终波' : '高压';
+          return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${why}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+        }
       }
       if (C.useShieldBash && oc >= 25) {
-        const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
+        const toStun = ranked.find((e) => e.alive && !e.is_red_boss && !e.stunned);
         if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
           return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
       }
@@ -201,7 +241,6 @@ export class Brain {
     // P16 破甲滚雪球平砍: 杂兵按 finWeight 选最优(血量+13状态+Yggdrasil); 仅剩红怪锁定持续平砍.
     //   红怪线(lockTarget/P13/P15/下方尾部锁定)全不动 —— 权重只接管杂兵选谁(守半自动红线).
     //   useTargetWeight=false → rankTargets 退回 eid 升序 = 现状, 零回归.
-    const ranked = rankTargets(S.enemies, weightCfg(C));
     const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
     if (trash.length) {
       const t = trash[0];
@@ -217,8 +256,7 @@ export class Brain {
 
   /** 锁定红怪(记忆目标优先, 否则首个活红怪) */
   lockTarget(S: BattleState): EnemyState | null {
-    const live = S.enemies.filter((e) => e.is_red_boss && e.alive);
-    return (S.lockedRedId !== undefined && live.find((e) => e.eid === S.lockedRedId)) || live[0] || null;
+    return selectRedTarget(S, rankTargets(S.enemies, weightCfg(config.all())), 'damage');
   }
 
   /** 定向红怪释放 hostile 减益 */

@@ -6,11 +6,16 @@ import type { Action, BattleState, BuffMap } from '../types';
 export const SK = {
   Weaken: 212,
   Imperil: 213,
+  Slow: 221,
+  Sleep: 222,
+  Blind: 231,
+  Silence: 232,
   Cure: 311,
   Regen: 312,
   FullCure: 313,
   Protection: 411,
   Haste: 412,
+  ShadowVeil: 413,
   Absorb: 421,
   Spark: 422,
   SpiritShield: 423,
@@ -39,12 +44,12 @@ export const IT = {
   infHoly: 12501,
 } as const;
 
-/** 战斗掉落宝石 powerup DBID(翻写自 dodying reference:908-911). 各对口 + 神秘回三样 */
+/** 战斗掉落宝石 powerup DBID(翻写自 dodying reference:908-911). 神秘宝石用于触发 Channeling, 不再伪装成恢复兜底. */
 export const GEM = {
   health: 10005, // 生命宝石 → HP
   mana: 10006, // 魔力宝石 → MP
   spirit: 10007, // 灵力宝石 → SP
-  mystic: 10008, // 神秘宝石 → HP/MP/SP
+  mystic: 10008, // 神秘宝石 → Channeling
 } as const;
 
 /** buff 图标 src 关键字(用于 #pane_effects>img 匹配) */
@@ -52,6 +57,7 @@ export const BUFF_IMG: Record<string, string> = {
   spark: 'sparklife',
   spiritShield: 'spiritshield',
   protection: 'protection',
+  shadowVeil: 'shadowveil',
   absorb: 'absorb',
   haste: 'haste',
   regen: 'regen',
@@ -73,6 +79,21 @@ export interface DebuffDef {
 export const DEBUFFS: DebuffDef[] = [
   { key: 'weaken', id: SK.Weaken, cfg: 'useWeaken', img: /weaken/i },
   { key: 'imperil', id: SK.Imperil, cfg: 'useImperil', img: /imperil/i },
+];
+
+/** 高压控制减益(按 survival-first 顺序). Sleep 不进默认链. */
+export interface ControlDebuffDef {
+  key: 'weaken' | 'silence' | 'imperil' | 'blind' | 'slow';
+  status: 'We' | 'Si' | 'Im' | 'Bl' | 'Slo';
+  id: number;
+  cfg: 'useWeaken' | 'useSilence' | 'useImperil' | 'useBlind' | 'useSlow';
+}
+export const CONTROL_DEBUFFS: ControlDebuffDef[] = [
+  { key: 'weaken', status: 'We', id: SK.Weaken, cfg: 'useWeaken' },
+  { key: 'silence', status: 'Si', id: SK.Silence, cfg: 'useSilence' },
+  { key: 'imperil', status: 'Im', id: SK.Imperil, cfg: 'useImperil' },
+  { key: 'blind', status: 'Bl', id: SK.Blind, cfg: 'useBlind' },
+  { key: 'slow', status: 'Slo', id: SK.Slow, cfg: 'useSlow' },
 ];
 
 /** 怪物 13 状态库(翻写 dodying skillLib hvAutoAttack.user.js:3302-3355).
@@ -133,8 +154,9 @@ export const cannonBtn = (): HTMLElement | undefined =>
 
 /** 法术 id → 中文名(HUD 显示用) */
 export const SK_CN: Record<number, string> = {
-  212: '虚弱', 213: '陷危', 311: '治疗', 312: '细胞活化', 313: '完全治愈',
-  411: '守护', 412: '急速', 421: '吸收', 422: '生命火花', 423: '灵力盾', 431: '穿心',
+  212: '虚弱', 213: '陷危', 221: '缓慢', 222: '沉眠', 231: '致盲', 232: '沉默',
+  311: '治疗', 312: '细胞活化', 313: '完全治愈',
+  411: '守护', 412: '急速', 413: '影纱', 421: '吸收', 422: '生命火花', 423: '灵力盾', 431: '穿心',
   2201: '盾击', 2202: '要害强击', 2203: '最后的慈悲',
 };
 /** 物品 DBID → 中文名 */

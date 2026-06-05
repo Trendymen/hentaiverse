@@ -29,7 +29,7 @@
 | 在不在冷却 | `cannonOnCd`(loop 按**回合**追踪) | ~~opacity~~、~~22s 时间戳~~ |
 | 炮在不在技能栏 | `cannonExists`(`!!cannonBtn()`) | — |
 
-**冷却回合追踪**(`src/loop.ts`):模块变量 `cannonCdLeft`,放炮置 `CANNON_CD_TURNS=50`,每个真新回合(状态推进)`-1`,归 0 = 冷却好;**新战斗清零**(没放过=不冷却,不再「一上来就以为冷却」)。
+**冷却回合追踪**(`src/loop.ts`):模块变量 `cannonCd`,只有 `Exec.cannon()` 实际返回 `true` 后才置 `CANNON_CD_TURNS=50`;每个真新回合(状态推进)`-1`,归 0 = 冷却好;**新战斗清零**(没放过=不冷却,不再「一上来就以为冷却」)。
 
 ### 三种炮场景的决策(brain P11.5 / P12 / P15)
 
@@ -56,7 +56,7 @@
 
 **与炮的优先级**:多怪攒炮场景,OC 留给炮,这三技让路;只在「非炮场景 / 炮冷却中」才用(P15)。
 
-> ⚠待核对:`castHostileOn` 对 OC 技能的真实 OC 消耗(onclick 已确认是 set_hostile_skill,但「点了真扣 OC」需战斗中再确认一次)。
+`castHostileOn` 对 OC 技能的释放已 GF 实测确认:点技能后 `commit_target(eid)` 真出招并真扣 OC。
 
 ---
 
@@ -90,6 +90,7 @@
 
 - `#pane_effects>img`,匹配 `src` 文件名 **或** `onmouseover` 里 `set_infopane_effect('名字')` 的名字(后者抗图标改名,如御谜士祝福认 `RiddleMaster`)
 - **吸收墙 absorb**:`src=absorb.png` / 名 `Absorbing Ward`(实测确认匹配)
+- **影纱 shadowVeil**:`src/name` 关键字按 `shadowveil` 匹配,进入高压防御层
 - 各 buff 关键字见 `src/battle/tables.ts` 的 `BUFF_IMG`
 - Channeling 也在此读(`channeling` 图标);命中后 1MP+增强 50%,brain P2.5 抢补最贵法术
 
@@ -121,31 +122,36 @@
 ```
 P0 小马图(留人工) → P0.5 胜利继续下一波 → P1 Spark零空窗 → P2 承伤预测急救
 → P2.5 Channeling补最贵 → P3 MP熔断 → P4 双墙(卷轴/单补) → P5 Absorb(法系)
-→ P7 Haste → P8 Regen → P9 回MP → P10 回HP → P11 回SP喂斗气
+→ P6 Shadow Veil(高压) → P7 Haste → P8 Regen → P9 回MP → P10 回HP
+→ P10.5 高压控制(Weaken→Silence→高价值Imperil) → P11 回SP预留
 → P11.5 小马炮 → P12 架式开关/攒炮让路 → P13 红怪减益(Weaken→Imperil)
-→ P14 Heartseeker → P15 OC近战技(非炮/冷却场景) → P16 破甲滚雪球平砍
+→ P14 Heartseeker → P15 OC近战技(最终波/高压不攒炮) → P16 破甲滚雪球平砍
 ```
 
-宝石按需对口:缺啥用对应宝石(生命/魔力/灵力),没对口的用神秘宝石兜底(回三样)。
+宝石按需对口:缺啥用对应专用宝石(生命/魔力/灵力);**神秘宝石不再当恢复兜底**,只作为 Channeling 触发器,服务 Spark/双墙/影纱/关键减益等下一发高价值法术。
 
 ---
 
 ## 决策回归工具
 
-`scripts/drive-brain.mts`:Node 里用**真实** `brain.decide` 跑 13 种典型状态,看每种出什么招。改 `brain` 后跑一遍即可回归:
+`scripts/drive-brain.mts`:Node 里用**真实** `brain.decide` 跑典型状态,看每种出什么招。`scripts/drive-c-layered.mts` 是 C-layered 的断言型回归(Mystic/影纱/沉默/最终波OC/SP预留)。改 `brain` 后两者都跑一遍即可回归:
 
 ```bash
 cd autobattle && npx tsx scripts/drive-brain.mts
+cd autobattle && npx tsx scripts/drive-c-layered.mts
 ```
 
-覆盖:满状态平砍 / Spark真空 / 危急急救 / 缺墙卷轴 / 放炮 / 攒炮 / 红怪减益 / 要害·盾击·慈悲连招 / Absorb / Channeling / 炮冷却中转OC技。
+覆盖:满状态平砍 / Spark真空 / 危急急救 / 缺墙卷轴 / 放炮 / 攒炮 / 红怪减益 / 要害·盾击·慈悲连招 / Absorb / Channeling / 炮冷却中转OC技 / Mystic / Shadow Veil / Silence / 最终波不攒炮。
 
 ---
 
 ## 待真机核对清单
 
-1. `castHostileOn` 放 OC 技能时**真扣 OC**(onclick 已确认 hostile,差最后一步实测)
-2. 流血图标 `wpn_bleed` 精确文件名 + 怪满血时血条 width 读法
-3. 晕眩图标 `stun` 精确 src(目前 `/stun/` 模糊匹配,实测 e4 命中)
-4. 血条 img 与 mkey 的 index 对应(大样本)
-5. §2.2 XHR `getLastBattle()` 真实响应样本(需先把 `window.__hvab`→`unsafeWindow.__hvab`)
+1. Mystic Gem 使用后 `channeling` buff 是否稳定被 reader 读到
+2. Shadow Veil 图标关键字是否确认为 `shadowveil`,剩余回合读取是否与其他 buff 一致
+3. Silence/Blind/Slow 的技能 id 与 opacity 冷却判断是否正确
+4. 高压控制不会在低压 GF/arena 明显拖慢
+5. 最终波 OC 不攒炮后,红怪/杂兵减压动作符合日志预期
+6. 流血图标 `wpn_bleed` 精确文件名 + 怪满血时血条 width 读法
+7. 晕眩图标 `stun` 精确 src(目前 `/stun/` 模糊匹配,实测 e4 命中)
+8. 血条 img 与 mkey 的 index 对应(大样本)

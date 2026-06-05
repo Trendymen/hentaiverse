@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG = {
   STRUGGLE_STREAK: 2, // 连续几次决策跌破 STRUGGLE_HP 才放弃攒炮(去抖, 防单次瞬掉误触发)
   MP_LOW: 0.35,
   SP_LOW: 0.3,
+  SP_RESERVE_RATIO: 0.45, // 高压/灵力盾场景的 SP 预留线: 不要求开架式也会补灵力
   OC_ON: 0.5, // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
   OC_OFF: 0.22,
   HS_MIN_ENEMIES: 2,
@@ -41,6 +42,14 @@ export const DEFAULT_CONFIG = {
   useImperil: true, // 红怪减益序列开关
   useChanneling: true, // Channeling 主动利用
   useAbsorb: false, // 法系怪吸收墙(默认关; 盾战物防为主, 遇法系怪再开)
+  useShadowVeil: true, // 高压影纱: 默认只在压力场景维护, 低压保留反击/OC收益
+  shadowVeilPressureOnly: true,
+  usePressureControl: true, // 高压控制层: Weaken -> Silence -> 高价值 Imperil
+  CONTROL_MIN_ENEMIES: 4,
+  useSilence: true,
+  useBlind: false,
+  useSlow: false,
+  useSleep: false, // 本轮只保留配置/ID, 不进默认自动链
   useVitalStrike: true, // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
   useShieldBash: true, // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
   useMercifulBlow: true, // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)

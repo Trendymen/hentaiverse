@@ -53,6 +53,7 @@ export interface BuffMap {
   spark: BuffState;
   spiritShield: BuffState;
   protection: BuffState;
+  shadowVeil: BuffState;
   absorb: BuffState;
   haste: BuffState;
   regen: BuffState;
@@ -100,7 +101,7 @@ export interface BattleState {
   roundAll: number;
   monsterTotal: number;
   battleType: string;
-  gems: { hp: number; mp: number; sp: number }; // 按需对口可用宝石 id(专用优先, 神秘兜底; 0=无)
+  gems: { hp: number; mp: number; sp: number; mystic: number }; // 对口恢复宝石 + 独立神秘宝石(Channeling); 0=无
   cannonExists: boolean; // 小马炮在技能栏(攒炮/放炮/OC技能让路共用; OC够看 overcharge≥200, 冷却看 cannonOnCd)
   cannonOnCd: boolean; // 在 50 回合冷却中(loop 按回合追踪注入; reader 读不到冷却, 默认 false)
   scrollReady: boolean;
