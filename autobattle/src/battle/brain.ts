@@ -1,8 +1,21 @@
 // 决策大脑: 16 级联 + 4 致命加固. 翻写自 reference/hv_brain_modern.user.js:128-187
 import { config } from '../core/config';
+import type { Config } from '../core/config';
 import { SK, SK_SPECIAL, IT, DEBUFFS, CHANNEL_Q } from './tables';
 import { Exec } from './executor';
-import type { Action, ActionType, BattleState, EnemyState } from '../types';
+import { rankTargets } from './target-weight';
+import type { Action, ActionType, BattleState, EnemyState, WeightConfig } from '../types';
+
+/** 从 config 装配 target-weight 所需的 WeightConfig(模块只认参数, 不碰单例) */
+function weightCfg(C: Config): WeightConfig {
+  return {
+    baseHpRatio: C.baseHpRatio,
+    yggdrasilExtraWeight: C.yggdrasilExtraWeight,
+    unreachableWeight: C.unreachableWeight,
+    statusWeight: C.statusWeight,
+    enabled: C.useTargetWeight,
+  };
+}
 
 export class Brain {
   decide(S: BattleState): Action {
@@ -156,9 +169,12 @@ export class Brain {
       if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
         return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
     }
-    // P16 破甲滚雪球平砍: 先清最弱杂兵, 仅剩红怪锁定持续平砍
-    const trash = S.enemies.filter((e) => !e.is_red_boss && e.alive);
-    if (trash.length) return A('attack', trash.sort((a, c) => a.eid - c.eid)[0].eid);
+    // P16 破甲滚雪球平砍: 杂兵按 finWeight 选最优(血量+13状态+Yggdrasil); 仅剩红怪锁定持续平砍.
+    //   红怪线(lockTarget/P13/P15/下方尾部锁定)全不动 —— 权重只接管杂兵选谁(守半自动红线).
+    //   useTargetWeight=false → rankTargets 退回 eid 升序 = 现状, 零回归.
+    const ranked = rankTargets(S.enemies, weightCfg(C));
+    const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
+    if (trash.length) return A('attack', trash[0].eid);
     if (tgt) {
       S.lockedRedId = tgt.eid;
       return A('attack', tgt.eid);
