@@ -149,5 +149,24 @@ export interface WeightConfig {
   enabled: boolean;
 }
 
+/** BleedTimer 喂入/判定输入(EnemyState 结构子集; EnemyState 鸭子类型可直接传) */
+export interface BleedFeedInput {
+  eid: number;
+  is_red_boss: boolean; // 语义标注; observe 收到的已是 filter(is_red_boss) 后的红名
+  hpPct: number;
+  // stunned/bleeding 不入此接口: 由 brain 两处要害分支的外层守卫把关, BleedTimer 内部只用 hpPct/eid
+}
+
+/** BleedTimer 配置(brain 从 config 装配传入; 模块本身不碰单例) */
+export interface BleedTimerConfig {
+  enabled: boolean; // 延迟逻辑总开关; false = shouldFeed 恒 true(退回旧"一晕就喂")
+  bleedTurns: number; // B: 流血持续回合数(默认 5)
+  safety: number; // 安全余量(默认 1); T ≤ B-safety 才喂
+  fallbackHpPct: number; // 无主动样本/速率太小时的保守血量窗口(默认 30)
+  rateWindow: number; // 速率移动平均窗口(默认 3)
+  minSamples: number; // 走速率主路最少样本数(默认 1)
+  minRate: number; // 速率有效下限 %/回合(默认 1)
+}
+
 /** 带 finWeight 的排序结果 */
 export type RankedEnemy = WeightInput & { finWeight: number };
