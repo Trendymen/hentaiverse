@@ -48,18 +48,17 @@
 - **依据**:设计 §9 验收"16 级联 + 4 加固";`brain.ts` 现有 TODO 注释。
 - **阻塞**:无(不需碰 HV 页;日志格式可从 reference 伤害解析器推定,上线后 GF 实测微调)。
 
-### 2.2 XHR battle 响应解析激活 —— 需真实样本 〔未开始/阻塞〕
+### 2.2 XHR battle 响应解析 —— ❌ 评估后不做(GF 实测样本确认无价值)
 
-- **现状**:`main.ts` document-start 已捕获 `lastBattleResponse`,但 `reader.ts` 全程走 DOM(`_expire` 注释仍写"待 GF 实测核对回合数读法")。设计 §1/§6 的核心卖点(精确 buff 剩余回合 / 精确鬥气)**未激活**。reference 旧 B大脑(`hv_brain_modern:90`)同样只抓不解析。
-- **要做**:拿到真实 battle 响应 JSON 后,在 reader 用响应字段替换/校正 DOM 读法(buff turns、overcharge、怪物状态)。
-- **依据**:设计 §6 数据流、§10 开放细节("XHR 旁路解析出的 battle 响应字段结构 → M2 在 GrindFest 实测核对")。
-- **阻塞**:**必须先有一份真实样本**(战斗中 `window.__hvab.getLastBattle()` 输出)。用户授权可读一次,但需用户正处于战斗中。在此之前不能写解析(否则瞎猜字段=违反"绝不臆造")。
-- **额外坑(实测)**:`__hvab.getLastBattle` 挂在油猴**沙箱 window**,页面世界(含 chrome-devtools)读不到 → 读样本前需把 `main.ts` 的 `window.__hvab` 改挂 `unsafeWindow.__hvab`。
+- **结论(2026-06-05 GF 实测样本)**:抓到真实 `/json` 响应(commit `5c1f449` 修过滤 `/Battle|api/`→加 `/json`;endpoint 实测 = `POST hentaiverse.org/json`,reqBody `{type:'battle',method:'action',mode,target,skill}`)。响应是 JSON{`pane_effects`/`pane_quickbar`/`pane_vitals`/`pane_monster`/`table_*` 全是 **HTML 字符串**,`textlog` 数组,`exp`/`healthflash`}。
+- **它就是 HV 渲染 DOM 的 HTML 源** → 解析这些 = 解析 HTML 字符串,**还不如直接读已渲染的 DOM**(现状)。**无任何"比 DOM 更精确的结构化数值"**:HP/MP/SP 在 pane_vitals 有数值文本(DOM 也有);**OC 连数值都没有**(只 `#vcp` width+数点,同 DOM;width=点数×19px 与数点法同源,精度收益不值标定);怪 HP 在 pane_monster 血条 width(同 DOM)。
+- **白捡的真修复**:① buff 剩余回合读法 → `_expire` 已修(§2.3);② endpoint 过滤已修(脚本现能捕获 `/json` 到 `__hvab.getLastBattle()`,留作将来调试 / 掉落统计 `exp` 字段用)。
+- **textlog 数组**(分条有序)比 DOM `#textlog` 略好(免顶底顺序坑),但现 DOM 读法(已 reverse 处理)够用,不值得切。
 
 ### 2.3 其它代码级遗留 〔低优先〕
 
 - `loop.ts:3`:回合触发机制 300ms 轮询 → 可升级 `MutationObserver` 精确监听(设计 §10)。〔优化,非阻塞〕
-- `reader.ts:_expire`:buff 剩余回合 DOM 读法待 GF 实测核对(与 2.2 一并解决更佳)。
+- ✅ `reader.ts:_expire`:已修(commit `d3471ee`)— buff 剩余回合改读 onmouseover `set_infopane_effect('名','描述',第三参数)`:数字=回合 / `'autocast'`=游戏自动维持。XHR `/json` 样本确认(pane_effects),原读 `[id*=expire]` 读不到才兜底 99。脚本补的 buff(Regen/穿心/吸收/陷危)现可提前补。
 - `typecheck`:✅ 现已通过(依赖已 `npm install`,`tsc --noEmit` exit 0)——原审计的 TS2688 已解除。
 
 ### 2.4 特殊近战技巧纳入决策(盾击 / 要害强击 / 最后的慈悲)✅ 完成(OC 经济策略见 §2.6)
