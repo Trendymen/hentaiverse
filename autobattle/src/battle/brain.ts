@@ -167,19 +167,30 @@ export class Brain {
     const saveOcForCannon =
       C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
     if (!saveOcForCannon) {
-      // 最后的慈悲(100 OC): 仅红名怪 25%+流血 处决(贵, 杂兵平砍即秒不值)
-      const dying = S.enemies.find((e) => e.alive && e.is_red_boss && e.hpPct < 25 && e.bleeding);
-      if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
-        return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
-      const tgtSp = this.lockTarget(S); // 红怪优先
-      // 要害强击(50 OC): 红名已晕→收割喂流血; 【红名在场 或 力不从心】→ 秒已晕杂兵减围殴血线压力; 纯杂兵且血健康→不放(平砍清, 省 OC 攒炮)
-      const stunnedTgt = (tgtSp?.stunned ? tgtSp : null) || ((hasRed || struggling) ? S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss) : null);
-      if (C.useVitalStrike && stunnedTgt && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-        return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunnedTgt.eid) };
-      // 盾击(25 OC): 给未晕眩目标上晕眩(红怪优先铺要害; 否则杂兵, 晕眩减伤 + 铺要害秒杂兵)
-      const toStun = tgtSp && !tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
-      if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-        return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+      const tgtSp = this.lockTarget(S); // 锁定红怪(连招与处决都对它)
+      // ── 红名处决连招(锁同一红怪串联, 优先于杂兵): 盾击晕 → 要害收割+5流血 → 慈悲25%处决 ──
+      if (tgtSp) {
+        // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决
+        if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+          return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
+        // 要害(连招第2步, 50 OC): 红名已晕 → 收割 + 5道流血(喂慈悲)
+        if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+        // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩(武器自带晕眩时常已晕 → 直接跳要害)
+        if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+          return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
+      }
+      // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
+      if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
+        const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
+        if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+      }
+      if (C.useShieldBash && oc >= 25) {
+        const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
+        if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
+          return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+      }
     }
     // P16 破甲滚雪球平砍: 杂兵按 finWeight 选最优(血量+13状态+Yggdrasil); 仅剩红怪锁定持续平砍.
     //   红怪线(lockTarget/P13/P15/下方尾部锁定)全不动 —— 权重只接管杂兵选谁(守半自动红线).
