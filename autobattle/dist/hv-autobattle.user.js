@@ -32,9 +32,14 @@
 .hvab-bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:7px;transition:width .25s}
 #hvab-hp{background:#4caf50}#hvab-mp{background:#3b82f6}#hvab-sp{background:#ef4444}#hvab-oc{background:#f59e0b}
 .hvab-bar span{position:absolute;inset:0;text-align:center;font:10px/14px monospace;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.7)}
-#hvab-panel{margin-top:8px;background:rgba(22,24,36,.94);backdrop-filter:blur(8px);border:1px solid rgba(120,140,200,.3);border-radius:12px;padding:8px 10px;display:none}
+#hvab-panel{margin-top:8px;background:rgba(22,24,36,.94);backdrop-filter:blur(8px);border:1px solid rgba(120,140,200,.3);border-radius:12px;padding:8px 10px;display:none;height:min(540px,calc(100vh - 180px));overflow-y:auto;overscroll-behavior:contain}
+#hvab-panel{scrollbar-width:thin;scrollbar-color:rgba(140,160,220,.5) transparent}
+#hvab-panel::-webkit-scrollbar{width:8px}
+#hvab-panel::-webkit-scrollbar-track{background:transparent;margin:6px 0}
+#hvab-panel::-webkit-scrollbar-thumb{background:rgba(140,160,220,.4);border-radius:10px;border:2px solid transparent;background-clip:padding-box;transition:background .2s}
+#hvab-panel::-webkit-scrollbar-thumb:hover{background:rgba(165,185,240,.7);background-clip:padding-box}
 #hvab-panel.open{display:block}
-.hvab-tabs{display:flex;gap:4px;margin-bottom:8px}
+.hvab-tabs{display:flex;gap:4px;position:sticky;top:0;z-index:5;margin:0 0 8px;padding-bottom:8px;background:rgba(22,24,36,.98)}
 .hvab-tab{flex:1;cursor:pointer;border:0;border-radius:6px;padding:4px 0;font-size:11px;background:rgba(255,255,255,.08);color:#bcd}
 .hvab-tab.active{background:#3a7;color:#fff}
 .hvab-tabpane{display:none}
@@ -138,6 +143,10 @@
     MP_FUSE: 0.3,
     // ④ MP 熔断阈值
     HP_HEAL: 0.6,
+    STRUGGLE_HP: 0.5,
+    // 放弃攒炮的血线阈值(hp 跌破此比例 = 血线下降, 转单体技减压)
+    STRUGGLE_STREAK: 2,
+    // 连续几次决策跌破 STRUGGLE_HP 才放弃攒炮(去抖, 防单次瞬掉误触发)
     MP_LOW: 0.35,
     SP_LOW: 0.3,
     OC_ON: 0.5,
@@ -303,7 +312,7 @@
     p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益"), swRow("useAbsorb", "法系怪吸收墙")));
     p.appendChild(group("OC 近战技(非炮场景)", swRow("useVitalStrike", "要害强击"), swRow("useShieldBash", "盾击晕眩"), swRow("useMercifulBlow", "慈悲处决(待HP%)")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
-    p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "觅心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
+    p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "穿心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
     return p;
   }
   function paneFor(key) {
@@ -553,7 +562,7 @@
     },
     {
       id: SK.Heartseeker,
-      need: (b, S) => (!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= config.get("HS_MIN_ENEMIES")
+      need: (b, S) => (!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= config.get("HS_MIN_ENEMIES") || S.enemies.some((e) => e.is_red_boss))
     }
   ];
   const cannonBtn = () => [...document.querySelectorAll("#pane_skill [onmouseover]")].find(
@@ -739,7 +748,7 @@
         const status = {};
         for (const k in STATUS_LIB) {
           const sd = STATUS_LIB[k];
-          status[k] = dimg.some((s) => s.includes(sd.img)) || dimgEl.some((i) => (i.getAttribute("onmouseover") || "").includes(`set_infopane_effect('${sd.name}'`));
+          status[k] = dimg.some((s) => s.includes(sd.img)) || dimgEl.some((i) => (i.getAttribute("onmouseover") || "").includes(`set_infopane_effect('${sd.name}`));
         }
         const bImg = m.querySelector(".btm4 > .btm5:nth-child(1) img");
         const bw = bImg ? parseFloat(bImg.style.width || "120") : 120;
@@ -917,11 +926,17 @@
     };
   }
   class Brain {
+    constructor() {
+      this.lowHpStreak = 0;
+    }
+    // 连续 hp<STRUGGLE_HP 的决策次数(达 STRUGGLE_STREAK 才判血线下降, 防单次瞬掉误触发)
     decide(S) {
       const C = config.all();
       const { hp, mp, sp } = S, oc = S.overcharge, ch = S.channeling, b = S.buff;
       const HM = S.maxHp || C.HPMAX, MM = S.maxMp || C.MPMAX, SM = S.maxSp || C.SPMAX;
       const hasRed = S.enemies.some((e) => e.is_red_boss);
+      if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
+      else this.lowHpStreak = 0;
       const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM);
       const predicted = hp - danger, PANIC = (hasRed ? C.PANIC_RED : C.PANIC_NORM) * HM;
       const mpFree = Math.max(0, mp - C.SPARK_RESERVE);
@@ -981,7 +996,7 @@
       if (C.useAbsorb && S.tookMagicDmg && !b.absorb.active && Exec.skillReady(SK.Absorb)) return A("spell", SK.Absorb);
       if (!b.haste.active || b.haste.turns <= 1) return A("spell", SK.Haste);
       if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
-      if (!b.blessing.active && (!b.regen.active || b.regen.turns <= 1)) return A("spell", SK.Regen);
+      if (!b.regen.active || b.regen.turns <= 1) return A("spell", SK.Regen);
       if (mpFree < C.MP_LOW * MM) {
         if (S.gems.mp) return A("item", S.gems.mp);
         if (!b.mpot.active) return A("item", IT.mDraught);
@@ -1006,19 +1021,31 @@
           return this.castOnRed(d.id, tgt, S);
         }
       }
-      if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
+      if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && (S.alive >= C.HS_MIN_ENEMIES || hasRed) && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
-      if (!(C.useCannon && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES)) {
-        const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
-        if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
-          return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
+      const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK;
+      const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES;
+      const saveOcForCannon = C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
+      if (!saveOcForCannon) {
         const tgtSp = this.lockTarget(S);
-        const stunnedTgt = tgtSp && tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && e.stunned);
-        if (C.useVitalStrike && stunnedTgt && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunnedTgt.eid) };
-        const toStun = tgtSp && !tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
-        if (C.useShieldBash && toStun && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-          return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+        if (tgtSp) {
+          if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+            return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
+          if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+            return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+          if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+            return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
+        }
+        if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
+          const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
+          if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
+            return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+        }
+        if (C.useShieldBash && oc >= 25) {
+          const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
+          if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
+            return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+        }
       }
       const ranked = rankTargets(S.enemies, weightCfg(C));
       const trash = ranked.filter((e) => !e.is_red_boss && e.alive);

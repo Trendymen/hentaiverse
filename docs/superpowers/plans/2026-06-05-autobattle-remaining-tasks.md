@@ -16,7 +16,7 @@
 | 里程碑 | 状态 | 说明 |
 |---|---|---|
 | M1 地基 | ✅ 完成 | 工程/构建(不压缩)/core/UI 骨架/document-start hook |
-| M2 战斗内 | 🟡 基本完成 | reader/brain/executor/tables + 战斗循环 + HUD 真实数据 + 战斗 tab 配置面板 + 小马炮逻辑修复(commit `a6a8472`);**剩 §2 收尾项** |
+| M2 战斗内 | 🟢 收尾接近完成 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度;**唯一剩:3 个 OC 技 castHostileOn 真机实测(§2.7)** |
 | M3 连刷 | 🟠 仅 GF 波次内续战 | `engine/` 未建;遭遇/竞技场/精力/连刷 tab 全缺(见 §3) |
 | M4 保护后勤 | ❌ 未开始 | `engine/{stamina,watchdog,supply,stats}.ts` 全缺(见 §4) |
 | M5 杂项打磨 | ❌ 未开始 | 告警/通知/异世界/小马提醒 + 提醒 tab + UI 精修(见 §5) |
@@ -32,12 +32,13 @@
 | D2 | HUD 加"角色等级" | ❌ **不加**,保持现状(HP/MP/SP/OC + 战斗类型/轮数/回合/怪数/动作) | 原版 dodying/B大脑 HUD 均无玩家等级;玩家级战斗页 DOM 读不到(代价高) |
 | D3 | P5 Absorb 法系怪判定 | **战斗日志魔法伤害启发式**(原版无此逻辑,需新写) | 见 §2.1 |
 | D4 | XHR battle 响应解析 | **需一份真实样本**才能定字段结构;授权我在你战斗中读一次 `window.__hvab.getLastBattle()` | 见 §2.2;reference 也只抓不解析 |
+| D6 | OC 经济策略(用户定) | 慈悲/要害限红名连招(盾击晕→要害流血→慈悲处决,锁同红怪)+ 盾击对杂兵减伤 + 跨波攒炮(有红名也攒,血线下降才放弃)+ 去抖(连续 2 次 hp<50%)+ 穿心单 boss 也放 + 祝福只增伤(撤 Regen 误跳) | 见 §2.6;武器暂无流血→慈悲依赖要害产流血,晕眩靠盾战反击概率 |
 
 ---
 
 ## 2. M2 收尾(本会话选定优先;小马炮已完成)
 
-### 2.1 P5 Absorb 法系怪判定 —— 战斗日志魔法伤害启发式 〔未开始〕
+### 2.1 P5 Absorb 法系怪判定 —— 战斗日志魔法伤害启发式 ✅ 完成(commit `08433d6`)
 
 - **现状**:`brain.ts` P5 处 `isMagic` 硬编码 `false`,Absorb 永不触发。所有 reference(B大脑/盾脑/decideAction)都**没有**识别"怪是法系攻击者"的代码——这是新写功能,非翻写。
 - **要做**:
@@ -61,7 +62,7 @@
 - `reader.ts:_expire`:buff 剩余回合 DOM 读法待 GF 实测核对(与 2.2 一并解决更佳)。
 - `typecheck`:✅ 现已通过(依赖已 `npm install`,`tsc --noEmit` exit 0)——原审计的 TS2688 已解除。
 
-### 2.4 特殊近战技巧纳入决策(盾击 / 要害强击 / 最后的慈悲)〔待完成〕
+### 2.4 特殊近战技巧纳入决策(盾击 / 要害强击 / 最后的慈悲)✅ 完成(OC 经济策略见 §2.6)
 
 - **现状**:brain 进攻只有平砍 + 小马炮,**不用**这三个吃 OC 的特殊近战技巧(实测 `pane_skill`/`pane_quickbar` 已解锁):
 
@@ -75,7 +76,36 @@
   实测 `onmouseover` 参数格式 = `[MP, OC点数, 冷却回合]`,每点 OC = 25。
 - **要做**(待用户定规则后):tables 加 `SK_SPECIAL`(2201/2202/2203);brain 在合适优先级插入(如残血红怪→慈悲、单体高价值→要害);各自加开关。
 - **核心设计张力**:它们都吃 OC,**会和攒小马炮抢 OC**。需先决定"攒炮模式下这些要不要也让路,还是允许用便宜的(盾击25/要害50)穿插"。**待用户定规则**(`AskUserQuestion` 已问,用户选"先标待完成")。
-- **阻塞**:无技术阻塞;等产品规则(OC 预算分配)。
+- **✅ 完成**:三技已接入决策 + OC 预算规则已定(见 §2.6);三技默认关,**待 castHostileOn 真机实测**释放机制后开启(§2.7)。
+
+### 2.5 目标权重系统(finWeight)✅ 完成
+
+- **做了什么**:翻写 dodying finWeight 目标权重(血量绝对 hpNow + 13 状态 + Yggdrasil boss),取代原"平砍最低 eid"。方案 C 分层:`reader` 出原始数据 / `target-weight.ts` 纯函数算权重排序 / `brain` P16 接入。
+- **关联**:设计 `specs/2026-06-05-autobattle-target-weight-design.md`;计划 `plans/2026-06-05-autobattle-target-weight.md`。
+- **commits**:types `e8df42d` / tables STATUS_LIB `4e6fe05` / target-weight `a849766` / reader(修血条 index bug + Spawned 初始 HP + hpNow/name/13状态) `e55106d` / brain `0f06e44` / config `dc76281` / review 修复(hpMin 防 NaN + _spawnHp 覆盖顺序) `8c1e923`。
+- **白捡 bug**:GF 实测扒出现有血条 `hpPct` 错位(全局 `bloodImgs[idx]` 每怪含 2 img),改 per-mkey **无条件修复**(慈悲判据 hpPct 也一起救)。
+- **配置**:`useTargetWeight` 默认关灰度 + `baseHpRatio`;13 状态权重内置(reference 实测默认值)。
+- **GF 真机实测确认**:Spawned 行格式 `Spawned Monster A: MID=N (Name) LV=N HP=N`(非旧版 Initializing);字母 A→mkey_1 对齐;13 状态 onmouseover 官方名英文不受汉化;待项见 §2.7。
+
+### 2.6 OC 经济策略细化 ✅ 完成
+
+按用户定的 OC 预算规则(D6)接入,三技默认关:
+- **慈悲(100 OC)**:仅红名怪 25%+流血 处决(贵,杂兵平砍即秒不值)。
+- **红名处决连招**(锁同一红怪串联,优先于杂兵):盾击晕 → 要害收割+5 道流血 → 慈悲 25% 处决。武器暂无流血 → 流血只能靠要害,故**慈悲必须配要害开**;晕眩靠盾战反击概率(红名常自带晕)。
+- **杂兵减压**(红名在场 或 力不从心):要害秒已晕杂兵降围殴 + 盾击晕杂兵减伤。
+- **跨波攒炮 `saveOcForCannon`**:炮在栏不冷却 + 血线健康 + (本波怪≥4 OR 高密度波)→ 攒 OC 不花单体技;**有红名也攒**(炮 AOE 削红名+清杂兵);高密度波剩 2-3 杂兵也攒(平砍清,OC 留下波炮)。
+- **放弃攒炮**:血线下降去抖(连续 `STRUGGLE_STREAK=2` 次 `hp<STRUGGLE_HP=50%`,防瞬掉误判)/ 低密度波 / 炮冷却 → 转单体技减压。
+- **穿心单 boss 也放**(commit `56e87b4`):P14 + Channeling 队列加 `||红名`,单 boss 持久战最该提暴(原 `HS_MIN_ENEMIES=2` 会漏)。
+- **祝福 Regen 误判修复**(commit `727158e`):御谜士祝福只增伤(+10/20%)+ 答题瞬间一次性回复,**不持续回血** → 撤销原"祝福期跳过 Regen"(会漏血)。
+- **commits**:慈悲限红名 `865252d` / 攒炮+减压 `e42021d` / 攒炮去 !hasRed `7936b31` / 去抖 `4a109bb` / 红名连招串联 `731fcaa` / 穿心+翻译 `56e87b4` / 祝福 Regen `727158e`。
+
+**UI 完善**(commits `23ebccd` 滚动 / `66bfc3c` 滚动条 / `7700bb6` 固定高度+tabs sticky):选项面板加滚动(固定高度 558px 防切 tab 跳变)+ tabs sticky 固定顶部 + 精致滚动条;面板标签 觅心→穿心。
+
+### 2.7 待真机实测(M2 唯一剩余阻塞)
+
+- **三个 OC 近战技 `castHostileOn` 释放机制**(最高优先):盾击/要害/慈悲默认关,因 `castHostileOn` 对 OC 技的释放(点了 OC 消不消耗、出不出招)未真机验证。需开开关 + GF 实测确认能放出后才正式启用——**这是整套 OC 连招/攒炮逻辑唯一未验证的环节**。
+- **目标权重真机核对**:开 `useTargetWeight` 看 P16 选目标;死怪 `nbardead` / 红怪 Yggdrasil 名 / 长回合 Spawned 缓存沿用 / 连刷换波 initHp 覆盖 / hpNow 数值核对(spec §10)。
+- **textlog 顺序遗留**:`_round`/`_enemyMagic` 注释"末尾"vs 实测"顶新底旧",靠每轮清空侥幸正确,待核统一(`_spawnHp` 已 reverse 防御)。
 
 ---
 
@@ -135,8 +165,8 @@
 
 ## 8. 建议实施顺序
 
-1. **§2.1 Absorb 启发式**(不碰 HV,可立即做)
-2. **§2.2 XHR 解析**(等用户进战斗,读一次样本后做;顺带解决 §2.3 buff 回合读法)
-3. **§2.3优化和2.4 特殊近战技巧纳入决策**
+1. ~~§2.1 Absorb 启发式~~ ✅ / ~~§2.4 OC 近战技~~ ✅ / ~~§2.5 目标权重~~ ✅ / ~~§2.6 OC 经济+UI~~ ✅
+2. **§2.7 三个 OC 技 castHostileOn 真机实测**(最高优先,解阻后即可开启三技 + useTargetWeight)
+3. **§2.2 XHR 解析**(等用户进战斗,读一次样本后做;顺带解决 §2.3 buff 回合读法)
 4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
 5. M4 → M5
