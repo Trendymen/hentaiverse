@@ -14,7 +14,7 @@ function battlePane(): HTMLElement {
   const p = el('div');
   p.appendChild(group('喝药线(低于即补)', pctRow('PANIC_RED', '急救血'), pctRow('HP_HEAL', '常规喝血'), pctRow('MP_LOW', '回蓝'), pctRow('SP_LOW', '喝灵力')));
   p.appendChild(group('灵动架式(斗气)', pctRow('OC_ON', '≥ 开'), pctRow('OC_OFF', '< 关')));
-  p.appendChild(group('开关', swRow('useCannon', '自动小马炮'), swRow('scrollFirst', '起手用卷轴'), swRow('useWeaken', '红怪铺虚弱'), swRow('useImperil', '红怪铺陷危'), swRow('useChanneling', 'Channeling 增益'), swRow('useAbsorb', '法系怪吸收墙')));
+  p.appendChild(group('开关', swRow('useCannon', '自动小马炮'), swRow('scrollFirst', '起手用卷轴'), swRow('useWeaken', '红怪铺虚弱'), swRow('useImperil', '红怪铺陷危'), swRow('useChanneling', 'Channeling 增益'), swRow('useAbsorb', '法系怪吸收墙'), swRow('useTargetWeight', '权重选怪')));
   p.appendChild(group('高压/SP', swRow('usePressureControl', '高压控制'), swRow('useSilence', '沉默'), swRow('useShadowVeil', '影纱'), pctRow('SP_RESERVE_RATIO', 'SP预留')));
   p.appendChild(group('OC 近战技(非炮场景)', swRow('useVitalStrike', '要害强击'), swRow('useShieldBash', '盾击晕眩'), swRow('useMercifulBlow', '慈悲处决')));
   p.appendChild(group('节奏', numRow('delayMin', '延迟下限', 'ms'), numRow('delayMax', '延迟上限', 'ms')));
