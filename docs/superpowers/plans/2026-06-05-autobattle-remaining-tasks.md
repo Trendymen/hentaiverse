@@ -126,7 +126,7 @@
   3. `panel.ts` **连刷 tab** 控件:遭遇战开关 / 竞技场等级勾选 / GF 开关 / 精力阈值 / 战前恢复(现为占位"待 M3 接入")
   4. `config.ts`:连刷 + 精力相关配置键
 - **依据**:设计 §5(engine/starter、stamina)、§7 连刷 tab、§8 M3、§6 数据流。
-- **阻塞**:遭遇/竞技场**开战 API 参数**为 §10 开放细节,需对照 `reference/hvAutoAttack.user.js`(dodying 原版含竞技场/遭遇逻辑)忠实翻写 + GF/竞技场实测核对。**实施前需先做一轮 reference 翻写研究**,把硬事实(endpoint/参数/选择器)落实后再写 bite-sized 步骤。
+- ~~**阻塞**:遭遇/竞技场**开战 API 参数**为 §10 开放细节~~ ✅ **2026-06-06 reference 翻写研究已完成 → `plans/2026-06-06-autobattle-m3-startbattle-research.md`**:开战三件套(`?s=Battle&ss=ar|ar&page=2|rb|gr` + `initid` + `inittoken`,token 每日从 `img[onclick*=init_battle]` 扒)、遭遇(`e-hentai.org/news.php?encounter` 跨站)、精力(`#stamina_readout` 读 + `?recover=stamina` 恢复 + 1点/小时)、GF 场间连刷(`arena.gr` 计数 + `lastHref` 返回 reload)、状态机编排全部落实。**阻塞解除**,下一步进 `writing-plans` 把研究文档 §9 拆 bite-sized TDD。
 
 ---
 
@@ -173,5 +173,5 @@
 1. ~~§2.1 Absorb 启发式~~ ✅ / ~~§2.4 OC 近战技~~ ✅ / ~~§2.5 目标权重~~ ✅ / ~~§2.6 OC 经济+UI~~ ✅
 2. ~~§2.7 C-layered P0 前置清理~~ ✅ / ~~C-layered 主体(Mystic/Shadow Veil/Silence/压力/OC预算)~~ ✅
 3. ~~**C-layered 真机观察微调**:目标权重 finWeight 已实测转正~~ ✅(2026-06-06)/ **剩防御层(影纱补·沉默·Mystic 开 Channeling)需逆风高压场触发** + 死怪 `nbardead` 垫底 / Yggdrasil 优先两个边缘 case 待补样本
-4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
+4. **§3 M3 连刷**:~~reference 翻写研究落实开战 API~~ ✅(`plans/2026-06-06-autobattle-m3-startbattle-research.md`)→ 下一步 `writing-plans` 拆 TDD,再分 stamina / starter(token+开战+GF计数+遭遇)/ 连刷 tab 三批实现
 5. M4 → M5
