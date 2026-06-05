@@ -33,25 +33,31 @@ export const Exec = {
     if (!e) return false;
     return e.style.opacity !== '0.5';
   },
-  /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
+  /** 平砍指定怪: n≥1 先 hover_target(元素) 再 battle.commit_target(此时 eid==位置, 已验证); 第10只 mkey_0 的 commit_target 参数是 10(位置)
+   *  不是 mkey 编号 0, 故 n===0 改点 #mkey_0 DOM 触发完整 onclick(hover_target+commit_target(10)).
+   *  真机坐实: 裸调 commit_target(0) 参数错(应10)+缺前置 hover_target 撞 r 残留守卫 → 打不到第10只、目标乱跳到 3/5/7.
+   *  hover 只改 l/v 的 style(attribute), 不触发 observer(只听 childList/characterData), 安全. */
   attack(n: number): boolean {
     const w =
       typeof unsafeWindow !== 'undefined' ? unsafeWindow : (window as unknown as typeof unsafeWindow);
     if (n === 0) {
-      // 诊断埋点(eid=0 = 10怪满编局第10只怪 mkey_0; HV 原版 getMonsterID=(order+1)%10, order=9→mkey_0 回绕).
-      // commit_target(0) 疑似 falsy 无效(原版从不裸调, 而是点 #mkey DOM 触发完整 hover_target+commit_target).
-      // 仅 dump 铁证, 不改逻辑: 下次10怪局复现时 chrome-devtools 读 console(pattern [HVAB:eid0]) 即可确认 commit_target(0) 是否真打到该怪.
+      // 诊断埋点(保留作验证): eid=0 = 10怪满编局第10只怪 mkey_0(HV (order+1)%10 回绕). 下次复现读 console(pattern [HVAB:eid0]) 确认点 DOM 后第10只血量正常下降.
       const el = document.getElementById('mkey_0');
       const bw = el?.querySelector<HTMLElement>('.btm4 > .btm5:nth-child(1) img')?.style.width || '?';
       console.warn(
-        `[HVAB:eid0] attack(0)触发 mkey_0存在=${!!el} commit_target存在=${!!w.battle?.commit_target} 血条w=${bw} onclick=${el?.getAttribute('onclick') || 'null'}`,
+        `[HVAB:eid0] attack(0)→点#mkey_0 DOM mkey_0存在=${!!el} 血条w=${bw} onclick=${el?.getAttribute('onclick') || 'null'}`,
       );
+      // 修复: 点 DOM 让 HV 用 onclick 里写死的正确位置参数(commit_target(10)), 不裸调错误的 commit_target(0).
+      return el ? (el.click(), true) : false;
     }
+    const e = document.getElementById('mkey_' + n);
+    // 点击前补一次真实 hover(对齐 HV onclick 的 hover_target(this)→commit_target 流程): 更新左侧目标信息面板
+    // (裸调 commit_target 跳过它=无 hover 展示), 并设 hover 态避免 commit_target 撞 r 残留守卫(同 n===0 乱跳根因).
+    if (e && w.battle?.hover_target) w.battle.hover_target(e);
     if (w.battle?.commit_target) {
       w.battle.commit_target(n);
       return true;
     }
-    const e = document.getElementById('mkey_' + n);
     return e ? (e.click(), true) : false;
   },
   /** 切换灵动架式 */

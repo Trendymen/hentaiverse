@@ -128,19 +128,17 @@ function decide(state: Record<string, unknown>, cfg: Record<string, unknown> = {
 
 {
   const s = base();
-  s.battleType = '塔楼';
-  s.enemies = many(4, { status: { We: true } });
+  s.enemies = many(4);
   s.alive = 4;
   s.monsterTotal = 4;
   s.buff = walls({ shadowVeil: b(false, 0) });
   const a = decide(s);
-  assert.equal(a.type, 'spell', 'tower pressure should maintain Shadow Veil before control/output');
-  assert.equal(a.id, SK.ShadowVeil);
+  assert.equal(a.type, 'attack', 'dense non-red waves must not enable Shadow Veil without real pressure');
+  assert.equal(a.id, 1);
 }
 
 {
   const s = base();
-  s.battleType = '塔楼';
   s.sp = 430;
   s.enemies = many(4, { debuff: { weaken: true }, status: { We: true } });
   s.alive = 4;
@@ -163,19 +161,18 @@ function decide(state: Record<string, unknown>, cfg: Record<string, unknown> = {
 
 {
   const s = base();
-  s.battleType = '塔楼';
   s.enemies = many(4);
   s.alive = 4;
   s.monsterTotal = 4;
   s.buff = walls({ shadowVeil: b(true, 5) });
   const a = decide(s);
-  assert.equal(a.type, 'spell', 'high pressure should apply Weaken before Silence/Imperil');
-  assert.equal(a.id, SK.Weaken);
+  assert.equal(a.type, 'attack', 'plain non-red waves should not get Weaken without real high pressure');
+  assert.equal(a.id, 1);
 }
 
 {
   const s = base();
-  s.battleType = '塔楼';
+  s.lastDmg = 8000;
   s.mp = 120;
   s.gems = { hp: 0, mp: 0, sp: 0, mystic: GEM.mystic };
   s.enemies = many(4);
@@ -189,7 +186,6 @@ function decide(state: Record<string, unknown>, cfg: Record<string, unknown> = {
 
 {
   const s = base();
-  s.battleType = '塔楼';
   s.mp = 120;
   s.sp = 620;
   s.gems = { hp: 0, mp: 0, sp: GEM.spirit, mystic: GEM.mystic };

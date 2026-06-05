@@ -12,7 +12,6 @@ export interface Pressure {
   level: PressureLevel;
   spReserveLow: boolean;
   spCritical: boolean;
-  tower: boolean;
   hasRed: boolean;
 }
 
@@ -43,21 +42,18 @@ export function assessPressure(S: BattleState, C: Config, memory: BrainMemory): 
   const HM = S.maxHp || C.HPMAX;
   const SM = S.maxSp || C.SPMAX;
   const spRatio = SM ? S.sp / SM : 1;
-  const tower = S.battleType === '塔楼';
   const hasRed = S.enemies.some((e) => e.alive && e.is_red_boss);
   const spReserveLow = spRatio < C.SP_RESERVE_RATIO;
   const spCritical = spRatio < C.SP_LOW;
-  const manyEnemies = S.alive >= C.CONTROL_MIN_ENEMIES;
   const heavy = S.lastDmg > 0.3 * HM;
   const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
-  const high = spCritical || heavy || lowHp || (tower && (manyEnemies || spReserveLow || hasRed));
-  const medium = high || tower || hasRed || spReserveLow;
+  const high = spCritical || heavy || lowHp;
+  const medium = high || hasRed || spReserveLow;
 
   return {
     level: high ? 'high' : medium ? 'medium' : 'low',
     spReserveLow,
     spCritical,
-    tower,
     hasRed,
   };
 }
@@ -87,7 +83,7 @@ export function selectRedTarget(S: BattleState, ranked: RankedEnemy[] = [], need
 
 export function selectControlDebuff(S: BattleState, C: Config, ranked: RankedEnemy[], pressure: Pressure): ControlChoice | null {
   if (!C.usePressureControl || pressure.level === 'low') return null;
-  if (!pressure.tower && !pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
+  if (!pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
 
   const live = ranked.filter((e) => e.alive);
   if (!live.length) return null;

@@ -210,6 +210,15 @@ export class Brain {
     const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK; // 血线下降去抖: 连续 STRUGGLE_STREAK 次跌破 STRUGGLE_HP(默认 50%×2 次)才放弃攒炮
     const finalRound = !hasFutureRound(S);
     const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
+    // 红名"要害+慈悲"破例(无视攒炮): 慈悲处决须先有要害产的流血(武器无流血附魔), 故两步绑定提到攒炮 gate 之前;
+    //   盾击不破例(攒炮期红名靠盾战反击概率晕, 省 25 OC). 慈悲(斩杀线<25%+流血)优先于要害(已晕→喂流血), 都锁同一红怪.
+    const execRed = selectRedTarget(S, ranked, 'execute');
+    if (execRed) {
+      if (C.useMercifulBlow && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+        return { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) };
+      if (C.useVitalStrike && execRed.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(已晕→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
+    }
     if (!saveOcForCannon) {
       const tgtSp = selectRedTarget(S, ranked, 'execute'); // 锁定红怪(连招与处决都对它)
       // ── 红名处决连招(锁同一红怪串联, 优先于杂兵): 盾击晕 → 要害收割+5流血 → 慈悲25%处决 ──

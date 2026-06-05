@@ -18,7 +18,7 @@ export function computeFinWeight(e: WeightInput, hpMin: number, cfg: WeightConfi
 export function rankTargets<T extends WeightInput>(enemies: T[], cfg: WeightConfig): (T & { finWeight: number })[] {
   if (!cfg.enabled) {
     return [...enemies]
-      .map((e) => ({ ...e, finWeight: e.eid }))
+      .map((e) => ({ ...e, finWeight: e.eid === 0 ? 10 : e.eid })) // eid=0 是10怪满编局第10只怪(mkey_0, HV (order+1)%10 回绕); 排序键当 10 排最后, 不再被数值 0 顶到最前死磕
       .sort((a, b) => a.finWeight - b.finWeight);
   }
   const liveHp = enemies.filter((e) => e.alive && isFinite(e.hpNow)).map((e) => e.hpNow);

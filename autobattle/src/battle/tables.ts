@@ -169,7 +169,7 @@ export const IT_CN: Record<number, string> = {
 };
 /** URL ss 参数 → 战斗类型中文 */
 export const SS_CN: Record<string, string> = {
-  gr: '压榨界', ar: '竞技场', rb: '浴血擂台', iw: '道具界', tw: '塔楼', ba: '遭遇战',
+  gr: '压榨界', ar: '竞技场', rb: '浴血擂台', iw: '道具界', ba: '遭遇战',
 };
 /** 决策动作 → 中文友好标签(HUD 显示) */
 export function actionLabel(a: Action | null): string {

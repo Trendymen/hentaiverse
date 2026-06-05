@@ -157,7 +157,8 @@
     // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
     HS_MIN_ENEMIES: 2,
-    CANNON_MIN_ENEMIES: 4,
+    CANNON_MIN_ENEMIES: 6,
+    // 攒炮最少怪(原4→6): 4-5只小局清场太快、OC攒不满200就清完=攒炮空转还压住近战技; 提到6让小局直接放近战技/平砍, 6+大局才攒炮(能攒满)
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
@@ -214,10 +215,11 @@
     statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 }
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
-  const CONFIG_VERSION = 2;
+  const CONFIG_VERSION = 3;
   if (Store.get("configVersion", 0) < CONFIG_VERSION) {
     current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs;
     current.OC_ON = DEFAULT_CONFIG.OC_ON;
+    current.CANNON_MIN_ENEMIES = DEFAULT_CONFIG.CANNON_MIN_ENEMIES;
     Store.set("config", current);
     Store.set("configVersion", CONFIG_VERSION);
   }
@@ -327,7 +329,7 @@
     p.appendChild(group("喝药线(低于即补)", pctRow("PANIC_RED", "急救血"), pctRow("HP_HEAL", "常规喝血"), pctRow("MP_LOW", "回蓝"), pctRow("SP_LOW", "喝灵力")));
     p.appendChild(group("灵动架式(斗气)", pctRow("OC_ON", "≥ 开"), pctRow("OC_OFF", "< 关")));
     p.appendChild(group("开关", swRow("useCannon", "自动小马炮"), swRow("scrollFirst", "起手用卷轴"), swRow("useWeaken", "红怪铺虚弱"), swRow("useImperil", "红怪铺陷危"), swRow("useChanneling", "Channeling 增益"), swRow("useAbsorb", "法系怪吸收墙")));
-    p.appendChild(group("高压/塔楼", swRow("usePressureControl", "高压控制"), swRow("useSilence", "沉默"), swRow("useShadowVeil", "影纱"), pctRow("SP_RESERVE_RATIO", "SP预留")));
+    p.appendChild(group("高压/SP", swRow("usePressureControl", "高压控制"), swRow("useSilence", "沉默"), swRow("useShadowVeil", "影纱"), pctRow("SP_RESERVE_RATIO", "SP预留")));
     p.appendChild(group("OC 近战技(非炮场景)", swRow("useVitalStrike", "要害强击"), swRow("useShieldBash", "盾击晕眩"), swRow("useMercifulBlow", "慈悲处决")));
     p.appendChild(group("节奏", numRow("delayMin", "延迟下限", "ms"), numRow("delayMax", "延迟上限", "ms")));
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "穿心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
@@ -652,7 +654,6 @@
     ar: "竞技场",
     rb: "浴血擂台",
     iw: "道具界",
-    tw: "塔楼",
     ba: "遭遇战"
   };
   function actionLabel(a) {
@@ -859,6 +860,7 @@
       };
       const gemAvail = (db) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
       const pickGem = (own) => gemAvail(own) ? own : 0;
+      const battleType = SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗";
       return {
         hp,
         mp,
@@ -879,7 +881,7 @@
         roundNow: this.roundNow,
         roundAll: this.roundAll,
         monsterTotal: allMkey.length,
-        battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
+        battleType,
         gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit), mystic: gemAvail(GEM.mystic) ? GEM.mystic : 0 },
         cannonExists: !!cannonEl,
         // 炮在技能栏(攒炮/放炮/OC技能让路共用)
@@ -921,7 +923,10 @@
       if (!e) return false;
       return e.style.opacity !== "0.5";
     },
-    /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
+    /** 平砍指定怪: n≥1 先 hover_target(元素) 再 battle.commit_target(此时 eid==位置, 已验证); 第10只 mkey_0 的 commit_target 参数是 10(位置)
+     *  不是 mkey 编号 0, 故 n===0 改点 #mkey_0 DOM 触发完整 onclick(hover_target+commit_target(10)).
+     *  真机坐实: 裸调 commit_target(0) 参数错(应10)+缺前置 hover_target 撞 r 残留守卫 → 打不到第10只、目标乱跳到 3/5/7.
+     *  hover 只改 l/v 的 style(attribute), 不触发 observer(只听 childList/characterData), 安全. */
     attack(n) {
       var _a, _b, _c;
       const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
@@ -929,14 +934,16 @@
         const el2 = document.getElementById("mkey_0");
         const bw = ((_a = el2 == null ? void 0 : el2.querySelector(".btm4 > .btm5:nth-child(1) img")) == null ? void 0 : _a.style.width) || "?";
         console.warn(
-          `[HVAB:eid0] attack(0)触发 mkey_0存在=${!!el2} commit_target存在=${!!((_b = w.battle) == null ? void 0 : _b.commit_target)} 血条w=${bw} onclick=${(el2 == null ? void 0 : el2.getAttribute("onclick")) || "null"}`
+          `[HVAB:eid0] attack(0)→点#mkey_0 DOM mkey_0存在=${!!el2} 血条w=${bw} onclick=${(el2 == null ? void 0 : el2.getAttribute("onclick")) || "null"}`
         );
+        return el2 ? (el2.click(), true) : false;
       }
+      const e = document.getElementById("mkey_" + n);
+      if (e && ((_b = w.battle) == null ? void 0 : _b.hover_target)) w.battle.hover_target(e);
       if ((_c = w.battle) == null ? void 0 : _c.commit_target) {
         w.battle.commit_target(n);
         return true;
       }
-      const e = document.getElementById("mkey_" + n);
       return e ? (e.click(), true) : false;
     },
     /** 切换灵动架式 */
@@ -989,7 +996,7 @@
   }
   function rankTargets(enemies, cfg) {
     if (!cfg.enabled) {
-      return [...enemies].map((e) => ({ ...e, finWeight: e.eid })).sort((a, b) => a.finWeight - b.finWeight);
+      return [...enemies].map((e) => ({ ...e, finWeight: e.eid === 0 ? 10 : e.eid })).sort((a, b) => a.finWeight - b.finWeight);
     }
     const liveHp = enemies.filter((e) => e.alive && isFinite(e.hpNow)).map((e) => e.hpNow);
     const hpMin = liveHp.length ? Math.max(1, Math.min(...liveHp)) : 1;
@@ -1009,20 +1016,17 @@
     const HM = S.maxHp || C.HPMAX;
     const SM = S.maxSp || C.SPMAX;
     const spRatio = SM ? S.sp / SM : 1;
-    const tower = S.battleType === "塔楼";
     const hasRed = S.enemies.some((e) => e.alive && e.is_red_boss);
     const spReserveLow = spRatio < C.SP_RESERVE_RATIO;
     const spCritical = spRatio < C.SP_LOW;
-    const manyEnemies = S.alive >= C.CONTROL_MIN_ENEMIES;
     const heavy = S.lastDmg > 0.3 * HM;
     const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
-    const high = spCritical || heavy || lowHp || tower && (manyEnemies || spReserveLow || hasRed);
-    const medium = high || tower || hasRed || spReserveLow;
+    const high = spCritical || heavy || lowHp;
+    const medium = high || hasRed || spReserveLow;
     return {
       level: high ? "high" : medium ? "medium" : "low",
       spReserveLow,
       spCritical,
-      tower,
       hasRed
     };
   }
@@ -1045,7 +1049,7 @@
   }
   function selectControlDebuff(S, C, ranked, pressure) {
     if (!C.usePressureControl || pressure.level === "low") return null;
-    if (!pressure.tower && !pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
+    if (!pressure.hasRed && S.alive < C.CONTROL_MIN_ENEMIES) return null;
     const live = ranked.filter((e) => e.alive);
     if (!live.length) return null;
     const highValue = live.filter((e) => e.is_red_boss || isYggdrasil(e));
@@ -1223,6 +1227,13 @@
       const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK;
       const finalRound = !hasFutureRound(S);
       const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
+      const execRed = selectRedTarget(S, ranked, "execute");
+      if (execRed) {
+        if (C.useMercifulBlow && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
+          return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) };
+        if (C.useVitalStrike && execRed.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(已晕→喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) };
+      }
       if (!saveOcForCannon) {
         const tgtSp = selectRedTarget(S, ranked, "execute");
         if (tgtSp) {

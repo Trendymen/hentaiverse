@@ -225,6 +225,8 @@ export class StateReader {
     // 宝石按需对口: 恢复只用对应专用宝石; 神秘宝石单独暴露给 Channeling 策略层, 不再伪装成恢复兜底.
     const gemAvail = (db: number) => !!$(`.bti3>div[onmouseover*="set_infopane_item(${db})"]`);
     const pickGem = (own: number) => (gemAvail(own) ? own : 0);
+    const battleType = SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗';
+
     return {
       hp,
       mp,
@@ -245,7 +247,7 @@ export class StateReader {
       roundNow: this.roundNow,
       roundAll: this.roundAll,
       monsterTotal: allMkey.length,
-      battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
+      battleType,
       gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit), mystic: gemAvail(GEM.mystic) ? GEM.mystic : 0 },
       cannonExists: !!cannonEl, // 炮在技能栏(攒炮/放炮/OC技能让路共用)
       cannonOnCd: false, // 50 回合冷却由 loop 按回合追踪注入(reader 读不到冷却)
