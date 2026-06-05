@@ -73,6 +73,9 @@ export interface EnemyState {
   hpPct: number; // 当前 HP%(血条 width/120)
   bleeding: boolean; // 是否流血(wpn_bleed; 慈悲处决判据)
   stunned: boolean; // 是否晕眩(要害连招判据: 盾击晕眩→要害高伤)
+  hpNow: number; // 绝对当前 HP(initHp×width/120; 初始HP缺失时退化为 hpPct; 死怪 Infinity)
+  name: string; // 怪名(.btm3 文本; Yggdrasil 检测用)
+  status: Record<string, boolean>; // 13 状态 flags(STATUS_LIB key → 是否挂着)
 }
 
 /** 一回合战斗状态快照 */
@@ -124,3 +127,25 @@ export interface BusEvents {
   'log:update': LogRecord | null;
   'ui:toggle': boolean;
 }
+
+/** target-weight 纯函数输入(EnemyState 的结构子集; EnemyState 鸭子类型可直接传) */
+export interface WeightInput {
+  eid: number;
+  alive: boolean;
+  is_red_boss: boolean;
+  hpNow: number;
+  name: string;
+  status: Record<string, boolean>;
+}
+
+/** target-weight 配置(brain 从 config 装配传入; 模块本身不碰单例) */
+export interface WeightConfig {
+  baseHpRatio: number;
+  yggdrasilExtraWeight: number;
+  unreachableWeight: number;
+  statusWeight: Record<string, number>;
+  enabled: boolean;
+}
+
+/** 带 finWeight 的排序结果 */
+export type RankedEnemy = WeightInput & { finWeight: number };
