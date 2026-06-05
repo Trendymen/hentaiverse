@@ -1037,7 +1037,7 @@ function loadEquipsInfo(){
         'Casting Speed':'施法速度',
         'Resist Chance':'抵抗率',
         'Spell Crit':'法术暴击',
-        'Attack Crit Damage':'物理爆击伤害',
+        'Attack Crit Damage':'物理暴击伤害',
         'Magic Accuracy':'魔法命中',
         'Counter-Parry':'反招架',
         'Attack Speed':'攻击速度',

@@ -1257,7 +1257,7 @@ const $equip = {
       const prefix = 'Ethereal|Fiery|Arctic|Shocking|Tempestuous|Hallowed|Demonic|Ruby|Cobalt|Amber|Jade|Zircon|Onyx|Charged|Frugal|Radiant|Mystic|Agile|Reinforced|Savage|Shielding|Mithril';
       const slot = 'Cap|Robe|Gloves|Pants|Shoes|Helmet|Breastplate|Gauntlets|Leggings|Boots|Cuirass|Armor|Greaves|Sabatons|Coif|Hauberk|Mitons|Chausses|Boots';
       const onehanded = 'Axe|Club|Rapier|Shortsword|Wakizashi|Dagger|Sword Chucks';
-      const twohanded = 'Estoc|Longsword|Mace|Katana|Scythe';
+      const twohanded = 'Swordchucks|Estoc|Longsword|Mace|Katana|Scythe';
       const staff = 'Oak Staff|Willow Staff|Katalox Staff|Redwood Staff|Ebony Staff';
       const shield = 'Buckler|Kite Shield|Force Shield|Tower Shield';
       const acloth = 'Cotton|Phase|Gossamer|Silk|Ironsilk';
@@ -1275,10 +1275,10 @@ const $equip = {
   // 将来合并所有脚本后,此块即可升格为统一翻译核心。译名仅作显示,英文 eq.info.name 原值不动。
   $i18n: {
     quality: { Peerless: '☯无双☯', Legendary: '✪传奇✪', Magnificent: '☆史诗☆', Exquisite: '✧精良✧', Superior: '上等', Fine: '优质', Average: '中等', Fair: '一般', Crude: '劣质', Flimsy: '薄弱' },
-    prefix: { Ethereal: '虚空之', Fiery: '灼热之', Arctic: '极寒之', Shocking: '闪电之', Tempestuous: '风暴之', Hallowed: '神圣之', Demonic: '恶魔之', Radiant: '魔光', Charged: '充能的', Mystic: '神秘的', Frugal: '节能', Savage: '野蛮的', Agile: '俊敏的', Reinforced: '加固的', Shielding: '盾化的', Mithril: '秘银的', Ruby: '红宝石(火抗)', Cobalt: '钴石(冰抗)', Amber: '琥珀(雷抗)', Jade: '翡翠(风抗)', Zircon: '锆石(圣抗)', Onyx: '缟玛瑙(暗抗)' },
-    type: { Rapier: '西洋剑', Club: '棍', Shortsword: '短剑', Axe: '斧', Wakizashi: '脇差', Dagger: '匕首', 'Sword Chucks': '锁链双剑', Estoc: '刺剑', Mace: '重槌', Longsword: '长剑', Katana: '太刀', Scythe: '镰刀', 'Oak Staff': '橡木法杖', 'Willow Staff': '柳木法杖', 'Katalox Staff': '铁木法杖', 'Redwood Staff': '红木法杖', 'Ebony Staff': '乌木法杖', 'Force Shield': '力场盾', Buckler: '圆盾', 'Kite Shield': '鸢盾', 'Tower Shield': '塔盾', Phase: '相位', Cotton: '棉质', Gossamer: '薄纱', Silk: '丝绸', Ironsilk: '铁绸', Shade: '暗影', Leather: '皮革', Kevlar: '凯夫拉', 'Dragon Hide': '龙皮', Drakehide: '龙皮', Power: '动力', Plate: '板甲', Chainmail: '锁子甲', Reactive: '反应装甲' },
-    slot: { Cap: '兜帽', Robe: '长袍', Gloves: '手套', Pants: '短裤', Shoes: '鞋', Helmet: '头盔', Breastplate: '护胸', Cuirass: '胸甲', Armor: '盔甲', Gauntlets: '手甲', Greaves: '护胫', Leggings: '护腿', Sabatons: '铁靴', Boots: '靴子', Coif: '头巾', Hauberk: '装甲', Mitons: '护手', Chausses: '裤' },
-    suffix: { Slaughter: '杀戮', Balance: '平衡', Swiftness: '加速', 'the Barrier': '格挡', 'the Nimble': '招架', 'the Battlecaster': '战法师', 'the Vampire': '吸血鬼', 'the Illithid': '灵吸怪', 'the Banshee': '报丧女妖', Destruction: '毁灭', Surtr: '苏尔特(火伤)', Niflheim: '尼芙菲姆(冰伤)', Mjolnir: '姆乔尔尼尔(雷伤)', Freyr: '弗瑞尔(风伤)', Heimdall: '海姆达(圣伤)', Fenrir: '芬里尔(暗伤)', Focus: '专注', 'the Elementalist': '元素使', 'the Heaven-sent': '天堂', 'the Demon-fiend': '恶魔', 'the Earth-walker': '地行者', 'the Curse-weaver': '咒术师', 'the Shadowdancer': '影舞者', 'the Fleet': '迅捷', 'the Arcanist': '奥术师', Negation: '否定', Protection: '物防', Warding: '魔防', Dampening: '抑制', Stoneskin: '石肤', Deflection: '偏转', 'the Ox': '牛(力量)', 'the Raccoon': '浣熊(灵巧)', 'the Cheetah': '猎豹(敏捷)', 'the Turtle': '乌龟(体质)', 'the Fox': '狐狸(智力)', 'the Owl': '猫头鹰(智慧)', 'the Fire-eater': '噬火者', 'the Thunder-child': '雷之子', 'the Wind-waker': '驭风者', 'the Frost-born': '冰人', 'the Spirit-ward': '灵魂护佑', 'the Thrice-blessed': '三重祝福' },
+    prefix: { Ethereal: '虚空之', Fiery: '灼热之', Arctic: '极寒之', Shocking: '闪电之', Tempestuous: '风暴之', Hallowed: '神圣之', Demonic: '恶魔之', Radiant: '魔光的(魔伤)', Charged: '充能的(加速)', Mystic: '神秘的(暴击)', Frugal: '节能(省魔)', Savage: '残暴的(暴伤)', Agile: '俊敏的(加速)', Reinforced: '坚固的(减伤)', Shielding: '盾化的(格挡)', Mithril: '秘银的(低重)', Ruby: '红宝石(火抗)', Cobalt: '钴石(冰抗)', Amber: '琥珀(雷抗)', Jade: '翡翠(风抗)', Zircon: '锆石(圣抗)', Onyx: '缟玛瑙(暗抗)' },
+    type: { Rapier: '西洋剑', Club: '棍', Shortsword: '短剑', Axe: '斧', Wakizashi: '脇差', Dagger: '匕首', 'Sword Chucks': '锁链双剑', Estoc: '刺剑', Mace: '重槌', Longsword: '长剑', Katana: '太刀', Scythe: '镰刀', 'Great Mace': '重锤', 'Swordchucks': '锁链双剑', 'Oak Staff': '橡木法杖', 'Willow Staff': '柳木法杖', 'Katalox Staff': '铁木法杖', 'Redwood Staff': '红木法杖', 'Ebony Staff': '乌木法杖', 'Force Shield': '力场盾', Buckler: '圆盾', 'Kite Shield': '鸢盾', 'Tower Shield': '塔盾', Phase: '相位', Cotton: '棉质', Gossamer: '薄纱', Silk: '丝绸', Ironsilk: '铁绸', Shade: '暗影', Leather: '皮革', Kevlar: '凯夫拉', 'Dragon Hide': '龙皮', Drakehide: '龙皮', Power: '动力', Plate: '板甲', Chainmail: '锁子甲', Reactive: '反应装甲' },
+    slot: { Cap: '兜帽', Robe: '长袍', Gloves: '手套', Pants: '裤', Shoes: '鞋', Helmet: '头盔', Breastplate: '护胸', Cuirass: '胸甲', Armor: '盔甲', Gauntlets: '手甲', Greaves: '护胫', Leggings: '护腿', Sabatons: '铁靴', Boots: '靴子', Coif: '头巾', Hauberk: '装甲', Mitons: '护手', Chausses: '裤' },
+    suffix: { Slaughter: '杀戮', Balance: '平衡', Swiftness: '加速', 'the Barrier': '格挡', 'the Nimble': '招架', 'the Battlecaster': '战法师', 'the Vampire': '吸血鬼', 'the Illithid': '灵吸怪', 'the Banshee': '报丧女妖', Destruction: '毁灭', Surtr: '苏尔特(火伤)', Niflheim: '尼芙菲姆(冰伤)', Mjolnir: '姆乔尔尼尔(雷伤)', Freyr: '弗瑞尔(风伤)', Heimdall: '海姆达(圣伤)', Fenrir: '芬里尔(暗伤)', Focus: '专注', 'the Elementalist': '元素使', 'the Heaven-sent': '天堂', 'the Demon-fiend': '恶魔', 'the Earth-walker': '地行者', 'the Curse-weaver': '咒术师', 'the Shadowdancer': '影舞者', 'the Fleet': '迅捷', 'the Arcanist': '奥术师', Negation: '否定', Protection: '物防', Warding: '魔防', Dampening: '抑制', Stoneskin: '石肤', Deflection: '偏转', 'the Ox': '牛(力量)', 'the Raccoon': '浣熊(灵巧)', 'the Cheetah': '猎豹(敏捷)', 'the Turtle': '乌龟(体质)', 'the Fox': '狐狸(智力)', 'the Owl': '猫头鹰(智慧)', 'the Fire-eater': '噬火者(火抗)', 'the Thunder-child': '雷之子(雷抗)', 'the Wind-waker': '驭风者(风抗)', 'the Frost-born': '冰人(冰抗)', 'the Spirit-ward': '灵魂护佑(暗抗)', 'the Thrice-blessed': '三重祝福(圣抗)' },
     items: {
       'Binding of Slaughter': '粘合剂 基础物理伤害', 'Binding of Balance': '粘合剂 物理命中率', 'Binding of Isaac': '粘合剂 物理暴击率', 'Binding of Destruction': '粘合剂 基础魔法伤害', 'Binding of Focus': '粘合剂 魔法命中率', 'Binding of Friendship': '粘合剂 魔法暴击率', 'Binding of Protection': '粘合剂 物理减伤', 'Binding of Warding': '粘合剂 魔法减伤', 'Binding of the Fleet': '粘合剂 回避率', 'Binding of the Barrier': '粘合剂 格挡率', 'Binding of the Nimble': '粘合剂 招架率', 'Binding of Negation': '粘合剂 抵抗率', 'Binding of the Ox': '粘合剂 力量', 'Binding of the Raccoon': '粘合剂 灵巧', 'Binding of the Cheetah': '粘合剂 敏捷', 'Binding of the Turtle': '粘合剂 体质', 'Binding of the Fox': '粘合剂 智力', 'Binding of the Owl': '粘合剂 智慧', 'Binding of the Elementalist': '粘合剂 元素魔法熟练度', 'Binding of the Heaven-sent': '粘合剂 神圣魔法熟练度', 'Binding of the Demon-fiend': '粘合剂 黑暗魔法熟练度', 'Binding of the Curse-weaver': '粘合剂 减益魔法熟练度', 'Binding of the Earth-walker': '粘合剂 增益魔法熟练度', 'Binding of Surtr': '粘合剂 火属性咒语伤害', 'Binding of Niflheim': '粘合剂 冰属性咒语伤害', 'Binding of Mjolnir': '粘合剂 雷属性咒语伤害', 'Binding of Freyr': '粘合剂 风属性咒语伤害', 'Binding of Heimdall': '粘合剂 圣属性咒语伤害', 'Binding of Fenrir': '粘合剂 暗属性咒语伤害', 'Binding of Dampening': '粘合剂 敲击减伤', 'Binding of Stoneskin': '粘合剂 斩击减伤', 'Binding of Deflection': '粘合剂 刺击减伤', 'Binding of the Fire-eater': '粘合剂 火属性减伤', 'Binding of the Frost-born': '粘合剂 冰属性减伤', 'Binding of the Thunder-child': '粘合剂 雷属性减伤', 'Binding of the Wind-waker': '粘合剂 风属性减伤', 'Binding of the Thrice-blessed': '粘合剂 圣属性减伤', 'Binding of the Spirit-ward': '粘合剂 暗属性减伤',
       'Health Potion': '体力药水', 'Health Draught': '体力长效药', 'Health Elixir': '终极体力药', 'Mana Potion': '法力药水', 'Mana Draught': '法力长效药', 'Mana Elixir': '终极法力药', 'Spirit Potion': '灵力药水', 'Spirit Draught': '灵力长效药', 'Spirit Elixir': '终极灵力药', 'Last Elixir': '终极秘药', 'Energy Drink': '能量饮料', 'Caffeinated Candy': '咖啡因糖果', 'Monster Chow': '怪物饲料', 'Monster Edibles': '怪物食品', 'Monster Cuisine': '怪物料理', 'Golden Lottery Ticket': '黄金彩票券',
@@ -1292,9 +1292,11 @@ const $equip = {
     },
     _join: function (i) {
       const I = $equip.$i18n;
+      let prefix = i.prefix, type = i.type;
+      if (prefix === 'Great' && type === 'Mace') { prefix = ''; type = 'Great Mace'; }
       const q = I.quality[i.quality] || i.quality || '';
-      const pre = i.prefix ? (I.prefix[i.prefix] || i.prefix) : '';
-      const t = i.type ? (I.type[i.type] || i.type) : '';
+      const pre = prefix ? (I.prefix[prefix] || prefix) : '';
+      const t = type ? (I.type[type] || type) : '';
       const slot = i.slot ? (I.slot[i.slot] || i.slot) : '';
       const suf = i.suffix ? (I.suffix[i.suffix] || i.suffix) : '';
       return [q, pre, t, slot, suf].filter(Boolean).join(' ');
@@ -1332,7 +1334,9 @@ const $equip = {
       const I = $equip.$i18n;
       const exec = $equip.reg.name.exec(str);
       if (!exec) { return I._esc(str); }
-      const segs = [[exec[1], I.quality], [exec[2] || exec[3], I.prefix], [exec[4] || exec[5] || exec[6] || exec[7] || exec[8] || exec[9] || exec[10], I.type], [exec[11], I.slot], [exec[12], I.suffix]];
+      let pre2 = exec[2] || exec[3], type2 = exec[4] || exec[5] || exec[6] || exec[7] || exec[8] || exec[9] || exec[10];
+      if (pre2 === 'Great' && type2 === 'Mace') { pre2 = ''; type2 = 'Great Mace'; }
+      const segs = [[exec[1], I.quality], [pre2, I.prefix], [type2, I.type], [exec[11], I.slot], [exec[12], I.suffix]];
       return segs.filter((s) => s[0]).map(([v, map]) => {
         const zh = map[v] || I._esc(v);
         const c = I.colors[v];
@@ -1539,6 +1543,7 @@ const $equip = {
         eq.info.type = exec[4] || exec[5] || exec[6] || exec[7] || exec[8] || exec[9] || exec[10];
         eq.info.slot = exec[11];
         eq.info.suffix = exec[12];
+        if (eq.info.prefix === 'Great' && eq.info.type === 'Mace') { eq.info.prefix = ''; eq.info.type = 'Great Mace'; }
       } else if (!eq.info.category) {
         eq.info.category = 'Unknown';
       }
