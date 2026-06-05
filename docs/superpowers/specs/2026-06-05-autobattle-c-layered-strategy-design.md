@@ -1,7 +1,7 @@
 # autobattle C-layered 盾战决策大脑设计
 
 > 日期: 2026-06-05
-> 状态: 设计文档已落库, 待用户 review 后进入 implementation plan
+> 状态: 设计文档已更新, 先执行 P0 前置清理, 再进入 C-layered 主体实现
 > 前置: `docs/superpowers/specs/2026-06-05-autobattle-target-weight-design.md` 已实现到当前源码
 
 ## 1. 目标
@@ -50,6 +50,10 @@
 - P11 回 SP 目前要求 `S.stanceOn`, 但高塔里 Spirit Shield/Spark 本身也需要 SP 储备。
 - P15 非红 OC 技仍用 `S.enemies.find(...)`, 没有消费 `rankTargets()` 的排序。
 - P15 `saveOcForCannon` 会因 `monsterTotal >= CANNON_MIN_ENEMIES` 在清到剩少数怪时继续跨波攒炮, 但最终波没有下一波。
+- `loop.ts` 当前在 `a.type === 'cannon'` 决策阶段就把 `cannonCd` 置为 50, 但真正 `Exec.cannon()` 是延迟执行; 若按钮变灰、页面卡住或执行返回 false, 会误盖 50 回合冷却。
+- `reader.ts` 的 `_spawnHp()` 已按 GF 实测"战斗日志顶新底旧"处理, 但 `_round()` / `_enemyMagic()` 仍取最后一个匹配, textlog 最新行读取口径不统一。
+- `autobattle/scripts/drive-brain.mts` 的慈悲样本仍写"残血+流血+慈悲开", 但当前策略已把 Merciful Blow 限定红名, 样本命名与预期落后。
+- `docs/superpowers/plans/2026-06-05-autobattle-remaining-tasks.md` 仍包含已完成或已关闭的阻塞项, 如 castHostileOn、XHR 解析、`_expire` 读取。
 - `autobattle/docs/battle-mechanics.md` 还记录 Mystic Gem "回三样"的旧结论, 需要同步修正。
 
 ## 3. 非目标
@@ -72,7 +76,14 @@ target-weight -> 纯函数排序, 不碰 DOM/config/store
 executor.ts   -> 执行动作, 不做策略
 ```
 
-`Brain.decide()` 内部按 C-layered 重新组织为 6 层, 每层仍是确定性短路:
+进入 C-layered 主体前先做 P0 前置清理, 让现有战斗循环和回归样本稳定, 避免把旧问题带进 Mystic/Shadow Veil/Silence 改造:
+
+1. 小马炮冷却只在 `Exec.cannon()` 实际执行成功后落点, 决策阶段不预写 `cannonCd`。
+2. `reader.ts` 提供统一的"取最新 textlog 匹配" helper, 默认按 GF 实测顶新底旧取第一条; `_round()` / `_enemyMagic()` / `_spawnHp()` 共享该口径。
+3. `drive-brain` 更新慈悲红名样本, 并新增最终波/炮执行成功类场景的离线覆盖。
+4. `remaining-tasks` 同步最新事实, 把已完成项从"阻塞"降为已验证/观察项。
+
+P0 完成后, `Brain.decide()` 内部按 C-layered 重新组织为 6 层, 每层仍是确定性短路:
 
 1. `L0 Interrupt`: 小马图、胜利继续、无法战斗等即时中断。
 2. `L1 Lethal Survival`: Spark 零空窗、预测急救、治疗/体力药降级。
@@ -352,6 +363,21 @@ useSleep: false
 
 ## 13. 测试与验证
 
+### 13.0 P0 前置清理回归
+
+前置清理必须先红后绿验证:
+
+- `drive-loop.mts` 或等价脚本覆盖 cannon 冷却落点:
+  - `Action(type='cannon')` 但执行函数返回 `false` 时, `cannonCd` 不得变成 50。
+  - 执行函数返回 `true` 时, 才写入 `CANNON_CD_TURNS`。
+- `drive-reader.mts` 或等价脚本覆盖 textlog 最新行:
+  - 两条伤害日志同在时, 顶部最新魔法伤害应让 `tookMagicDmg=true`, 底部旧物理伤害不应覆盖它。
+  - 两条 Round 行同在时, 顶部最新 round 应覆盖底部旧 round。
+- `drive-brain.mts` 更新样本:
+  - 非红残血+流血不触发慈悲。
+  - 红名残血+流血触发慈悲。
+  - 最终波/炮冷却相关样本要与当前策略名一致。
+
 ### 13.1 纯函数/脚本回归
 
 优先给 helper 做可离线验证:
@@ -391,7 +417,10 @@ useSleep: false
 实现后验证顺序:
 
 ```bash
+cd autobattle && npx tsx scripts/drive-loop.mts
+cd autobattle && npx tsx scripts/drive-reader.mts
 cd autobattle && npx tsx scripts/drive-brain.mts
+cd autobattle && npm run typecheck
 cd autobattle && npm run build
 ```
 
@@ -409,12 +438,13 @@ cd autobattle && npm run build
 
 ## 14. 实施边界
 
-建议分 4 个提交或至少 4 个实施 checkpoint:
+建议分 5 个提交或至少 5 个实施 checkpoint:
 
-1. 数据层与文档修正: Mystic split、Shadow Veil buff、技能 id、`battle-mechanics.md`。
-2. 纯 helper: pressure、control debuff selector、red target selector、OC budget。
-3. `brain.ts` 接入: L2/L3/L4/L5 按 helper 消费, 保留现有优先级短路。
-4. UI/log/drive-brain 回归与构建验证。
+1. P0 前置清理: cannon 冷却落点、textlog 最新行统一、drive-brain 样本、remaining-tasks 同步。
+2. 数据层与文档修正: Mystic split、Shadow Veil buff、技能 id、`battle-mechanics.md`。
+3. 纯 helper: pressure、control debuff selector、red target selector、OC budget。
+4. `brain.ts` 接入: L2/L3/L4/L5 按 helper 消费, 保留现有优先级短路。
+5. UI/log/drive-brain 回归与构建验证。
 
 每个 checkpoint 都应保持脚本可构建。`dist/hv-autobattle.user.js` 只在最终 build 时更新, 避免手改生成物。
 
@@ -428,7 +458,9 @@ cd autobattle && npm run build
 | Silence 命中受重甲干扰影响 | 中 | Channeling 优先喂关键 Silence; 失败时不死循环, 继续按压力重试/降级 |
 | 多红怪切目标抖动 | 中 | 保留 `lockedRedId`, 只有更高层级目标才切锁 |
 | 最终波 round 读取失败 | 低 | 读不到 round 时按有下一波处理, 保守不乱花 OC |
+| cannon 执行失败误盖冷却 | 中 | P0 改为执行成功后才落 `cannonCd`; 脚本回归覆盖 false/true |
+| textlog 新旧顺序被不同 reader 方法各自解释 | 中 | P0 统一 reader helper; 顶新底旧作为当前 GF 实测默认 |
 
 ## 16. Review 结论
 
-这份设计聚焦在 M2 战斗决策, 不扩散到连刷后勤。核心改造点都有明确数据来源和降级路径。下一步应先写 implementation plan, 再按数据层 -> helper -> brain 接入 -> UI/log/验证的顺序实施。
+这份设计聚焦在 M2 战斗决策, 不扩散到连刷后勤。核心改造点都有明确数据来源和降级路径。下一步先执行 P0 前置清理, 再按数据层 -> helper -> brain 接入 -> UI/log/验证的顺序实施 C-layered 主体。
