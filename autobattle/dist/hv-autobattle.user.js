@@ -1291,6 +1291,7 @@
   function tick() {
     const nowIn = inBattle();
     if (nowIn !== lastInBattle) {
+      console.log("[hvab-dbg] loop battle:active emit =", nowIn, "(was", lastInBattle, ") t=", Date.now() % 1e5);
       bus.emit("battle:active", nowIn);
       lastInBattle = nowIn;
     }
@@ -1453,6 +1454,7 @@
   }
   function mountUI() {
     if (document.getElementById("hvab-root")) return;
+    console.log("[hvab-dbg] mountUI: logOpen=", config.get("logOpen"), "inBattle=", !!document.getElementById("pane_vitals"), "t=", Date.now() % 1e5);
     const root = el("div", { id: "hvab-root" });
     const style = el("style");
     style.textContent = CSS;
@@ -1472,6 +1474,7 @@
         const open = logView.style.display !== "flex";
         toggleLog(logView, open);
         config.set("logOpen", open);
+        console.log("[hvab-dbg] 📋 click → logOpen=", open);
       }
     );
     root.appendChild(hud);
@@ -1480,11 +1483,13 @@
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
     bus.on("battle:active", (active) => {
+      console.log("[hvab-dbg] on battle:active", active, "logOpen=", config.get("logOpen"));
       if (active) {
         if (config.get("logOpen")) toggleLog(logView, true);
       } else {
         toggleLog(logView, false);
         config.set("logOpen", false);
+        console.log("[hvab-dbg] → 退出战斗判定, 清 logOpen=false");
       }
     });
   }

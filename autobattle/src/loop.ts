@@ -50,6 +50,7 @@ function tick(): void {
   // 日志窗口联动: 检测进/退战斗(独立于 enabled — 暂停脚本也要随战斗开关日志窗口). 回退到 0267a59 原始逻辑(去抖会引入跨波闪烁, 用户实测对比确认)
   const nowIn = inBattle();
   if (nowIn !== lastInBattle) {
+    console.log('[hvab-dbg] loop battle:active emit =', nowIn, '(was', lastInBattle, ') t=', Date.now() % 100000); // 临时诊断: 看 nowIn 序列(是否有短暂 false)
     bus.emit('battle:active', nowIn);
     lastInBattle = nowIn;
   }

@@ -49,6 +49,7 @@ function hookNet(): void {
 // 挂载现代界面(右下常驻 HUD + 抽屉)
 function mountUI(): void {
   if (document.getElementById('hvab-root')) return;
+  console.log('[hvab-dbg] mountUI: logOpen=', config.get('logOpen'), 'inBattle=', !!document.getElementById('pane_vitals'), 't=', Date.now() % 100000); // 临时诊断: reload 后挂载时 logOpen 值(被清了没)
   const root = el('div', { id: 'hvab-root' });
   const style = el('style');
   style.textContent = CSS;
@@ -69,6 +70,7 @@ function mountUI(): void {
       const open = logView.style.display !== 'flex';
       toggleLog(logView, open);
       config.set('logOpen', open); // 点📋 = 记忆打开/关闭状态
+      console.log('[hvab-dbg] 📋 click → logOpen=', open); // 临时诊断
     },
   );
 
@@ -81,11 +83,13 @@ function mountUI(): void {
 
   // 日志窗口随战斗开关(loop emit battle:active): 进战斗+记忆打开→自动开; 退出战斗→关窗口+清记忆(用户选定). 回退 0267a59 不闪版
   bus.on('battle:active', (active) => {
+    console.log('[hvab-dbg] on battle:active', active, 'logOpen=', config.get('logOpen')); // 临时诊断
     if (active) {
       if (config.get('logOpen')) toggleLog(logView, true);
     } else {
       toggleLog(logView, false);
       config.set('logOpen', false);
+      console.log('[hvab-dbg] → 退出战斗判定, 清 logOpen=false'); // 临时诊断: 谁清的 logOpen
     }
   });
 }
