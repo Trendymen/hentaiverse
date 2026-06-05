@@ -75,6 +75,30 @@ export const DEBUFFS: DebuffDef[] = [
   { key: 'imperil', id: SK.Imperil, cfg: 'useImperil', img: /imperil/i },
 ];
 
+/** 怪物 13 状态库(翻写 dodying skillLib hvAutoAttack.user.js:3302-3355).
+ *  key → {中文名, src 关键字, 官方英文名}. reader 读状态用它, target-weight 权重按 key 对应; 不含权重数值(解耦).
+ *  匹配: .btm6 img 的 src 含 img 关键字, 或 onmouseover set_infopane_effect('name'...) 官方名(双保险). */
+export interface StatusDef {
+  cn: string;
+  img: string;
+  name: string;
+}
+export const STATUS_LIB: Record<string, StatusDef> = {
+  We: { cn: '虚弱', img: 'weaken', name: 'Weaken' },
+  Bl: { cn: '致盲', img: 'blind', name: 'Blind' },
+  Slo: { cn: '缓慢', img: 'slow', name: 'Slow' },
+  Si: { cn: '沉默', img: 'silence', name: 'Silence' },
+  Sle: { cn: '沉眠', img: 'sleep', name: 'Sleep' },
+  Im: { cn: '陷危', img: 'imperil', name: 'Imperil' },
+  PA: { cn: '破甲', img: 'wpn_ap', name: 'Penetrated Armor' },
+  BW: { cn: '流血', img: 'wpn_bleed', name: 'Bleeding Wound' },
+  Co: { cn: '混乱', img: 'confuse', name: 'Confuse' },
+  Dr: { cn: '枯竭', img: 'drainhp', name: 'Drain' },
+  MN: { cn: '魔磁网', img: 'magnet', name: 'MagNet' },
+  Stun: { cn: '眩晕', img: 'wpn_stun', name: 'Stunned' },
+  CM: { cn: '魔力合流', img: 'coalescemana', name: 'Coalesced Mana' },
+};
+
 /** Channeling 折扣窗口(1MP+50%)待补贵技能优先队列(贵→便宜) */
 export interface ChannelDef {
   id: number;
