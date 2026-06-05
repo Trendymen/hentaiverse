@@ -21,8 +21,10 @@ export class BleedTimer {
    *  @param reds 当前所有活红名快照(已由 brain filter(is_red_boss)) */
   observe(reds: BleedFeedInput[]): void {
     const aliveEids = new Set(reds.map((e) => e.eid));
-    // cleanup: 死亡/切场的红名删样本(防 Map 泄漏 + eid 复用串味)
-    for (const eid of this.reds.keys()) if (!aliveEids.has(eid)) this.reds.delete(eid);
+    // cleanup: 死亡/切场的红名删样本(防 Map 泄漏 + eid 复用串味). 先收集再删, 避免边迭代边改 Map
+    const stale: number[] = [];
+    for (const eid of this.reds.keys()) if (!aliveEids.has(eid)) stale.push(eid);
+    for (const eid of stale) this.reds.delete(eid);
     for (const red of reds) {
       const rec = this.reds.get(red.eid) ?? { lastHpPct: red.hpPct, activeDeltas: [] };
       // 兑现: 仅当"上回合主动打了这只红名"且本回合真掉血, 才计入主动速率样本(被动掉血/miss 自然排除)
@@ -30,7 +32,7 @@ export class BleedTimer {
         const drop = rec.lastHpPct - red.hpPct;
         if (drop > 0) {
           rec.activeDeltas.push(drop);
-          if (rec.activeDeltas.length > SAMPLE_CAP) rec.activeDeltas.shift();
+          while (rec.activeDeltas.length > SAMPLE_CAP) rec.activeDeltas.shift();
         }
       }
       rec.lastHpPct = red.hpPct;
@@ -50,8 +52,8 @@ export class BleedTimer {
     if (!cfg.enabled) return true; // 退回旧行为(brain 的 stunned&&!bleeding 守门)
     const hp = execRed.hpPct; // 全程 hpPct(0-100), 不用 hpNow
     let path = 'fallback';
-    let r = 0;
-    let T = 0;
+    let r = NaN;
+    let T = NaN;
     let feed: boolean;
 
     if (hp <= EXECUTE_HP) {
