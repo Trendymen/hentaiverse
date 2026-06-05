@@ -203,8 +203,8 @@
     useMercifulBlow: true,
     // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)
     // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
-    useTargetWeight: false,
-    // 总开关(默认关·灰度); 只控制 P16 是否按权重排序. 血条 bug 修复不受此控制
+    useTargetWeight: true,
+    // 总开关; 只控制 P16 是否按权重排序. 血条 bug 修复不受此控制. 2026-06-06 GF/竞技场真机核对通过(切换即时生效·血量+破甲滚雪球排序·无死磕)→ 脱离灰度转默认开
     baseHpRatio: 1,
     // 关键可调: >0 低血优先 / <0 高血优先
     yggdrasilExtraWeight: -1e3,

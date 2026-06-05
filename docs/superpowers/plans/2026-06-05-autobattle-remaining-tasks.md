@@ -17,7 +17,7 @@
 | 里程碑 | 状态 | 说明 |
 |---|---|---|
 | M1 地基 | ✅ 完成 | 工程/构建(不压缩)/core/UI 骨架/document-start hook |
-| M2 战斗内 | 🟢 C-layered 核心已接入 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度; castHostileOn / XHR / `_expire` 阻塞已解除; C-layered P0 + Mystic split / Shadow Veil / Silence / 压力层已接入, 剩真机观察 |
+| M2 战斗内 | 🟢 C-layered 核心已接入 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度; castHostileOn / XHR / `_expire` 阻塞已解除; C-layered P0 + Mystic split / Shadow Veil / Silence / 压力层已接入; **2026-06-06 竞技场真机核对: 顺风局核心全正常零 bug + 目标权重转正默认开(§2.7)**; 剩防御层(影纱补/沉默/Mystic)逆风场未验证 + 死怪/Yggdrasil 边缘 case 无样本 |
 | M3 连刷 | 🟠 仅 GF 波次内续战 | `engine/` 未建;遭遇/竞技场/精力/连刷 tab 全缺(见 §3) |
 | M4 保护后勤 | ❌ 未开始 | `engine/{stamina,watchdog,supply,stats}.ts` 全缺(见 §4) |
 | M5 杂项打磨 | ❌ 未开始 | 告警/通知/异世界/小马提醒 + 提醒 tab + UI 精修(见 §5) |
@@ -107,8 +107,10 @@
   4. SP reserve 可在非架式时补灵力;最终波不为下一波攒炮,非红 OC 技按 ranked 选目标。
 
 - **三个 OC 近战技 `castHostileOn` 释放机制 ✅ 已验证**(commit `8df9804`):GF 实测点 `2201`+`commit_target` 真放出盾击(crit 102413,`Cut Down has been defeated`,OC 138→100 真消耗)。技能元素 `id=DBID`、`onclick=lock_action+set_hostile_skill`(无 touch_and_go,靠 commit_target 释放),与红怪减益同机制;castHostileOn 已加 opacity 守卫。**释放机制确认可用**;剩"实战观察决策优先级/攒炮节奏是否如预期"(装最新 build 开三开关跑一轮)。
-- **目标权重真机核对**:开 `useTargetWeight` 看 P16 选目标;死怪 `nbardead` / 红怪 Yggdrasil 名 / 长回合 Spawned 缓存沿用 / 连刷换波 initHp 覆盖 / hpNow 数值核对(spec §10)。
-- **C-layered 真机观察**:Mystic 使用后是否稳定读到 Channeling;Shadow Veil 图标关键字/剩余回合;Silence ID/冷却;高压控制是否拖慢低压场;最终波 OC 技日志是否符合预期。
+- **目标权重真机核对 ✅ 2026-06-06 竞技场实测通过**(`useTargetWeight` 转正默认开):切换即时生效(`最低eid`→`finWeight最优`,18 条样本无残留)、血量+破甲滚雪球排序、残血打到 6-7% 才换、无死磕打不动的怪、目标随血量/破甲动态重算。**剩两个边缘 case 无样本待补**:① 死怪 `nbardead` 垫底(需 AOE 后死怪仍在场的回合)② Yggdrasil 优先(需 GF 世界树场);纯函数逻辑已写对(`target-weight.ts` unreachableWeight/yggdrasilExtraWeight),仅缺触发场景。
+- **C-layered 真机观察 — 2026-06-06 竞技场实测部分结论**(5000 条日志 + 当前 buff + `[HVAB:foes]` 埋点):
+  - ✅ **顺风局核心全正常零 bug**:慈悲处决红名连招(40)、要害喂流血(296,"只喂一次"已生效)、盾击(180)、Absorb(87)、Weaken/Imperil(138/83)、Channeling 折扣铺虚弱(25)、小马炮(36)/攒炮(657)、续波(85)、安全网(4)/网络卡(0);红名识别 100% 准(console 实测 Mikuru/Yuki Nagato + 晕/血/减益追踪)。
+  - ⚠️ **影纱补 / 沉默 / Mystic 开 Channeling 三条路径"0 次"≠ bug,是顺风局前提未现**:① 影纱:当前 `Shadow Veil` 常驻挂着 → `shadowDown=false` 不重复补(正确);② 沉默:压力 high 仅 1 次(medium 179),需 SP 吃紧高压场;③ Mystic:`Spark of Life` 常驻、防御/MP 不缺,无需用宝石开 Channeling。**待逆风/高压场(不预挂影纱·SP 吃紧·Spark 掉)才能检验这三条防御层**。
 
 ---
 
@@ -170,6 +172,6 @@
 
 1. ~~§2.1 Absorb 启发式~~ ✅ / ~~§2.4 OC 近战技~~ ✅ / ~~§2.5 目标权重~~ ✅ / ~~§2.6 OC 经济+UI~~ ✅
 2. ~~§2.7 C-layered P0 前置清理~~ ✅ / ~~C-layered 主体(Mystic/Shadow Veil/Silence/压力/OC预算)~~ ✅
-3. **C-layered 真机观察微调**:Mystic/Channeling、Shadow Veil、Silence 命中/冷却、低压拖慢、最终波 OC
+3. ~~**C-layered 真机观察微调**:目标权重 finWeight 已实测转正~~ ✅(2026-06-06)/ **剩防御层(影纱补·沉默·Mystic 开 Channeling)需逆风高压场触发** + 死怪 `nbardead` 垫底 / Yggdrasil 优先两个边缘 case 待补样本
 4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
 5. M4 → M5
