@@ -51,7 +51,7 @@ export function assessPressure(S: BattleState, C: Config, memory: BrainMemory): 
   const heavy = S.lastDmg > 0.3 * HM;
   const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
   const high = spCritical || heavy || lowHp || (tower && (manyEnemies || spReserveLow || hasRed));
-  const medium = high || tower || hasRed || manyEnemies || spReserveLow;
+  const medium = high || tower || hasRed || spReserveLow;
 
   return {
     level: high ? 'high' : medium ? 'medium' : 'low',

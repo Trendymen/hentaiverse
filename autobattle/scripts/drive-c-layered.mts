@@ -153,6 +153,16 @@ function decide(state: Record<string, unknown>, cfg: Record<string, unknown> = {
 
 {
   const s = base();
+  s.enemies = many(5);
+  s.alive = 5;
+  s.monsterTotal = 5;
+  const a = decide(s);
+  assert.equal(a.type, 'attack', 'plain dense non-red waves should save OC and attack instead of spending MP on pressure control');
+  assert.equal(a.id, 1);
+}
+
+{
+  const s = base();
   s.battleType = '塔楼';
   s.enemies = many(4);
   s.alive = 4;
