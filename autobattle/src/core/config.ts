@@ -5,6 +5,7 @@ export const DEFAULT_CONFIG = {
   // ── M1 界面态 ──
   enabled: false, // B大脑总开关 (🧠自动 / ⏸暂停)
   panelOpen: false, // 抽屉是否展开
+  logOpen: false, // 战斗日志窗口是否打开(持久化记忆; 进战斗自动恢复, 手动✕关或退出战斗清)
   activeTab: 'battle' as 'battle' | 'farm' | 'guard' | 'notify',
   // ── M2 战斗常量(玩家实测换算; 动态满值会自适应覆盖) ──
   HPMAX: 24232,

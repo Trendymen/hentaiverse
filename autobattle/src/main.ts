@@ -5,6 +5,7 @@ import { createPanel, togglePanel } from './ui/panel';
 import { createLogView, toggleLog } from './ui/log';
 import { config } from './core/config';
 import { logger } from './core/logger';
+import { bus } from './core/bus';
 import { startLoop } from './loop';
 
 // ── document-start: 最早 hook XHR/fetch 旁路(只读不改) ──
@@ -64,7 +65,11 @@ function mountUI(): void {
       togglePanel(panel, open);
       config.set('panelOpen', open);
     },
-    () => toggleLog(logView),
+    () => {
+      const open = logView.style.display !== 'flex';
+      toggleLog(logView, open);
+      config.set('logOpen', open); // 点📋 = 记忆打开/关闭状态
+    },
   );
 
   root.appendChild(hud);
@@ -73,6 +78,16 @@ function mountUI(): void {
   document.body.appendChild(root);
 
   if (config.get('panelOpen')) togglePanel(panel, true);
+
+  // 日志窗口随战斗开关(loop emit battle:active, 首次 tick 即同步 reload 前状态): 进战斗+记忆打开→自动开; 退出战斗→关窗口+清记忆(用户选定)
+  bus.on('battle:active', (active) => {
+    if (active) {
+      if (config.get('logOpen')) toggleLog(logView, true);
+    } else {
+      toggleLog(logView, false);
+      config.set('logOpen', false);
+    }
+  });
 }
 
 // 调试接口: 挂到 unsafeWindow(页面世界), devtools/console 与外部脚本可直接读 __hvab.log()/logText()/getLastBattle()

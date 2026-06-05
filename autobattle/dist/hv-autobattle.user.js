@@ -128,6 +128,8 @@
     // B大脑总开关 (🧠自动 / ⏸暂停)
     panelOpen: false,
     // 抽屉是否展开
+    logOpen: false,
+    // 战斗日志窗口是否打开(持久化记忆; 进战斗自动恢复, 手动✕关或退出战斗清)
     activeTab: "battle",
     // ── M2 战斗常量(玩家实测换算; 动态满值会自适应覆盖) ──
     HPMAX: 24232,
@@ -464,7 +466,10 @@
       logger.clear();
       renderAll();
     };
-    box.querySelector("#hvab-log-x").onclick = () => toggleLog(box, false);
+    box.querySelector("#hvab-log-x").onclick = () => {
+      config.set("logOpen", false);
+      toggleLog(box, false);
+    };
     box._renderAll = renderAll;
     return box;
   }
@@ -1089,6 +1094,7 @@
   let lastRound = -1;
   let timer = null;
   let lastSig = "";
+  let lastInBattle = null;
   let stuckN = 0;
   let cannonCd = Store.get("cannonCd", 0);
   let cannonRoundSeen = Store.get("cannonRound", -1);
@@ -1101,8 +1107,13 @@
     return [S.hp, S.mp, S.sp, S.overcharge, S.alive, foes, buffs, S.channeling ? "ch" : ""].join("|");
   }
   function tick() {
+    const nowIn = inBattle();
+    if (nowIn !== lastInBattle) {
+      bus.emit("battle:active", nowIn);
+      lastInBattle = nowIn;
+    }
     try {
-      if (config.get("enabled") && inBattle() && Date.now() >= busyUntil) {
+      if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
         const S = reader.read();
         const fp = fingerprint(S);
         const changed = fp !== lastFp;
@@ -1247,13 +1258,25 @@
         togglePanel(panel, open);
         config.set("panelOpen", open);
       },
-      () => toggleLog(logView)
+      () => {
+        const open = logView.style.display !== "flex";
+        toggleLog(logView, open);
+        config.set("logOpen", open);
+      }
     );
     root.appendChild(hud);
     root.appendChild(panel);
     root.appendChild(logView);
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
+    bus.on("battle:active", (active) => {
+      if (active) {
+        if (config.get("logOpen")) toggleLog(logView, true);
+      } else {
+        toggleLog(logView, false);
+        config.set("logOpen", false);
+      }
+    });
   }
   {
     const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;

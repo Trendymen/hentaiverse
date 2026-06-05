@@ -126,6 +126,7 @@ export interface BusEvents {
   'hud:update': HudData;
   'log:update': LogRecord | null;
   'ui:toggle': boolean;
+  'battle:active': boolean; // loop 检测 inBattle 跨 tick 变化: true=进战斗(下一轮恢复日志窗口), false=退出战斗(关窗口+清记忆)
 }
 
 /** target-weight 纯函数输入(EnemyState 的结构子集; EnemyState 鸭子类型可直接传) */

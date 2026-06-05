@@ -18,6 +18,7 @@ let turn = 0;
 let lastRound = -1;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let lastSig = ''; // 上一次决策动作签名(死循环安全网用)
+let lastInBattle: boolean | null = null; // 上一 tick 是否在战斗(初始 null → 首次 tick 必 emit 当前态, 同步 reload 后日志窗口); 检测进/退战斗驱动 battle:active
 let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
 // 小马炮冷却跨波/轮持续(HV 跳轮 reload 内存全失), 故持久化到 Store: cannonCd=剩余冷却回合, cannonRound=上次轮(检测重开 GrindFest)
 let cannonCd = Store.get<number>('cannonCd', 0);
@@ -42,8 +43,14 @@ function fingerprint(S: BattleState): string {
 }
 
 function tick(): void {
+  // 日志窗口联动: 检测进/退战斗(独立于 enabled — 暂停脚本也要随战斗开关日志窗口)
+  const nowIn = inBattle();
+  if (nowIn !== lastInBattle) {
+    bus.emit('battle:active', nowIn);
+    lastInBattle = nowIn;
+  }
   try {
-    if (config.get('enabled') && inBattle() && Date.now() >= busyUntil) {
+    if (config.get('enabled') && nowIn && Date.now() >= busyUntil) {
       const S = reader.read();
       const fp = fingerprint(S);
       const changed = fp !== lastFp;

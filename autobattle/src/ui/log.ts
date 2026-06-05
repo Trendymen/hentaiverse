@@ -1,6 +1,7 @@
 // 战斗日志视图: 右下弹出可滚动面板, 场中实时刷 + 场后回查, 带 复制/导出/清空.
 import { el } from '../core/dom';
 import { bus } from '../core/bus';
+import { config } from '../core/config';
 import { logger, fmtLine } from '../core/logger';
 
 function copyText(t: string): void {
@@ -79,7 +80,10 @@ export function createLogView(): HTMLElement {
     logger.clear();
     renderAll();
   };
-  box.querySelector<HTMLButtonElement>('#hvab-log-x')!.onclick = () => toggleLog(box, false);
+  box.querySelector<HTMLButtonElement>('#hvab-log-x')!.onclick = () => {
+    config.set('logOpen', false); // 手动关 = 记忆为关, 不再自动开
+    toggleLog(box, false);
+  };
 
   (box as unknown as { _renderAll: () => void })._renderAll = renderAll;
   return box;
