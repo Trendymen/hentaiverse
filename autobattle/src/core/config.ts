@@ -60,6 +60,14 @@ export const DEFAULT_CONFIG = {
   unreachableWeight: 1000, // 内置: 死怪垫底
   // 内置 13 状态权重(reference 1067-1079 实测默认值). statusWeight 是 record, 将来若做面板可调需注意整体覆盖语义
   statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 } as Record<string, number>,
+  // ── 要害延迟喂流血(BleedTimer; 详见 specs/2026-06-06-autobattle-delayed-bleed-design.md)──
+  useDelayedBleed: true, // 延迟逻辑开关; false 退回旧"红名一晕就喂"(灰度可一键回滚)
+  BLEED_DURATION: 5, // 流血持续回合 B(要害产的 DoT 覆盖窗口)
+  BLEED_SAFETY: 1, // 安全余量; 要求 T ≤ B-safety(=4) 才喂, 留 1 回合冗余防 DoT 先过期
+  BLEED_FALLBACK_HP: 30, // 无主动速率样本/速率太小时的兜底血量窗口(hpPct ≤ 此值就喂)
+  BLEED_RATE_WINDOW: 3, // 速率移动平均窗口(最近 2-3 个主动样本)
+  BLEED_MIN_SAMPLES: 1, // 走速率主路最少样本数, 不足走兜底
+  BLEED_MIN_RATE: 1, // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
 };
 
 export type Config = typeof DEFAULT_CONFIG;
