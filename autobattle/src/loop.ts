@@ -72,11 +72,19 @@ function tick(): void {
         else stuckN = 0;
         lastSig = sig;
         if (stuckN >= 2) {
-          const t = S.enemies.find((e) => e.alive);
-          a = t
-            ? { type: 'attack', id: t.eid, exec: () => Exec.attack(t.eid), note: '安全网:上招放不出→强制平砍' }
-            : { type: 'defend', exec: () => Exec.defend(), note: '安全网:上招放不出→防御' };
-          stuckN = 0;
+          // 退避升级(GF 实测 R32 网络卡死循环刷屏): 原"强制平砍"和正常平砍是同一 commit_target, 网络卡时照样放不出 → 无限循环刷屏.
+          //   达 STUCK_PAUSE → 疑似网络卡/无响应: 告警 + 自动暂停(不再疯狂刷), 等人工▶恢复;
+          //   否则换个活怪平砍(目标可能特殊/卡) + 指数退避(busyUntil 拉长, 见下); stuckN 不重置, 累积到 pause(网络恢复 changed 会清零).
+          if (stuckN >= config.get('STUCK_PAUSE')) {
+            a = { type: 'skip', note: `⚠连续${stuckN}次放不出, 疑似网络卡/无响应 → 自动暂停, 检查网络后手动▶恢复` };
+            config.set('enabled', false);
+          } else {
+            const live = S.enemies.filter((e) => e.alive);
+            const t = live.length ? live[stuckN % live.length] : null; // 轮换目标试
+            a = t
+              ? { type: 'attack', id: t.eid, exec: () => Exec.attack(t.eid), note: `安全网:换目标#${t.eid}(连续${stuckN}次放不出·退避重试)` }
+              : { type: 'defend', exec: () => Exec.defend(), note: '安全网:无活怪→防御' };
+          }
         }
         if (a.type === 'cannon') { cannonCd = config.get('CANNON_CD_TURNS'); Store.set('cannonCd', cannonCd); } // 放炮 → 50 回合冷却(持久化跨波/轮)
         // 轮数变 → 回合计数归零(新一波从 T1 起)
@@ -138,7 +146,7 @@ function tick(): void {
               /* HV 处理中/元素未就绪 */
             }
           }, delay);
-          busyUntil = Date.now() + delay + 150; // 出招后极短锁(仅覆盖 exec 执行那一下); 同回合重复主要靠指纹去重, 锁短 = 换回合后响应快
+          busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5000) : 0); // 出招后极短锁; 连续放不出(stuckN>1)指数退避减速(stuckN×500, 上限5s), 防网络卡时 300ms 疯狂刷屏
           actedAt = Date.now();
         }
         lastFp = fp;

@@ -173,6 +173,8 @@
     delayMin: 160,
     delayMax: 400,
     // 动作间随机延迟范围(ms)
+    STUCK_PAUSE: 12,
+    // 连续放不出达此次数 → 疑似网络卡/无响应 → 自动暂停告警(退避减速后仍不通才暂停, 防死循环刷屏)
     useWeaken: true,
     useImperil: true,
     // 红怪减益序列开关
@@ -1144,9 +1146,14 @@
           else stuckN = 0;
           lastSig = sig;
           if (stuckN >= 2) {
-            const t = S.enemies.find((e) => e.alive);
-            a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: "安全网:上招放不出→强制平砍" } : { type: "defend", exec: () => Exec.defend(), note: "安全网:上招放不出→防御" };
-            stuckN = 0;
+            if (stuckN >= config.get("STUCK_PAUSE")) {
+              a = { type: "skip", note: `⚠连续${stuckN}次放不出, 疑似网络卡/无响应 → 自动暂停, 检查网络后手动▶恢复` };
+              config.set("enabled", false);
+            } else {
+              const live = S.enemies.filter((e) => e.alive);
+              const t = live.length ? live[stuckN % live.length] : null;
+              a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: `安全网:换目标#${t.eid}(连续${stuckN}次放不出·退避重试)` } : { type: "defend", exec: () => Exec.defend(), note: "安全网:无活怪→防御" };
+            }
           }
           if (a.type === "cannon") {
             cannonCd = config.get("CANNON_CD_TURNS");
@@ -1205,7 +1212,7 @@
               } catch {
               }
             }, delay);
-            busyUntil = Date.now() + delay + 150;
+            busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5e3) : 0);
             actedAt = Date.now();
           }
           lastFp = fp;

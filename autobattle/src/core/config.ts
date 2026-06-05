@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG = {
   scrollFirst: true, // 起手/2墙缺优先卷轴(关=法术逐个补省卷轴)
   delayMin: 160,
   delayMax: 400, // 动作间随机延迟范围(ms)
+  STUCK_PAUSE: 12, // 连续放不出达此次数 → 疑似网络卡/无响应 → 自动暂停告警(退避减速后仍不通才暂停, 防死循环刷屏)
   useWeaken: true,
   useImperil: true, // 红怪减益序列开关
   useChanneling: true, // Channeling 主动利用
