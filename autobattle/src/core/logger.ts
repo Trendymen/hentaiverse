@@ -42,6 +42,14 @@ export const logger = {
   toText(): string {
     return buf.map(fmtLine).join('\n');
   },
+  /** 立即落盘(清防抖 timer): 用于 reload 前(如 continueBattle 下一波会刷新页面)保住缓冲, 防丢最后几条 */
+  flush(): void {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    Store.set(KEY, buf);
+  },
   clear(): void {
     buf = [];
     Store.set(KEY, []);

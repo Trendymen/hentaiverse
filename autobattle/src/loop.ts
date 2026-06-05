@@ -124,6 +124,7 @@ function tick(): void {
           action: actionLabel(a),
           note,
         });
+        if (a.type === 'continue') logger.flush(); // 继续下一波 battle_continue() 会 reload 页面 → 立即落盘, 防这条(及3s防抖内未落盘缓冲)随 reload 丢失
 
         if (a?.exec) {
           const dMin = config.get('delayMin'),

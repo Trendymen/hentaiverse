@@ -392,6 +392,14 @@
     toText() {
       return buf.map(fmtLine).join("\n");
     },
+    /** 立即落盘(清防抖 timer): 用于 reload 前(如 continueBattle 下一波会刷新页面)保住缓冲, 防丢最后几条 */
+    flush() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      Store.set(KEY, buf);
+    },
     clear() {
       buf = [];
       Store.set(KEY, []);
@@ -1183,6 +1191,7 @@
             action: actionLabel(a),
             note
           });
+          if (a.type === "continue") logger.flush();
           if (a == null ? void 0 : a.exec) {
             const dMin = config.get("delayMin"), dMax = config.get("delayMax");
             const delay = dMin + Math.random() * Math.max(1, dMax - dMin);
