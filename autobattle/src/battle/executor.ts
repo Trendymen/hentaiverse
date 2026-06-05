@@ -37,6 +37,16 @@ export const Exec = {
   attack(n: number): boolean {
     const w =
       typeof unsafeWindow !== 'undefined' ? unsafeWindow : (window as unknown as typeof unsafeWindow);
+    if (n === 0) {
+      // 诊断埋点(eid=0 = 10怪满编局第10只怪 mkey_0; HV 原版 getMonsterID=(order+1)%10, order=9→mkey_0 回绕).
+      // commit_target(0) 疑似 falsy 无效(原版从不裸调, 而是点 #mkey DOM 触发完整 hover_target+commit_target).
+      // 仅 dump 铁证, 不改逻辑: 下次10怪局复现时 chrome-devtools 读 console(pattern [HVAB:eid0]) 即可确认 commit_target(0) 是否真打到该怪.
+      const el = document.getElementById('mkey_0');
+      const bw = el?.querySelector<HTMLElement>('.btm4 > .btm5:nth-child(1) img')?.style.width || '?';
+      console.warn(
+        `[HVAB:eid0] attack(0)触发 mkey_0存在=${!!el} commit_target存在=${!!w.battle?.commit_target} 血条w=${bw} onclick=${el?.getAttribute('onclick') || 'null'}`,
+      );
+    }
     if (w.battle?.commit_target) {
       w.battle.commit_target(n);
       return true;

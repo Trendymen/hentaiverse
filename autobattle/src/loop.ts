@@ -118,6 +118,11 @@ function tick(): void {
         const C = config.all();
         const pct = (v: number, m: number) => (m ? Math.min(100, Math.round((v / m) * 100)) : 0);
         let note = a.note || ''; // 优先 brain 的决策原因(目标/连招阶段/攒炮/减压); 没有再补炮诊断
+        // 诊断埋点: 平砍目标命中 mkey_0(10怪满编局第10只怪, eid=0; HV (order+1)%10 回绕). 落盘 battlelog 留明显标记 + 附 onclick(看 commit_target 参数). 仅诊断, 不改决策.
+        if (a.type === 'attack' && a.id === 0) {
+          const oc0 = document.getElementById('mkey_0')?.getAttribute('onclick') || 'null';
+          note = `⚠️mkey_0(第10只·疑似打不动)[oc=${oc0.slice(0, 70)}] ${note}`;
+        }
         if (!note && a.type !== 'cannon' && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
           if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
           else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;

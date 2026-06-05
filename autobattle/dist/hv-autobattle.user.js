@@ -923,9 +923,16 @@
     },
     /** 平砍指定怪: 优先页面 battle.commit_target(unsafeWindow), 退回点 mkey 元素 */
     attack(n) {
-      var _a;
+      var _a, _b, _c;
       const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
-      if ((_a = w.battle) == null ? void 0 : _a.commit_target) {
+      if (n === 0) {
+        const el2 = document.getElementById("mkey_0");
+        const bw = ((_a = el2 == null ? void 0 : el2.querySelector(".btm4 > .btm5:nth-child(1) img")) == null ? void 0 : _a.style.width) || "?";
+        console.warn(
+          `[HVAB:eid0] attack(0)触发 mkey_0存在=${!!el2} commit_target存在=${!!((_b = w.battle) == null ? void 0 : _b.commit_target)} 血条w=${bw} onclick=${(el2 == null ? void 0 : el2.getAttribute("onclick")) || "null"}`
+        );
+      }
+      if ((_c = w.battle) == null ? void 0 : _c.commit_target) {
         w.battle.commit_target(n);
         return true;
       }
@@ -1289,6 +1296,7 @@
     return [S.hp, S.mp, S.sp, S.overcharge, S.alive, foes, buffs, S.channeling ? "ch" : ""].join("|");
   }
   function tick() {
+    var _a;
     const nowIn = inBattle();
     if (nowIn !== lastInBattle) {
       console.log("[hvab-dbg] loop battle:active emit =", nowIn, "(was", lastInBattle, ") t=", Date.now() % 1e5);
@@ -1349,6 +1357,10 @@
           const C = config.all();
           const pct = (v, m) => m ? Math.min(100, Math.round(v / m * 100)) : 0;
           let note = a.note || "";
+          if (a.type === "attack" && a.id === 0) {
+            const oc0 = ((_a = document.getElementById("mkey_0")) == null ? void 0 : _a.getAttribute("onclick")) || "null";
+            note = `⚠️mkey_0(第10只·疑似打不动)[oc=${oc0.slice(0, 70)}] ${note}`;
+          }
           if (!note && a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
             if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
             else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
