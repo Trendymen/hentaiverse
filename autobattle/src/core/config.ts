@@ -39,6 +39,13 @@ export const DEFAULT_CONFIG = {
   useVitalStrike: true, // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
   useShieldBash: true, // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
   useMercifulBlow: false, // 最后的慈悲(残血处决; 待怪 HP% 读法, 默认关)
+  // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
+  useTargetWeight: false, // 总开关(默认关·灰度); 只控制 P16 是否按权重排序. 血条 bug 修复不受此控制
+  baseHpRatio: 1, // 关键可调: >0 低血优先 / <0 高血优先
+  yggdrasilExtraWeight: -1000, // 内置: 世界树 boss 绝对优先
+  unreachableWeight: 1000, // 内置: 死怪垫底
+  // 内置 13 状态权重(reference 1067-1079 实测默认值). statusWeight 是 record, 将来若做面板可调需注意整体覆盖语义
+  statusWeight: { We: 12, Bl: 10, Slo: 15, Si: 10, Sle: 100, Im: -15, PA: -12, BW: -10, Co: -109, Dr: 2, MN: 7, Stun: 290, CM: -20 } as Record<string, number>,
 };
 
 export type Config = typeof DEFAULT_CONFIG;
