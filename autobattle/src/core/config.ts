@@ -17,6 +17,8 @@ export const DEFAULT_CONFIG = {
   PANIC_NORM: 0.25,
   MP_FUSE: 0.3, // ④ MP 熔断阈值
   HP_HEAL: 0.6,
+  STRUGGLE_HP: 0.5, // 放弃攒炮的血线阈值(hp 跌破此比例 = 血线下降, 转单体技减压)
+  STRUGGLE_STREAK: 2, // 连续几次决策跌破 STRUGGLE_HP 才放弃攒炮(去抖, 防单次瞬掉误触发)
   MP_LOW: 0.35,
   SP_LOW: 0.3,
   OC_ON: 0.5, // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)

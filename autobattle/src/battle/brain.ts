@@ -18,6 +18,8 @@ function weightCfg(C: Config): WeightConfig {
 }
 
 export class Brain {
+  private lowHpStreak = 0; // 连续 hp<STRUGGLE_HP 的决策次数(达 STRUGGLE_STREAK 才判血线下降, 防单次瞬掉误触发)
+
   decide(S: BattleState): Action {
     const C = config.all();
     const { hp, mp, sp } = S,
@@ -28,6 +30,9 @@ export class Brain {
       MM = S.maxMp || C.MPMAX,
       SM = S.maxSp || C.SPMAX; // 动态满值(自适应)
     const hasRed = S.enemies.some((e) => e.is_red_boss);
+    // 血线下降去抖: 连续 STRUGGLE_STREAK 次 hp<STRUGGLE_HP 才判撑不住(放弃攒炮), 防单次瞬掉(挨发暴击又被拉回)误触发
+    if (hp < C.STRUGGLE_HP * HM) this.lowHpStreak++;
+    else this.lowHpStreak = 0;
     const danger = Math.max(S.lastDmg, hasRed ? C.BURST_EST * HM : 0.3 * HM); // ②
     const predicted = hp - danger,
       PANIC = (hasRed ? C.PANIC_RED : C.PANIC_NORM) * HM;
@@ -157,7 +162,7 @@ export class Brain {
     //     有红名也攒: 怪多时炮 AOE 清场+削红名最值(red boss 也吃炮伤), 总是先尝试攒炮.
     //     高密度波(monsterTotal≥CANNON_MIN_ENEMIES)即使清到剩 2-3 杂兵也攒: 杂兵平砍清, OC 留给(本/下)波开炮 AOE.
     //   放弃攒炮(血线下降 struggling / 低密度波 / 炮冷却) → 单体技减压: 慈悲处决红名, 要害秒怪降围殴, 盾击晕眩.
-    const struggling = hp < C.HP_HEAL * HM; // 血线下降(掉到健康线下 → 放弃攒炮, 单体技杀怪减压)
+    const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK; // 血线下降去抖: 连续 STRUGGLE_STREAK 次跌破 STRUGGLE_HP(默认 50%×2 次)才放弃攒炮
     const highDensity = S.monsterTotal >= C.CANNON_MIN_ENEMIES; // 高密度波(下波大概率也多 → 值得跨波攒炮)
     const saveOcForCannon =
       C.useCannon && S.cannonExists && !S.cannonOnCd && !struggling && (S.alive >= C.CANNON_MIN_ENEMIES || highDensity);
