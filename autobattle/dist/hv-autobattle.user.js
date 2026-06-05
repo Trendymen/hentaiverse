@@ -7,6 +7,8 @@
 // @match        *://hentaiverse.org/*
 // @match        *://alt.hentaiverse.org/*
 // @match        *://e-hentai.org/*
+// @exclude      *://hentaiverse.org/equip/*
+// @exclude      *://alt.hentaiverse.org/equip/*
 // @connect      hentaiverse.org
 // @connect      e-hentai.org
 // @grant        GM_deleteValue
