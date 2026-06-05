@@ -156,8 +156,8 @@ export class Brain {
     //   炮场景 = 多怪 + 炮在栏 + 不在冷却(该攒炮, OC 留给炮) → 跳过本段.
     //   冷却中(cannonOnCd)反而进本段: 炮放不出, OC 不必留 → 花在盾击/要害/慈悲(用 cannonExists 非 opacity, 炮死锁同源).
     if (!(C.useCannon && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES)) {
-      // 最后的慈悲(100 OC, 残血处决): 怪 HP<25% + 流血(对齐原版 dodying:3811). 处决优先于要害/盾击
-      const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
+      // 最后的慈悲(100 OC, 残血处决): 仅【红名怪/强怪】HP<25% + 流血. 100 OC 昂贵, 杂兵 25% 血平砍即秒不值得 → 留给血厚红怪处决省回合
+      const dying = S.enemies.find((e) => e.alive && e.is_red_boss && e.hpPct < 25 && e.bleeding);
       if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
         return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
       const tgtSp = this.lockTarget(S); // 红怪优先
