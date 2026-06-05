@@ -1,6 +1,6 @@
 // 目标权重(finWeight)纯函数模块. 翻写 dodying countMonsterHP hvAutoAttack.user.js:3357-3379.
 // 零 DOM / 零 config 单例 / 零 Store: 输入即全部依赖, 可独立喂数据验证(控制台 import 直接跑).
-import type { WeightInput, WeightConfig, RankedEnemy } from '../types';
+import type { WeightInput, WeightConfig } from '../types';
 
 /** 单怪 finWeight(可独立验证的最小单元). hpMin = 全体活怪 hpNow 最小值.
  *  权重越小优先级越高: 血越低→w 越小; 负权重状态(陷危/破甲/流血/混乱)→更小→优先打;
@@ -15,7 +15,7 @@ export function computeFinWeight(e: WeightInput, hpMin: number, cfg: WeightConfi
 
 /** 按 finWeight 升序排序(拷贝输入, 不可变, 纯函数). [0] = 最该打的目标.
  *  enabled=false → 直接按 eid 升序返回(总开关关 = 退回现状, 零回归). */
-export function rankTargets(enemies: WeightInput[], cfg: WeightConfig): RankedEnemy[] {
+export function rankTargets<T extends WeightInput>(enemies: T[], cfg: WeightConfig): (T & { finWeight: number })[] {
   if (!cfg.enabled) {
     return [...enemies]
       .map((e) => ({ ...e, finWeight: e.eid }))

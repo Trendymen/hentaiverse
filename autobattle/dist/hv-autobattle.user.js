@@ -933,6 +933,7 @@
     }
     // 连续 hp<STRUGGLE_HP 的决策次数(达 STRUGGLE_STREAK 才判血线下降, 防单次瞬掉误触发)
     decide(S) {
+      var _a;
       const C = config.all();
       const { hp, mp, sp } = S, oc = S.overcharge, ch = S.channeling, b = S.buff;
       const HM = S.maxHp || C.HPMAX, MM = S.maxMp || C.MPMAX, SM = S.maxSp || C.SPMAX;
@@ -957,8 +958,8 @@
       if (S.riddle) {
         const r = this.riddle();
         return r ? { type: "riddle", option: r.option, exec: () => {
-          var _a;
-          return (_a = document.querySelector(r.option)) == null ? void 0 : _a.click();
+          var _a2;
+          return (_a2 = document.querySelector(r.option)) == null ? void 0 : _a2.click();
         } } : { type: "skip", note: "riddle留人工" };
       }
       if (S.canContinue) return { type: "continue", exec: () => Exec.continueBattle() };
@@ -1032,29 +1033,33 @@
         const tgtSp = this.lockTarget(S);
         if (tgtSp) {
           if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
-            return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
+            return { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
           if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-            return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+            return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(已晕→喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
           if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-            return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
+            return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
         }
         if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
           const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
           if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
-            return { type: "spell", id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+            return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${struggling ? "力不从心" : "红名在场"}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
         }
         if (C.useShieldBash && oc >= 25) {
           const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
           if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
-            return { type: "spell", id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+            return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
         }
       }
       const ranked = rankTargets(S.enemies, weightCfg(C));
       const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
-      if (trash.length) return A("attack", trash[0].eid);
+      if (trash.length) {
+        const t = trash[0];
+        const why = saveOcForCannon ? "攒炮中" : C.useTargetWeight ? "finWeight最优" : "最低eid";
+        return { type: "attack", id: t.eid, note: `平砍杂兵#${t.eid}(${why},${t.hpPct}%${((_a = t.status) == null ? void 0 : _a.PA) ? "·破甲" : ""})`, exec: () => Exec.attack(t.eid) };
+      }
       if (tgt) {
         S.lockedRedId = tgt.eid;
-        return A("attack", tgt.eid);
+        return { type: "attack", id: tgt.eid, note: `平砍红名#${tgt.eid}(仅剩红怪,${tgt.hpPct}%)`, exec: () => Exec.attack(tgt.eid) };
       }
       return { type: "defend", exec: Exec.defend };
     }
@@ -1145,8 +1150,8 @@
           });
           const C = config.all();
           const pct = (v, m) => m ? Math.min(100, Math.round(v / m * 100)) : 0;
-          let note = "";
-          if (a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
+          let note = a.note || "";
+          if (!note && a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
             if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
             else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
           }

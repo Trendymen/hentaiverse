@@ -172,24 +172,24 @@ export class Brain {
       if (tgtSp) {
         // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决
         if (C.useMercifulBlow && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
-          return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
+          return { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) };
         // 要害(连招第2步, 50 OC): 红名已晕 → 收割 + 5道流血(喂慈悲)
         if (C.useVitalStrike && tgtSp.stunned && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
+          return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(已晕→喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) };
         // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩(武器自带晕眩时常已晕 → 直接跳要害)
         if (C.useShieldBash && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
-          return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
+          return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) };
       }
       // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
       if (C.useVitalStrike && (hasRed || struggling) && oc >= 50) {
         const stunTrash = S.enemies.find((e) => e.alive && e.stunned && !e.is_red_boss);
         if (stunTrash && Exec.skillReady(SK_SPECIAL.vitalStrike))
-          return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
+          return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${struggling ? '力不从心' : '红名在场'}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
       }
       if (C.useShieldBash && oc >= 25) {
         const toStun = S.enemies.find((e) => e.alive && !e.is_red_boss && !e.stunned);
         if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
-          return { type: 'spell', id: SK_SPECIAL.shieldBash, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
+          return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
       }
     }
     // P16 破甲滚雪球平砍: 杂兵按 finWeight 选最优(血量+13状态+Yggdrasil); 仅剩红怪锁定持续平砍.
@@ -197,10 +197,14 @@ export class Brain {
     //   useTargetWeight=false → rankTargets 退回 eid 升序 = 现状, 零回归.
     const ranked = rankTargets(S.enemies, weightCfg(C));
     const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
-    if (trash.length) return A('attack', trash[0].eid);
+    if (trash.length) {
+      const t = trash[0];
+      const why = saveOcForCannon ? '攒炮中' : C.useTargetWeight ? 'finWeight最优' : '最低eid';
+      return { type: 'attack', id: t.eid, note: `平砍杂兵#${t.eid}(${why},${t.hpPct}%${t.status?.PA ? '·破甲' : ''})`, exec: () => Exec.attack(t.eid) };
+    }
     if (tgt) {
       S.lockedRedId = tgt.eid;
-      return A('attack', tgt.eid);
+      return { type: 'attack', id: tgt.eid, note: `平砍红名#${tgt.eid}(仅剩红怪,${tgt.hpPct}%)`, exec: () => Exec.attack(tgt.eid) };
     }
     return { type: 'defend', exec: Exec.defend };
   }

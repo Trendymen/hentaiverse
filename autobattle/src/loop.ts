@@ -98,8 +98,8 @@ function tick(): void {
         // 战斗日志: 每决策一条(含"为什么没放炮"诊断), 落盘 GM
         const C = config.all();
         const pct = (v: number, m: number) => (m ? Math.min(100, Math.round((v / m) * 100)) : 0);
-        let note = '';
-        if (a.type !== 'cannon' && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
+        let note = a.note || ''; // 优先 brain 的决策原因(目标/连招阶段/攒炮/减压); 没有再补炮诊断
+        if (!note && a.type !== 'cannon' && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
           if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
           else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
         }
