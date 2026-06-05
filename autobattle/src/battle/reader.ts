@@ -6,6 +6,47 @@ import { BUFF_IMG, DEBUFFS, SS_CN, GEM, STATUS_LIB } from './tables';
 import { IT } from './tables';
 import type { BattleState, BuffMap, BuffState, EnemyState } from '../types';
 
+export interface RoundInfo {
+  roundNow: number;
+  roundAll: number;
+}
+
+function asGlobal(re: RegExp): RegExp {
+  const flags = re.flags.includes('g') ? re.flags : `${re.flags}g`;
+  return new RegExp(re.source, flags);
+}
+
+/** textlog DOM 当前 GF 实测为顶新底旧; matchAll 文本序即 newest -> oldest. */
+export function textlogMatchesNewestFirst(text: string, re: RegExp): RegExpMatchArray[] {
+  return [...text.matchAll(asGlobal(re))];
+}
+
+export function latestTextlogMatch(text: string, re: RegExp): RegExpMatchArray | undefined {
+  return textlogMatchesNewestFirst(text, re)[0];
+}
+
+export function parseLatestRound(text: string): RoundInfo | null {
+  let m = latestTextlogMatch(text, /Round\s*(\d+)\s*\/\s*(\d+)/i);
+  if (!m) m = latestTextlogMatch(text, /[(（][^)）]{0,8}?(\d+)\s*\/\s*(\d+)[^)）]{0,8}?[)）]/);
+  return m ? { roundNow: +m[1], roundAll: +m[2] } : null;
+}
+
+export function parseLatestEnemyMagic(text: string): boolean | null {
+  const m = latestTextlogMatch(text, /you for \d+ ([a-zA-Z]+) damage/i);
+  if (!m) return null;
+  const type = m[1].replace(/ing$/i, '').toLowerCase();
+  return !/pierc|crush|slash/.test(type);
+}
+
+export function parseSpawnHp(text: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
+  for (const m of textlogMatchesNewestFirst(text, re)) {
+    if (out[m[1]] === undefined) out[m[1]] = +m[2];
+  }
+  return out;
+}
+
 export class StateReader {
   prev: Partial<BattleState> = {};
   maxHp = 0;
@@ -60,26 +101,20 @@ export class StateReader {
   private _round(): void {
     const tl = document.getElementById('textlog');
     if (!tl) return;
-    const txt = tl.textContent || '';
-    let ms = [...txt.matchAll(/Round\s*(\d+)\s*\/\s*(\d+)/gi)];
-    if (!ms.length) ms = [...txt.matchAll(/[(（][^)）]{0,8}?(\d+)\s*\/\s*(\d+)[^)）]{0,8}?[)）]/g)];
-    const last = ms[ms.length - 1];
-    if (last) {
-      this.roundNow = +last[1];
-      this.roundAll = +last[2];
+    const parsed = parseLatestRound(tl.textContent || '');
+    if (parsed) {
+      this.roundNow = parsed.roundNow;
+      this.roundAll = parsed.roundAll;
     }
   }
 
   /** 从 #textlog 最新一条"敌方对我伤害"判物理/魔法(物理 pierc/crush/slash, 否则魔法).
-   *  翻写自 dodying:4264-4280; 日志最新在末尾(与 _round 一致)故取最后一个匹配; 读不到保留上次缓存. */
+   *  翻写自 dodying:4264-4280; GF 实测 textlog 顶新底旧, 故取第一个匹配; 读不到保留上次缓存. */
   private _enemyMagic(): void {
     const tl = document.getElementById('textlog');
     if (!tl) return;
-    const ms = [...(tl.textContent || '').matchAll(/you for \d+ ([a-zA-Z]+) damage/g)];
-    const last = ms[ms.length - 1];
-    if (!last) return;
-    const type = last[1].replace(/ing$/i, '').toLowerCase();
-    this.takesMagic = !/pierc|crush|slash/.test(type);
+    const takesMagic = parseLatestEnemyMagic(tl.textContent || '');
+    if (takesMagic !== null) this.takesMagic = takesMagic;
   }
 
   /** 从 #textlog 解析 "Spawned Monster X: MID=N (Name) LV=N HP=N" 行 → 缓存每怪初始 HP.
@@ -89,10 +124,7 @@ export class StateReader {
   private _spawnHp(): void {
     const tl = document.getElementById('textlog');
     if (!tl) return;
-    const re = /Spawned Monster ([A-Z]):\s*MID=\d+\s*\([^)]+\)\s*LV=\d+\s*HP=(\d+)/g;
-    // textlog 顶新底旧(本文件 _round/_enemyMagic 注释的"末尾"措辞与此相反, 以 GF 实测 spec§2.4 为准).
-    // reverse: matchAll 按文本序(顶→底=新→旧), 反转后先写旧波、后写新波 → 同字母新波覆盖旧波(防 textlog 万一不清空时用错波次 HP).
-    for (const m of [...(tl.textContent || '').matchAll(re)].reverse()) this.initHp[m[1]] = +m[2];
+    Object.assign(this.initHp, parseSpawnHp(tl.textContent || ''));
   }
 
   read(): BattleState {

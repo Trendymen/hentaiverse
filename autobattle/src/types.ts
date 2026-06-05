@@ -117,7 +117,7 @@ export interface Action {
   id?: number;
   option?: string;
   note?: string;
-  exec?: () => void;
+  exec?: () => boolean | void;
 }
 
 /** 事件总线事件表 */

@@ -4,6 +4,7 @@
 - 性质:审计结论 + 决策记录 + 待办清单(非 bite-sized TDD 计划;部分项阻塞于实测样本,待解阻后再细化为可执行步骤)
 - 关联文档:
   - 设计:`docs/superpowers/specs/2026-06-04-autobattle-ui-rework-design.md`(§5 目录 / §7 四 tab / §8 里程碑 / §9 验收 / §10 开放细节)
+  - C-layered 策略:`docs/superpowers/specs/2026-06-05-autobattle-c-layered-strategy-design.md`
   - M1 计划:`docs/superpowers/plans/2026-06-04-autobattle-m1-foundation.md`
   - 冲突审计:`docs/i18n-scripts-conflict-audit.md`
 
@@ -16,7 +17,7 @@
 | 里程碑 | 状态 | 说明 |
 |---|---|---|
 | M1 地基 | ✅ 完成 | 工程/构建(不压缩)/core/UI 骨架/document-start hook |
-| M2 战斗内 | 🟢 收尾接近完成 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度;**唯一剩:3 个 OC 技 castHostileOn 真机实测(§2.7)** |
+| M2 战斗内 | 🟢 C-layered 前置清理中 | reader/brain/executor/tables + 循环 + HUD + 战斗 tab 面板 + 小马炮 + **目标权重 finWeight(§2.5)** + **OC 近战技连招/跨波攒炮(§2.4/2.6)** + Absorb(§2.1) + UI 滚动/固定高度; castHostileOn / XHR / `_expire` 阻塞已解除, 当前先做 C-layered P0 前置清理(§2.7) |
 | M3 连刷 | 🟠 仅 GF 波次内续战 | `engine/` 未建;遭遇/竞技场/精力/连刷 tab 全缺(见 §3) |
 | M4 保护后勤 | ❌ 未开始 | `engine/{stamina,watchdog,supply,stats}.ts` 全缺(见 §4) |
 | M5 杂项打磨 | ❌ 未开始 | 告警/通知/异世界/小马提醒 + 提醒 tab + UI 精修(见 §5) |
@@ -31,7 +32,7 @@
 | D5 | **OC 读数 bug(炮不放/架式乱抖的总根因)** | ✅ commit `71beb11`:reader 把 OC 从"量条宽 `bar/vcp×250`"(抄旧 B大脑,满 OC 也只算出 ~119 → `oc≥200` 永不成立 → 炮永不放、攒炮永真压架式)改为 **dodying 数点法** `(#vcp>div>div 数 − #vcp>div>div#vcr 数)×25` | dodying `hvAutoAttack.user.js:2666`;实测满 OC: 数点法=250、旧法=119 |
 | D2 | HUD 加"角色等级" | ❌ **不加**,保持现状(HP/MP/SP/OC + 战斗类型/轮数/回合/怪数/动作) | 原版 dodying/B大脑 HUD 均无玩家等级;玩家级战斗页 DOM 读不到(代价高) |
 | D3 | P5 Absorb 法系怪判定 | **战斗日志魔法伤害启发式**(原版无此逻辑,需新写) | 见 §2.1 |
-| D4 | XHR battle 响应解析 | **需一份真实样本**才能定字段结构;授权我在你战斗中读一次 `window.__hvab.getLastBattle()` | 见 §2.2;reference 也只抓不解析 |
+| D4 | XHR battle 响应解析 | ✅ 已抓真实 `/json` 样本并评估关闭:响应是 DOM HTML 源,不作为主数据源;保留 `__hvab.getLastBattle()` 调试入口 | 见 §2.2 |
 | D6 | OC 经济策略(用户定) | 慈悲/要害限红名连招(盾击晕→要害流血→慈悲处决,锁同红怪)+ 盾击对杂兵减伤 + 跨波攒炮(有红名也攒,血线下降才放弃)+ 去抖(连续 2 次 hp<50%)+ 穿心单 boss 也放 + 祝福只增伤(撤 Regen 误跳) | 见 §2.6;武器暂无流血→慈悲依赖要害产流血,晕眩靠盾战反击概率 |
 
 ---
@@ -40,13 +41,8 @@
 
 ### 2.1 P5 Absorb 法系怪判定 —— 战斗日志魔法伤害启发式 ✅ 完成(commit `08433d6`)
 
-- **现状**:`brain.ts` P5 处 `isMagic` 硬编码 `false`,Absorb 永不触发。所有 reference(B大脑/盾脑/decideAction)都**没有**识别"怪是法系攻击者"的代码——这是新写功能,非翻写。
-- **要做**:
-  1. `reader.ts`:解析战斗日志 `#textlog`,提取**最近一回合敌方对我造成的伤害类型**。物理系=pierce/crush/slash;魔法系=fire/cold/wind/elec/holy/dark/soul 等。复用 dodying 伤害类型解析思路(`reference/hvAutoAttack.user.js:4266-4287` 的 `pierc|crush|slash` 物理判定 + 元素词)。
-  2. 在 `BattleState` 加瞬态字段(如 `tookMagicDmg: boolean` 或 `lastEnemyDmgType`)。
-  3. `brain.ts` P5:`isMagic = S.tookMagicDmg`(或近 N 回合内吃过魔法伤害),据此放 Absorb;加 `useAbsorb` 配置开关(默认可关,盾战物防为主)。
-- **依据**:设计 §9 验收"16 级联 + 4 加固";`brain.ts` 现有 TODO 注释。
-- **阻塞**:无(不需碰 HV 页;日志格式可从 reference 伤害解析器推定,上线后 GF 实测微调)。
+- `reader.ts` 已输出 `tookMagicDmg`;`brain.ts` P5 在 `useAbsorb` 开启且最近吃到魔法伤害时补 Absorb。
+- 当前 P0 前置清理会统一 textlog 顶新底旧读取,避免 `_enemyMagic()` 拿旧伤害类型。
 
 ### 2.2 XHR battle 响应解析 —— ❌ 评估后不做(GF 实测样本确认无价值)
 
@@ -63,7 +59,7 @@
 
 ### 2.4 特殊近战技巧纳入决策(盾击 / 要害强击 / 最后的慈悲)✅ 完成(OC 经济策略见 §2.6)
 
-- **现状**:brain 进攻只有平砍 + 小马炮,**不用**这三个吃 OC 的特殊近战技巧(实测 `pane_skill`/`pane_quickbar` 已解锁):
+- 三个吃 OC 的特殊近战技巧已接入:
 
   | 技巧 | DBID | OC 消耗 | 冷却 | 效果 |
   |---|---|---|---|---|
@@ -73,9 +69,7 @@
   | (小马炮 OFC) | 1111 | 200(8点) | 50 | 已接入 P11.5 |
 
   实测 `onmouseover` 参数格式 = `[MP, OC点数, 冷却回合]`,每点 OC = 25。
-- **要做**(待用户定规则后):tables 加 `SK_SPECIAL`(2201/2202/2203);brain 在合适优先级插入(如残血红怪→慈悲、单体高价值→要害);各自加开关。
-- **核心设计张力**:它们都吃 OC,**会和攒小马炮抢 OC**。需先决定"攒炮模式下这些要不要也让路,还是允许用便宜的(盾击25/要害50)穿插"。**待用户定规则**(`AskUserQuestion` 已问,用户选"先标待完成")。
-- **✅ 完成**:三技已接入决策 + OC 预算规则已定(见 §2.6);三技默认关,**待 castHostileOn 真机实测**释放机制后开启(§2.7)。
+- **✅ 完成**:tables 已加 `SK_SPECIAL`;brain 已接入红名连招/杂兵减压/攒炮让路;castHostileOn 释放机制已 GF 实测确认(§2.7)。
 
 ### 2.5 目标权重系统(finWeight)✅ 完成
 
@@ -100,11 +94,15 @@
 
 **UI 完善**(commits `23ebccd` 滚动 / `66bfc3c` 滚动条 / `7700bb6` 固定高度+tabs sticky):选项面板加滚动(固定高度 558px 防切 tab 跳变)+ tabs sticky 固定顶部 + 精致滚动条;面板标签 觅心→穿心。
 
-### 2.7 待真机实测(M2 唯一剩余阻塞)
+### 2.7 C-layered P0 前置清理 / 观察项
+
+- **P0 当前优先**:
+  1. `loop.ts` 小马炮冷却落点:只在 `Exec.cannon()` 实际返回 `true` 后写 `cannonCd=50`,避免决策为 cannon 但执行失败时误盖冷却。
+  2. `reader.ts` 统一 textlog 最新行读取:GF 实测 DOM textlog 顶新底旧, `_round()` / `_enemyMagic()` / `_spawnHp()` 共用同一 helper。
+  3. `scripts/drive-brain.mts` 更新慈悲样本:非红残血+流血不触发慈悲,红名残血+流血才触发慈悲。
 
 - **三个 OC 近战技 `castHostileOn` 释放机制 ✅ 已验证**(commit `8df9804`):GF 实测点 `2201`+`commit_target` 真放出盾击(crit 102413,`Cut Down has been defeated`,OC 138→100 真消耗)。技能元素 `id=DBID`、`onclick=lock_action+set_hostile_skill`(无 touch_and_go,靠 commit_target 释放),与红怪减益同机制;castHostileOn 已加 opacity 守卫。**释放机制确认可用**;剩"实战观察决策优先级/攒炮节奏是否如预期"(装最新 build 开三开关跑一轮)。
 - **目标权重真机核对**:开 `useTargetWeight` 看 P16 选目标;死怪 `nbardead` / 红怪 Yggdrasil 名 / 长回合 Spawned 缓存沿用 / 连刷换波 initHp 覆盖 / hpNow 数值核对(spec §10)。
-- **textlog 顺序遗留**:`_round`/`_enemyMagic` 注释"末尾"vs 实测"顶新底旧",靠每轮清空侥幸正确,待核统一(`_spawnHp` 已 reverse 防御)。
 
 ---
 
@@ -165,7 +163,7 @@
 ## 8. 建议实施顺序
 
 1. ~~§2.1 Absorb 启发式~~ ✅ / ~~§2.4 OC 近战技~~ ✅ / ~~§2.5 目标权重~~ ✅ / ~~§2.6 OC 经济+UI~~ ✅
-2. **§2.7 三个 OC 技 castHostileOn 真机实测**(最高优先,解阻后即可开启三技 + useTargetWeight)
-3. **§2.2 XHR 解析**(等用户进战斗,读一次样本后做;顺带解决 §2.3 buff 回合读法)
+2. **§2.7 C-layered P0 前置清理**:cannon 冷却落点 / textlog 最新行 / drive-brain 样本 / 本文件同步
+3. **C-layered 主体**:Mystic split → Shadow Veil → Silence/压力层 → OC/红怪目标预算
 4. **§3 M3 连刷**(先 reference 翻写研究落实开战 API,再分 starter / stamina / 连刷 tab 三批)
 5. M4 → M5

@@ -67,8 +67,9 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true })]; run('⑦红怪+未减益+MP够', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, stunned: true, debuff: { weaken: true, imperil: true } })]; s.overcharge = 50; run('⑧晕眩红怪+OC50[要害]', { state: s }); }
 { const s = base(); s.enemies = many(2); s.alive = 2; s.monsterTotal = 2; s.overcharge = 25; run('⑨未晕眩2怪+OC25[盾击]', { state: s }); }
-{ const s = base(); s.enemies = [enemy(1, { hpPct: 20, bleeding: true })]; s.overcharge = 100; run('⑩残血20%+流血+OC100[慈悲开]', { cfg: { useMercifulBlow: true }, state: s }); }
+{ const s = base(); s.enemies = [enemy(1, { hpPct: 20, bleeding: true })]; s.overcharge = 100; run('⑩非红残血+流血[不慈悲]', { cfg: { useMercifulBlow: true }, state: s }); }
 { const s = base(); s.tookMagicDmg = true; run('⑪法系伤害+Absorb开', { cfg: { useAbsorb: true }, state: s }); }
 { const s = base(); s.channeling = true; s.enemies = [enemy(1, { is_red_boss: true, debuff: { weaken: true } })]; run('⑫Channeling+红怪缺陷危', { state: s }); }
 { const s = base(); s.enemies = many(4); s.alive = 4; s.monsterTotal = 4; s.overcharge = 200; s.cannonOnCd = true; s.stanceOn = true; (s.enemies as Record<string, unknown>[])[0].stunned = true; run('⑬4怪+OC200+炮冷却中(架开)', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, debuff: { weaken: true, imperil: true } })]; s.overcharge = 50; run('⑭已减益未晕眩红怪+OC50[应盾击]', { state: s }); }
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 20, bleeding: true, debuff: { weaken: true, imperil: true } })]; s.overcharge = 100; run('⑯红名残血+流血+OC100[慈悲]', { cfg: { useMercifulBlow: true }, state: s }); }
