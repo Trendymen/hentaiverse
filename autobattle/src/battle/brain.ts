@@ -161,8 +161,8 @@ export class Brain {
       if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
         return { type: 'spell', id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
       const tgtSp = this.lockTarget(S); // 红怪优先
-      // 要害强击(50 OC): 对【已晕眩】目标 → 大伤害 + 5道流血(连招第2步; 流血喂慈悲). 优先红怪, 否则任意晕眩怪
-      const stunnedTgt = tgtSp && tgtSp.stunned ? tgtSp : S.enemies.find((e) => e.alive && e.stunned);
+      // 要害强击(50 OC): 仅打【已晕眩的红名怪】(与慈悲一致, 50 OC 别浪费在平砍即秒的杂兵上). 红怪晕眩由盾击上 → 收割+5道流血喂慈悲
+      const stunnedTgt = tgtSp?.stunned ? tgtSp : null;
       if (C.useVitalStrike && stunnedTgt && oc >= 50 && Exec.skillReady(SK_SPECIAL.vitalStrike))
         return { type: 'spell', id: SK_SPECIAL.vitalStrike, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunnedTgt.eid) };
       // 盾击(25 OC): 给【未晕眩】目标上晕眩(连招第1步, 为要害铺垫; 已晕眩不重复). 优先红怪, 否则杂兵
