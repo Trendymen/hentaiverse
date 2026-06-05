@@ -1010,7 +1010,7 @@
     const heavy = S.lastDmg > 0.3 * HM;
     const lowHp = memory.lowHpStreak >= C.STRUGGLE_STREAK;
     const high = spCritical || heavy || lowHp || tower && (manyEnemies || spReserveLow || hasRed);
-    const medium = high || tower || hasRed || manyEnemies || spReserveLow;
+    const medium = high || tower || hasRed || spReserveLow;
     return {
       level: high ? "high" : medium ? "medium" : "low",
       spReserveLow,
@@ -1485,8 +1485,9 @@
     root.appendChild(hud);
     root.appendChild(panel);
     root.appendChild(logView);
-    document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
+    if (config.get("logOpen") && document.getElementById("pane_vitals")) toggleLog(logView, true);
+    document.body.appendChild(root);
     bus.on("battle:active", (active) => {
       if (active) {
         if (config.get("logOpen")) toggleLog(logView, true);

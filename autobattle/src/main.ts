@@ -75,12 +75,13 @@ function mountUI(): void {
   root.appendChild(hud);
   root.appendChild(panel);
   root.appendChild(logView);
+  // 入 body 前就定好 panel/log 初始显示态 → 随 root 首帧一次性渲染, 不经历 display:none→flex 二次切换.
+  //   (那才是日志窗口闪的真因: HUD 创建即显示故不闪; 日志窗口 CSS 默认 none, 若入 DOM 后才 toggle flex → 浏览器先画 none 再画 flex 的二次绘制突现 = 闪.)
+  if (config.get('panelOpen')) togglePanel(panel, true);
+  if (config.get('logOpen') && document.getElementById('pane_vitals')) toggleLog(logView, true);
   document.body.appendChild(root);
 
-  if (config.get('panelOpen')) togglePanel(panel, true);
-
-  // 日志窗口随战斗开关(loop emit battle:active, 退出已去抖): 进战斗+记忆打开→自动开(靠首次 tick, 不挂载主动开 —
-  //   挂载立即开会跟整页 reload 重建同帧→闪, 见 57f0504 无闪对比); 真退出战斗→关窗口+清记忆(用户选定)
+  // 日志窗口随战斗开关(loop emit battle:active, 退出已去抖): 战斗中进/退驱动开关; 真退出战斗→关窗口+清记忆(用户选定)
   bus.on('battle:active', (active) => {
     if (active) {
       if (config.get('logOpen')) toggleLog(logView, true);
