@@ -24,6 +24,7 @@ export const DEFAULT_CONFIG = {
   HS_MIN_ENEMIES: 2,
   CANNON_MIN_ENEMIES: 4,
   CANNON_MIN_OC: 200, // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
+  CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认). loop 按回合追踪, 弃用 opacity 判冷却(OC<200 与冷却同为 opacity:0.5 无法区分)
   // ── M2 开关/节奏 ──
   useCannon: true,
   cannonYieldStance: true, // 攒炮时架式让路: 架式每回合烧 10%OC, 一开就永远攒不到 200; 关掉它让 OC 爬满放炮

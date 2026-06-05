@@ -136,12 +136,11 @@ export class StateReader {
     const lastDmg =
       typeof this.prev.hp === 'number' && this.prev.hp > hp ? this.prev.hp - hp : 0;
 
-    // 小马炮按钮置灰(opacity:0.5 + onclick=null)= 在 50 回合冷却中. 实测 OC=119<200 仍未置灰 → 置灰只代表冷却, 不代表 OC.
-    // 故 cannonReady = 未置灰(冷却好); 能否真放再由 brain 叠加 OC≥200 判. 可用态 DOM: 无 opacity、有 onclick.
+    // 小马炮: 只判"在不在技能栏"(cannonExists). OC 够不够看数值(overcharge≥200), 50 回合冷却由 loop 按回合追踪(cannonOnCd).
+    // 弃用 opacity 判冷却: 实测 OC<200 与 50 回合冷却都是 opacity:0.5+onclick=null, 视觉无法区分(这是炮死锁根因).
     const cannonEl = $$<HTMLElement>('#pane_skill [onmouseover]').find((e) =>
       /Friendship|Cannon/i.test(e.getAttribute('onmouseover') || ''),
     );
-    const cannonDimmed = /opacity\s*:\s*0?\.\d/.test(cannonEl?.getAttribute('style') || '');
 
     const buff: BuffMap = {
       spark: B.spark,
@@ -182,8 +181,8 @@ export class StateReader {
       monsterTotal: allMkey.length,
       battleType: SS_CN[new URLSearchParams(location.search).get('ss') || ''] || '战斗',
       gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
-      cannonReady: !!cannonEl && !cannonDimmed, // 未置灰 = OC≥200 且不冷却(实测: OC<200 也 opacity0.5+onclick=null, 与冷却无法区分) → 仅用于 OC≥200 时放炮判定
-      cannonExists: !!cannonEl, // 炮在技能栏(不管置灰): 攒炮判定用此(OC<200 必置灰, 用 cannonReady 会攒炮死锁)
+      cannonExists: !!cannonEl, // 炮在技能栏(攒炮/放炮/OC技能让路共用)
+      cannonOnCd: false, // 50 回合冷却由 loop 按回合追踪注入(reader 读不到冷却)
       scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
       firstRound: this.prev._started !== true,
       lockedRedId: this.prev.lockedRedId,

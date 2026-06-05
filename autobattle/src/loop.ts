@@ -18,6 +18,8 @@ let lastRound = -1;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let lastSig = ''; // 上一次决策动作签名(死循环安全网用)
 let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
+let cannonCdLeft = 0; // 小马炮剩余冷却回合(放炮置满 CANNON_CD_TURNS, 每新回合 -1, 0=冷却好)
+let inBattlePrev = false; // 上 tick 是否在战斗: 检测新战斗 → 炮冷却清零(没放过=不冷却)
 
 function inBattle(): boolean {
   // 用战斗 vital 容器判定(#pane_vitals 的 id 不随状态变, 最稳); 兜底任何 HP 数值变体(vrhd/vrhb/宽屏 dvrh*).
@@ -39,12 +41,17 @@ function fingerprint(S: BattleState): string {
 
 function tick(): void {
   try {
-    if (config.get('enabled') && inBattle() && Date.now() >= busyUntil) {
+    const nowIn = inBattle();
+    if (!nowIn) inBattlePrev = false; // 离开战斗 → 下场战斗冷却清零
+    if (config.get('enabled') && nowIn && Date.now() >= busyUntil) {
+      if (!inBattlePrev) { cannonCdLeft = 0; inBattlePrev = true; } // 新战斗: 炮冷却清零(没放过=不冷却, 不再"一上来以为冷却")
       const S = reader.read();
       const fp = fingerprint(S);
       const changed = fp !== lastFp;
       const stalled = Date.now() - actedAt > 2500; // 2.5s 状态没推进 → 上一招可能无效, 强制重新决策换招(防自锁死)
       if (changed || stalled) {
+        if (changed && cannonCdLeft > 0) cannonCdLeft--; // 真新回合(状态推进)才扣炮冷却
+        S.cannonOnCd = cannonCdLeft > 0; // 注入冷却态给 brain(reader 读不到冷却)
         let a = brain.decide(S);
         // 死循环安全网: stalled(fp 没变=上招没推进)又决策同一招 → 判定该招放不出(法术冷却/物品没货/按钮缺), 连续 2 次强制平砍脱困
         const sig = `${a.type}:${a.id ?? ''}`;
@@ -58,6 +65,7 @@ function tick(): void {
             : { type: 'defend', exec: () => Exec.defend(), note: '安全网:上招放不出→防御' };
           stuckN = 0;
         }
+        if (a.type === 'cannon') cannonCdLeft = config.get('CANNON_CD_TURNS'); // 放炮 → 进 50 回合冷却
         // 轮数变 → 回合计数归零(新一波从 T1 起)
         if (S.roundNow !== lastRound) {
           turn = 0;
@@ -86,8 +94,8 @@ function tick(): void {
         const pct = (v: number, m: number) => (m ? Math.min(100, Math.round((v / m) * 100)) : 0);
         let note = '';
         if (a.type !== 'cannon' && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
-          if (!S.cannonReady) note = '炮:冷却';
-          else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
+          if (S.cannonOnCd) note = `炮:冷却剩${cannonCdLeft}回合`;
+          else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
         }
         logger.push({
           round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
@@ -98,7 +106,7 @@ function tick(): void {
           sp: pct(S.sp, S.maxSp || C.SPMAX),
           alive: S.alive,
           total: S.monsterTotal,
-          cannon: S.cannonReady ? '可用' : '冷却',
+          cannon: S.cannonOnCd ? `冷却${cannonCdLeft}` : S.overcharge >= C.CANNON_MIN_OC ? '可放' : '攒OC',
           stance: S.stanceOn,
           action: actionLabel(a),
           note,

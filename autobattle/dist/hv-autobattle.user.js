@@ -147,6 +147,8 @@
     CANNON_MIN_ENEMIES: 4,
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
+    CANNON_CD_TURNS: 50,
+    // 小马炮放完后 50 回合冷却(实测确认). loop 按回合追踪, 弃用 opacity 判冷却(OC<200 与冷却同为 opacity:0.5 无法区分)
     // ── M2 开关/节奏 ──
     useCannon: true,
     cannonYieldStance: true,
@@ -712,7 +714,6 @@
       const cannonEl = $$("#pane_skill [onmouseover]").find(
         (e) => /Friendship|Cannon/i.test(e.getAttribute("onmouseover") || "")
       );
-      const cannonDimmed = /opacity\s*:\s*0?\.\d/.test((cannonEl == null ? void 0 : cannonEl.getAttribute("style")) || "");
       const buff = {
         spark: B.spark,
         spiritShield: B.spiritShield,
@@ -750,10 +751,10 @@
         monsterTotal: allMkey.length,
         battleType: SS_CN[new URLSearchParams(location.search).get("ss") || ""] || "战斗",
         gems: { hp: pickGem(GEM.health), mp: pickGem(GEM.mana), sp: pickGem(GEM.spirit) },
-        cannonReady: !!cannonEl && !cannonDimmed,
-        // 未置灰 = OC≥200 且不冷却(实测: OC<200 也 opacity0.5+onclick=null, 与冷却无法区分) → 仅用于 OC≥200 时放炮判定
         cannonExists: !!cannonEl,
-        // 炮在技能栏(不管置灰): 攒炮判定用此(OC<200 必置灰, 用 cannonReady 会攒炮死锁)
+        // 炮在技能栏(攒炮/放炮/OC技能让路共用)
+        cannonOnCd: false,
+        // 50 回合冷却由 loop 按回合追踪注入(reader 读不到冷却)
         scrollReady: !!$(`.bti3>div[onmouseover*="set_infopane_item(${IT.scrollProt})"]`),
         firstRound: this.prev._started !== true,
         lockedRedId: this.prev.lockedRedId,
@@ -762,8 +763,6 @@
     }
   }
   const reader = new StateReader();
-  let _lastCannon = 0;
-  const lastCannon = () => _lastCannon;
   const Exec = {
     /** 通用法术: 读 onclick 自动区分 friendly(touch_and_go 自动)/hostile(选中后对第一个活怪 commit) */
     skill(id) {
@@ -820,7 +819,6 @@
       if (/opacity\s*:\s*0?\.\d/.test(c.getAttribute("style") || "")) return false;
       const id = parseInt(c.id);
       const r = Number.isNaN(id) ? (c.click(), true) : Exec.skill(id);
-      if (r) _lastCannon = Date.now();
       return r;
     },
     /** hostile 定向: 选中技能后 commit 指定红怪 eid(修"打第一个怪"); 找不到 eid 退回通用 skill */
@@ -915,9 +913,9 @@
       }
       if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A("item", S.gems.hp) : A("item", IT.hDraught);
       if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
-      if (C.useCannon && S.cannonReady && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC && Date.now() - lastCannon() > C.cannonCdMs)
+      if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
-      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      const chargingCannon = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
       if (chargingCannon) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
@@ -935,7 +933,7 @@
       }
       if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
         return A("spell", SK.Heartseeker);
-      if (!(C.useCannon && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES)) {
+      if (!(C.useCannon && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES)) {
         const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
         if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
           return { type: "spell", id: SK_SPECIAL.mercifulBlow, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, dying.eid) };
@@ -979,6 +977,8 @@
   let timer = null;
   let lastSig = "";
   let stuckN = 0;
+  let cannonCdLeft = 0;
+  let inBattlePrev = false;
   function inBattle() {
     return !!document.getElementById("pane_vitals") || !!document.querySelector('[id^="vrh"],[id^="dvrh"]');
   }
@@ -989,12 +989,20 @@
   }
   function tick() {
     try {
-      if (config.get("enabled") && inBattle() && Date.now() >= busyUntil) {
+      const nowIn = inBattle();
+      if (!nowIn) inBattlePrev = false;
+      if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
+        if (!inBattlePrev) {
+          cannonCdLeft = 0;
+          inBattlePrev = true;
+        }
         const S = reader.read();
         const fp = fingerprint(S);
         const changed = fp !== lastFp;
         const stalled = Date.now() - actedAt > 2500;
         if (changed || stalled) {
+          if (changed && cannonCdLeft > 0) cannonCdLeft--;
+          S.cannonOnCd = cannonCdLeft > 0;
           let a = brain.decide(S);
           const sig = `${a.type}:${a.id ?? ""}`;
           if (!changed && sig === lastSig) stuckN++;
@@ -1005,6 +1013,7 @@
             a = t ? { type: "attack", id: t.eid, exec: () => Exec.attack(t.eid), note: "安全网:上招放不出→强制平砍" } : { type: "defend", exec: () => Exec.defend(), note: "安全网:上招放不出→防御" };
             stuckN = 0;
           }
+          if (a.type === "cannon") cannonCdLeft = config.get("CANNON_CD_TURNS");
           if (S.roundNow !== lastRound) {
             turn = 0;
             lastRound = S.roundNow;
@@ -1030,8 +1039,8 @@
           const pct = (v, m) => m ? Math.min(100, Math.round(v / m * 100)) : 0;
           let note = "";
           if (a.type !== "cannon" && C.useCannon && S.alive >= C.CANNON_MIN_ENEMIES) {
-            if (!S.cannonReady) note = "炮:冷却";
-            else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
+            if (S.cannonOnCd) note = `炮:冷却剩${cannonCdLeft}回合`;
+            else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
           }
           logger.push({
             round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
@@ -1042,7 +1051,7 @@
             sp: pct(S.sp, S.maxSp || C.SPMAX),
             alive: S.alive,
             total: S.monsterTotal,
-            cannon: S.cannonReady ? "可用" : "冷却",
+            cannon: S.cannonOnCd ? `冷却${cannonCdLeft}` : S.overcharge >= C.CANNON_MIN_OC ? "可放" : "攒OC",
             stance: S.stanceOn,
             action: actionLabel(a),
             note

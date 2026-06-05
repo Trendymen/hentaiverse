@@ -98,8 +98,8 @@ export interface BattleState {
   monsterTotal: number;
   battleType: string;
   gems: { hp: number; mp: number; sp: number }; // 按需对口可用宝石 id(专用优先, 神秘兜底; 0=无)
-  cannonReady: boolean;
-  cannonExists: boolean; // 小马炮按钮未置灰 = 不在 50 回合冷却(实测: 置灰=冷却中, 与 OC 无关; 能否真放还需 OC≥200, 由 brain 判)
+  cannonExists: boolean; // 小马炮在技能栏(攒炮/放炮/OC技能让路共用; OC够看 overcharge≥200, 冷却看 cannonOnCd)
+  cannonOnCd: boolean; // 在 50 回合冷却中(loop 按回合追踪注入; reader 读不到冷却, 默认 false)
   scrollReady: boolean;
   firstRound: boolean;
   lockedRedId: number | undefined;

@@ -1,7 +1,7 @@
 // 决策大脑: 16 级联 + 4 致命加固. 翻写自 reference/hv_brain_modern.user.js:128-187
 import { config } from '../core/config';
 import { SK, SK_SPECIAL, IT, DEBUFFS, CHANNEL_Q } from './tables';
-import { Exec, lastCannon } from './executor';
+import { Exec } from './executor';
 import type { Action, ActionType, BattleState, EnemyState } from '../types';
 
 export class Brain {
@@ -109,22 +109,16 @@ export class Brain {
     if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A('item', S.gems.hp) : A('item', IT.hDraught);
     // P11 回 SP 喂斗气(节流)
     if (sp < C.SP_LOW * SM && S.stanceOn && !b.spot.active) return S.gems.sp ? A('item', S.gems.sp) : A('item', IT.sDraught);
-    // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): cannonReady=按钮未置灰=不在50回合冷却(实测置灰只代表冷却);
-    //   再叠加 OC≥200(炮耗8点斗气=200). 若排在 P12 之后, OC 攒到 200 那刻会被 P12"开架式"抢走, 架式又把 OC 烧回<200,
-    //   结果炮放不出、架式来回开关(=你看到的现象). 放到架式之前根治; survival(P1-P11)仍在其上, 不抢救命.
-    if (
-      C.useCannon &&
-      S.cannonReady &&
-      S.alive >= C.CANNON_MIN_ENEMIES &&
-      oc >= C.CANNON_MIN_OC &&
-      Date.now() - lastCannon() > C.cannonCdMs
-    )
+    // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): 不在 50 回合冷却(loop 按回合追踪 cannonOnCd) + OC≥200(炮耗8点斗气).
+    //   弃用 opacity 判: OC<200 与冷却同为 opacity:0.5 无法区分(炮死锁根因), 改用回合冷却 + OC 数值.
+    //   排在架式之上: 否则 OC 攒到 200 那刻被 P12"开架式"抢走 → 架式烧回<200 → 炮放不出+架式来回开关.
+    if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
       return { type: 'cannon', exec: Exec.cannon };
     // P12 灵动架式开关(滞回) + 攒炮让路
-    //   攒炮模式: 炮已冷却好(cannonReady)+ 够怪 + OC 没攒够 → 架式让路(开着就关止血/关着别开), 让 OC 爬到 200.
-    //   ⚠用 cannonReady(冷却好)而非"在技能栏": 炮在50回合冷却中就不攒、架式照常用, 否则冷却期也压着架式空等→来回开关.
+    //   攒炮模式: 炮在栏 + 不在冷却 + 够怪 + OC 没攒够 → 架式让路(开着就关止血/关着别开), 让 OC 爬到 200.
+    //   冷却中(cannonOnCd)不攒: 攒满也放不出 → 架式照常用; 这才是回合冷却追踪的价值(opacity 分不清冷却/OC不足).
     const chargingCannon =
-      C.useCannon && C.cannonYieldStance && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
+      C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc < C.CANNON_MIN_OC;
     if (chargingCannon) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式, 停止 OC 流失
     } else {
@@ -145,9 +139,9 @@ export class Brain {
     if ((!b.heartseeker.active || b.heartseeker.turns <= 1) && S.alive >= C.HS_MIN_ENEMIES && (ch || mpFree >= 0.4 * MM))
       return A('spell', SK.Heartseeker);
     // P15 OC 特殊近战技(非炮场景才用 — 多怪攒炮时让路, 按用户定的 OC 预算规则).
-    //   非炮场景 = 非"多怪+有炮(该攒炮)"局面. ⚠必须用 cannonExists 而非 cannonReady(与炮死锁同源):
-    //   攒炮时 OC<200 炮置灰 → cannonReady=false, 用它会误判"非炮场景"→ 要害偷 50 OC → 永远攒不到 200.
-    if (!(C.useCannon && S.cannonExists && S.alive >= C.CANNON_MIN_ENEMIES)) {
+    //   炮场景 = 多怪 + 炮在栏 + 不在冷却(该攒炮, OC 留给炮) → 跳过本段.
+    //   冷却中(cannonOnCd)反而进本段: 炮放不出, OC 不必留 → 花在盾击/要害/慈悲(用 cannonExists 非 opacity, 炮死锁同源).
+    if (!(C.useCannon && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES)) {
       // 最后的慈悲(100 OC, 残血处决): 怪 HP<25% + 流血(对齐原版 dodying:3811). 处决优先于要害/盾击
       const dying = S.enemies.find((e) => e.alive && e.hpPct < 25 && e.bleeding);
       if (C.useMercifulBlow && dying && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow))
