@@ -572,12 +572,15 @@
       this.roundNow = 0;
       this.roundAll = 0;
     }
-    /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等. 传多个 id = 依次兜底(HV 两套战斗布局: 标准 vrhd / 宽屏 dvrhd) */
-    _num(...ids) {
-      for (const id of ids) {
-        const e = document.getElementById(id);
-        const m = e && (e.textContent || "").match(/\d+/);
-        if (m) return parseInt(m[0]);
+    /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
+     *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
+    _vital(...prefixes) {
+      const scope = document.getElementById("pane_vitals") ?? document.body;
+      for (const p of prefixes) {
+        for (const e of Array.from(scope.querySelectorAll(`[id^="${p}"]`))) {
+          const m = (e.textContent || "").match(/\d+/);
+          if (m) return parseInt(m[0]);
+        }
       }
       return NaN;
     }
@@ -622,7 +625,7 @@
       var _a;
       const C = config.all();
       this._round();
-      const hp = this._num("vrhd", "dvrhd"), mp = this._num("vrm", "dvrm"), sp = this._num("vrs", "dvrs");
+      const hp = this._vital("vrh", "dvrh"), mp = this._vital("vrm", "dvrm"), sp = this._vital("vrs", "dvrs");
       if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp);
       if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
       if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
@@ -905,7 +908,7 @@
   let lastSig = "";
   let stuckN = 0;
   function inBattle() {
-    return !!(document.getElementById("vrhd") || document.getElementById("dvrhd"));
+    return !!document.getElementById("pane_vitals") || !!document.querySelector('[id^="vrh"],[id^="dvrh"]');
   }
   function fingerprint(S) {
     const buffs = Object.entries(S.buff).filter(([, v]) => v.active).map(([k]) => k).join(",");

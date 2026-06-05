@@ -14,12 +14,15 @@ export class StateReader {
   roundNow = 0;
   roundAll = 0;
 
-  /** 取元素第一个数字组, 无视百分比插件注入的 [88%] 等. 传多个 id = 依次兜底(HV 两套战斗布局: 标准 vrhd / 宽屏 dvrhd) */
-  private _num(...ids: string[]): number {
-    for (const id of ids) {
-      const e = document.getElementById(id);
-      const m = e && (e.textContent || '').match(/\d+/);
-      if (m) return parseInt(m[0]);
+  /** 读 vital 数值(HP/MP/SP): HV 会按状态换数值元素 id 后缀(实测 HP 在 vrhd↔vrhb 间切)+ 宽屏版加前缀 dvr*.
+   *  故在 #pane_vitals 内按 id 前缀匹配, 不写死全名 —— 一次覆盖所有后缀/前缀变体(连原版都只认 vrhd、漏了 vrhb). */
+  private _vital(...prefixes: string[]): number {
+    const scope = document.getElementById('pane_vitals') ?? document.body;
+    for (const p of prefixes) {
+      for (const e of Array.from(scope.querySelectorAll(`[id^="${p}"]`))) {
+        const m = (e.textContent || '').match(/\d+/);
+        if (m) return parseInt(m[0]);
+      }
     }
     return NaN;
   }
@@ -67,10 +70,10 @@ export class StateReader {
   read(): BattleState {
     const C = config.all();
     this._round(); // 更新轮数缓存
-    // HV 两套战斗布局: 标准版 vrhd/vrm/vrs, 宽屏(d)版 dvrhd/dvrm/dvrs. 只认一套会在切布局时读不到 → HUD 全 - / inBattle 误判停摆(对齐原版 hvAutoAttack:4114-4116 的 ?? 兜底)
-    const hp = this._num('vrhd', 'dvrhd'),
-      mp = this._num('vrm', 'dvrm'),
-      sp = this._num('vrs', 'dvrs');
+    // HV 按状态/布局换 vital 数值 id: HP 实测 vrhd↔vrhb(截图证), 宽屏版加前缀 dvr*. 用前缀匹配兜住所有变体(修"切到 vrhb 态 HUD 全空+脚本停摆")
+    const hp = this._vital('vrh', 'dvrh'),
+      mp = this._vital('vrm', 'dvrm'),
+      sp = this._vital('vrs', 'dvrs');
     if (hp) this.maxHp = Math.max(this.maxHp || C.HPMAX, hp); // 动态识别满值(自适应成长/插件), 解决 >100%
     if (mp) this.maxMp = Math.max(this.maxMp || C.MPMAX, mp);
     if (sp) this.maxSp = Math.max(this.maxSp || C.SPMAX, sp);
