@@ -22,12 +22,23 @@ function battlePane(): HTMLElement {
   return p;
 }
 
+/** 连刷 tab: M3 接入 */
+function farmPane(): HTMLElement {
+  const p = el('div');
+  p.appendChild(group('连刷总控', swRow('farmEnabled', '启用连刷(需同时开战斗🧠)')));
+  p.appendChild(group('竞技场/GF', numRow('grPerDay', 'GF每日场数')));
+  p.appendChild(group('精力(战前门)', swRow('restoreStamina', '不足喝药恢复'), numRow('staminaLow', '开战精力下限'), numRow('staminaEncounter', '遭遇精力下限'), numRow('staminaLowWithNat', '含自然恢复下限')));
+  p.appendChild(group('遭遇战', swRow('autoEncounter', '自动接受遭遇'), numRow('encounterCdMin', '遭遇冷却', '分')));
+  p.appendChild(group('节奏', numRow('farmTickMs', '连刷tick', 'ms')));
+  return p;
+}
+
 function paneFor(key: string): HTMLElement {
   switch (key) {
     case 'battle':
       return battlePane();
     case 'farm':
-      return section('连刷(遭遇 / 竞技场 / GF) · 待 M3 接入');
+      return farmPane();
     case 'guard':
       return section('保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入');
     default:

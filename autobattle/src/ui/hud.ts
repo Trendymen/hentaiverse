@@ -54,5 +54,13 @@ export function createHud(onToggle: () => void, onGear: () => void, onLog: () =>
     if (m1) m1.textContent = `${d.battleType}${round} · T${d.turn}`;
     if (m2) m2.textContent = `怪 ${d.alive}/${d.monsterTotal} · ▶ ${d.action}`;
   });
+
+  // M3 连刷: 战斗外展示当前 FSM 状态(战斗内由 hud:update 写 meta1, 二者互斥不冲突)
+  bus.on('farm:state', (f) => {
+    const m1 = document.getElementById('hvab-meta1');
+    if (!m1) return;
+    const cd = f.cdRemainMs && f.cdRemainMs > 0 ? ` · cd ${Math.ceil(f.cdRemainMs / 60000)}分` : '';
+    m1.textContent = `连刷:${f.state}${f.note ? ' · ' + f.note : ''}${cd}`;
+  });
   return hud;
 }
