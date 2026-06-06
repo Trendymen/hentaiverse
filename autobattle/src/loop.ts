@@ -39,14 +39,17 @@ function inBattle(): boolean {
   return !!document.getElementById('pane_vitals') || !!document.querySelector('[id^="vrh"],[id^="dvrh"]');
 }
 
-// 回合指纹: 状态没变=同回合(不重复出招); 变了=新回合(可出招). 含怪的减益(铺 Weaken/Imperil 后也算推进).
+// 回合指纹: 状态没变=同回合(不重复出招); 变了=新回合(可出招). 含怪血+减益(铺 Weaken/Imperil 后也算推进).
+//   ⚠怪血(hpNow)必须纳入: 攒OC平砍杂兵阶段玩家三围/OC/存活/减益全不动, 平砍只掉怪血 —— 若指纹漏掉怪血,
+//   逐 tick 指纹恒定 → changed=false → loop 把"打中但指纹没变"误判为"上招放不出" → stuckN 累加触发安全网换目标(实测误报根因).
+//   纳入后: 平砍打中→指纹变→立刻再出手(farming更快)+ stuckN 清零; 真网络卡怪血冻住→指纹仍不变→安全网照常生效, 不破坏原设计.
 function fingerprint(S: BattleState): string {
   const buffs = Object.entries(S.buff)
     .filter(([, v]) => v.active)
     .map(([k]) => k)
     .join(',');
   const foes = S.enemies
-    .map((e) => `${e.eid}:${Object.keys(e.debuff).filter((k) => e.debuff[k]).join('')}`)
+    .map((e) => `${e.eid}:${e.hpNow}:${Object.keys(e.debuff).filter((k) => e.debuff[k]).join('')}`)
     .join(',');
   return [S.hp, S.mp, S.sp, S.overcharge, S.alive, foes, buffs, S.channeling ? 'ch' : ''].join('|');
 }
