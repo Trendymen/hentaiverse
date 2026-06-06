@@ -1360,7 +1360,7 @@
         this.charging = false;
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
-        const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
+        const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && (S.alive >= C.CANNON_MIN_ENEMIES || hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES);
         if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
         if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
         if (this.charging) {

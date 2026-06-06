@@ -95,3 +95,6 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 150; s.stanceOn = true; run('㉖单红+架开+OC150+开关on[应切架式关]', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 50; s.stanceOn = false; run('㉗单红+架关+OC50+开关on[应盾击晕红名]', { state: s }); }
 { const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 50; s.stanceOn = false; run('㉘单红+架关+OC50+开关off[现状→平砍]', { cfg: { useEndgameStanceOff: false }, state: s }); }
+
+// ── 跨波预判攒炮观察 ── 当前波剩2杂兵但本波大波(monsterTotal8)+有下一波: 放宽 cannonCtx 应关架式冲刺
+{ const s = base(); s.enemies = many(2); s.alive = 2; s.monsterTotal = 8; s.overcharge = 125; s.stanceOn = true; run('㉙当前波剩2杂兵+本波8怪+有下一波OC125架开[跨波预判→切架式攒炮]', { state: s }); }
