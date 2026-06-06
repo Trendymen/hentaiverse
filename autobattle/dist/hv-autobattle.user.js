@@ -1227,7 +1227,7 @@
   function endgameSoloRed(S, C) {
     if (!C.useEndgameStanceOff) return false;
     const live = S.enemies.filter((e) => e.alive);
-    return live.length === 1 && live[0].is_red_boss;
+    return live.length === 1 && live[0].is_red_boss && hasFutureRound(S);
   }
   function weightCfg(C) {
     return {
