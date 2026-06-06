@@ -90,3 +90,8 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 // ── 攒炮冲刺起始线观察(开架式线 OC_ON×OCMAX 50%=125)── 6杂兵炮可用、架已开
 { const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 100; s.stanceOn = true; run('㉔6杂兵OC100(40%)架开炮可用[<50%不冲刺→平砍攒炮]', { state: s }); }
 { const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 125; s.stanceOn = true; run('㉕6杂兵OC125(50%)架开炮可用[≥50%关架式冲刺攒炮]', { state: s }); }
+
+// ── 单红收尾关架式攒OC观察(endgameSoloRed)── 红名带减益跳过P13, 聚焦架式/连招
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 150; s.stanceOn = true; run('㉔单红+架开+OC150+开关on[应切架式关]', { state: s }); }
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 50; s.stanceOn = false; run('㉕单红+架关+OC50+开关on[应盾击晕红名]', { state: s }); }
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 50; s.stanceOn = false; run('㉖单红+架关+OC50+开关off[现状→平砍]', { cfg: { useEndgameStanceOff: false }, state: s }); }

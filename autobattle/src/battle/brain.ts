@@ -6,7 +6,7 @@ import { Exec } from './executor';
 import { rankTargets } from './target-weight';
 import { BleedTimer } from './bleed-timing';
 import type { Action, ActionType, BattleState, EnemyState, WeightConfig, BleedTimerConfig } from '../types';
-import { assessPressure, hasFutureRound, ocFloorOk, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
+import { assessPressure, endgameSoloRed, hasFutureRound, ocFloorOk, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
 
 /** 从 config 装配 target-weight 所需的 WeightConfig(模块只认参数, 不碰单例) */
 function weightCfg(C: Config): WeightConfig {
@@ -227,14 +227,20 @@ export class Brain {
     //   多杂兵(够怪+炮在栏+不冷却) + OC≥开架式线 OC_ON×OCMAX(50%=125) → 关架式全程冲刺攒炮, 让 OC 冲到 200 放炮 AOE 清场.
     //   trade-off: 早关架式(125)比原临门关(175)多损失架式+100%物理平砍, 但多杂兵时换更快炮AOE; 仅 cannonCtx 场景, 非攒炮波(怪不够/无炮)架式照常滞回常驻.
     //   ⚠滞回防抖(GF 实测 66 次切架式 bug): charging 状态滞回(进入≥125 / 退出 OC_OFF×OCMAX=55 / 放炮归0 / 炮不可用), 区间[55,125]防横跳, 冲刺期只切一次架式.
-    const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
-    if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
-    if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
-    if (this.charging) {
-      if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 冲刺期关架式(只切一次, 之后保持关攒到 200)
+    // 单红收尾(灰度): 关架式攒 OC, 让处决链在关架式下跑(供 A/C 引用)
+    const soloRed = endgameSoloRed(S, C);
+    if (soloRed) {
+      if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式攒OC; 不自动开(落到 P13+)
     } else {
-      if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: 'stance', exec: Exec.stance };
-      if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
+      const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
+      if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
+      if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
+      if (this.charging) {
+        if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 冲刺期关架式(只切一次, 之后保持关攒到 200)
+      } else {
+        if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: 'stance', exec: Exec.stance };
+        if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: 'stance', exec: Exec.stance };
+      }
     }
     // P13 红怪减益序列(表驱动 Weaken→Imperil; 定向 commit 红怪)
     const tgt = selectRedTarget(S, ranked, 'control');
@@ -257,7 +263,7 @@ export class Brain {
     //   放弃攒炮(血线下降 struggling / 低密度波 / 炮冷却) → 单体技减压: 慈悲处决红名, 要害秒怪降围殴, 盾击晕眩.
     const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK; // 血线下降去抖: 连续 STRUGGLE_STREAK 次跌破 STRUGGLE_HP(默认 50%×2 次)才放弃攒炮
     const finalRound = !hasFutureRound(S);
-    const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
+    const saveOcForCannon = !soloRed && shouldSaveOcForCannon(S, C, pressure, struggling);
     // 红名"要害+慈悲"破例(无视攒炮): 慈悲处决须先有要害产的流血(武器无流血附魔), 故两步绑定提到攒炮 gate 之前;
     //   盾击不破例(攒炮期红名靠盾战反击概率晕, 省 25 OC). 慈悲(斩杀线<25%+流血)优先于要害(已晕→喂流血), 都锁同一红怪.
     const execRed = selectRedTarget(S, ranked, 'execute');
@@ -281,10 +287,10 @@ export class Brain {
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) });
         }
         // 要害(连招第2步, 延迟喂流血): 已晕 + 未流血 + 血量时机到才喂. 补 !bleeding 防喂完未到25%又重复喂; 让位架式同前
-        if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        if (C.useVitalStrike && (S.stanceOn || soloRed) && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(${tgtSp.hpPct}%·延迟喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) });
         // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩. 让位架式: 架式未开先攒OC开架式(架式开后靠反击+主动盾击晕)
-        if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+        if (C.useShieldBash && (S.stanceOn || soloRed) && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) });
       }
       // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
