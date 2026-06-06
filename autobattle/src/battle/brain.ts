@@ -303,6 +303,11 @@ export class Brain {
           return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
       }
     }
+    // P15.5 长效药主动维持(MAINTAIN_LINE=75% 硬编码养生): HP/MP/SP 在「低线~75%」区间 → 喝对应长效药(便宜+持续回, 趁早补满少掉低线/急救);
+    //   排平砍前不抢核心输出(炮/控制/红怪处决都在前); 长效药独立冷却天然限频, 蓝药额外受 manaPotOnCd 冷静期防连喝.
+    if (hp < C.MAINTAIN_LINE * HM && Exec.itemAvailable(IT.hDraught)) return A('item', IT.hDraught);
+    if (mp < C.MAINTAIN_LINE * MM && !S.manaPotOnCd && Exec.itemAvailable(IT.mDraught)) return A('item', IT.mDraught);
+    if (sp < C.MAINTAIN_LINE * SM && Exec.itemAvailable(IT.sDraught)) return A('item', IT.sDraught);
     // P16 破甲滚雪球平砍: 杂兵按 finWeight 选最优(血量+13状态+Yggdrasil); 仅剩红怪锁定持续平砍.
     //   红怪线(lockTarget/P13/P15/下方尾部锁定)全不动 —— 权重只接管杂兵选谁(守半自动红线).
     //   useTargetWeight=false → rankTargets 退回 eid 升序 = 现状, 零回归.

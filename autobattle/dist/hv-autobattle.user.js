@@ -157,6 +157,8 @@
     MP_LOW: 0.45,
     // 常规回蓝线(HUD「回蓝」滑块): P9 现按 mp/maxMp 直接算(不扣预留), 设多少=HUD多少; mp<45% 就用药水/长效补, 绝不碰终极
     SP_LOW: 0.3,
+    MAINTAIN_LINE: 0.75,
+    // 长效药主动维持线(硬编码, 不上面板): HP/MP/SP 任一<此值且对应长效药可点 → 喝长效药养生(便宜+持续回, 趁早补满少掉低线/急救); 排在平砍前不抢核心输出, 长效药独立冷却天然限频
     SP_RESERVE_RATIO: 0.45,
     // 高压/灵力盾场景的 SP 预留线: 不要求开架式也会补灵力
     OC_ON: 0.5,
@@ -1395,6 +1397,9 @@
             return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
         }
       }
+      if (hp < C.MAINTAIN_LINE * HM && Exec.itemAvailable(IT.hDraught)) return A("item", IT.hDraught);
+      if (mp < C.MAINTAIN_LINE * MM && !S.manaPotOnCd && Exec.itemAvailable(IT.mDraught)) return A("item", IT.mDraught);
+      if (sp < C.MAINTAIN_LINE * SM && Exec.itemAvailable(IT.sDraught)) return A("item", IT.sDraught);
       const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) {
         const t = trash[0];
