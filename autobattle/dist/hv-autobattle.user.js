@@ -176,7 +176,7 @@
     MANAPOT_HOLD: 3,
     // 回蓝药喝后多少回合常规线(P9)不重复喝: 防长效药慢回看不到效果→同波连喝长效/药水/终极; 急救线(P1/P3/墙倒)不受限
     CANNON_YIELD_OC: 175,
-    // 架式让位阈值: 仅 OC≥此值(接近200)才关架式冲刺; OC<此值架式常驻(ehwiki:+100%物理伤害+OC净涨)
+    // 接近200的线: 现仅用作 ocFloorOk 炮可用时的盾击地板(为炮预留); P12 攒炮冲刺起始已改用开架式线 OC_ON×OCMAX(50%=125)
     // ── M2 开关/节奏 ──
     useCannon: true,
     cannonYieldStance: true,
@@ -1349,7 +1349,7 @@
       if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
       const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
-      if (cannonCtx && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC) this.charging = true;
+      if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
       if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
       if (this.charging) {
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };

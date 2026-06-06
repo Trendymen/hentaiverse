@@ -223,14 +223,12 @@ export class Brain {
     //   排在架式之上: 否则 OC 攒到 200 那刻被 P12"开架式"抢走 → 架式烧回<200 → 炮放不出+架式来回开关.
     if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
       return { type: 'cannon', exec: Exec.cannon };
-    // P12 灵动架式开关(滞回) + 临门让位
-    //   架式常驻为主(ehwiki:+100%物理伤害; 平砍+反击产OC > 架式烧10% → 净涨); 仅"临门一脚"让位:
-    //   炮在栏+不冷却+够怪+OC接近200(≥CANNON_YIELD_OC 且 <200) → 关架式冲刺1-2回合让 OC 冲到 200 放炮.
-    //   OC<CANNON_YIELD_OC 架式照常滞回常驻(不再全程压架式攒炮 — 日志实测全程架关=丢光+100%伤害).
-    //   ⚠滞回防抖(GF 实测 66 次切架式 bug): 原 chargingCannon 每回合按 oc≥YIELD 重算 → 关架式后 OC 烧到<YIELD 又满足常驻开架式 → 175 上下反复横跳.
-    //   改 charging 状态滞回: OC≥YIELD 进入冲刺(关架式并保持), 放炮归0 / 跌破 OC_OFF / 炮不可用 才退出, 冲刺期只切一次架式.
+    // P12 灵动架式开关(滞回) + 攒炮让位
+    //   多杂兵(够怪+炮在栏+不冷却) + OC≥开架式线 OC_ON×OCMAX(50%=125) → 关架式全程冲刺攒炮, 让 OC 冲到 200 放炮 AOE 清场.
+    //   trade-off: 早关架式(125)比原临门关(175)多损失架式+100%物理平砍, 但多杂兵时换更快炮AOE; 仅 cannonCtx 场景, 非攒炮波(怪不够/无炮)架式照常滞回常驻.
+    //   ⚠滞回防抖(GF 实测 66 次切架式 bug): charging 状态滞回(进入≥125 / 退出 OC_OFF×OCMAX=55 / 放炮归0 / 炮不可用), 区间[55,125]防横跳, 冲刺期只切一次架式.
     const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
-    if (cannonCtx && oc >= C.CANNON_YIELD_OC && oc < C.CANNON_MIN_OC) this.charging = true;
+    if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
     if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
     if (this.charging) {
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 冲刺期关架式(只切一次, 之后保持关攒到 200)

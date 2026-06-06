@@ -86,3 +86,7 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 140; s.cannonExists = false; s.stanceOn = true; run('㉑无压力3杂兵OC140炮不可用架已开[盾击应抑制→平砍]', { state: s }); }
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 150; s.cannonExists = false; s.stanceOn = true; run('㉒无压力3杂兵OC150炮不可用架已开[盾击放行]', { state: s }); }
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 190; s.cannonExists = true; s.cannonOnCd = false; s.stanceOn = true; run('㉓无压力3杂兵OC190炮可用架已开[盾击应抑制→平砍]', { state: s }); }
+
+// ── 攒炮冲刺起始线观察(开架式线 OC_ON×OCMAX 50%=125)── 6杂兵炮可用、架已开
+{ const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 100; s.stanceOn = true; run('㉔6杂兵OC100(40%)架开炮可用[<50%不冲刺→平砍攒炮]', { state: s }); }
+{ const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 125; s.stanceOn = true; run('㉕6杂兵OC125(50%)架开炮可用[≥50%关架式冲刺攒炮]', { state: s }); }

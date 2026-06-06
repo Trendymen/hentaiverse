@@ -32,7 +32,7 @@ export const DEFAULT_CONFIG = {
   CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
   REGEN_HOLD: 12, // 细胞活化放出后多少回合不重放: 覆盖 reader 的 DOM 检测空窗(放出后图标短暂读不到→连放烧蓝); 过窗后仍由 buff 检测主导, reader 失灵也最多每 12 回合放一次
   MANAPOT_HOLD: 3, // 回蓝药喝后多少回合常规线(P9)不重复喝: 防长效药慢回看不到效果→同波连喝长效/药水/终极; 急救线(P1/P3/墙倒)不受限
-  CANNON_YIELD_OC: 175, // 架式让位阈值: 仅 OC≥此值(接近200)才关架式冲刺; OC<此值架式常驻(ehwiki:+100%物理伤害+OC净涨)
+  CANNON_YIELD_OC: 175, // 接近200的线: 现仅用作 ocFloorOk 炮可用时的盾击地板(为炮预留); P12 攒炮冲刺起始已改用开架式线 OC_ON×OCMAX(50%=125)
   // ── M2 开关/节奏 ──
   useCannon: true,
   cannonYieldStance: true, // 架式临门让位(仅 OC≥CANNON_YIELD_OC): 架式烧10%OC但反击产更多→常驻净涨, 只在冲200那1-2回合关架式, 不全程压
