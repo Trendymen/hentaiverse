@@ -131,6 +131,7 @@ export interface BusEvents {
   'log:update': LogRecord | null;
   'ui:toggle': boolean;
   'battle:active': boolean; // loop 检测 inBattle 跨 tick 变化: true=进战斗(下一轮恢复日志窗口), false=退出战斗(关窗口+清记忆)
+  'farm:state': FarmHud; // M3 连刷: 当前 FSM 状态 → HUD 战斗外展示
 }
 
 /** target-weight 纯函数输入(EnemyState 的结构子集; EnemyState 鸭子类型可直接传) */
@@ -173,3 +174,105 @@ export interface BleedTimerConfig {
 
 /** 带 finWeight 的排序结果 */
 export type RankedEnemy = WeightInput & { finWeight: number };
+
+// ── M3 连刷(farm)类型. 详见 specs/2026-06-06-autobattle-m3-farm-design.md ──
+
+/** 连刷有限状态机的 13 个状态 */
+export type FarmState =
+  | 'IDLE' // HV 战斗外页, 连刷开 → 准备下一场
+  | 'CHECK_ENCOUNTER' // 开战前先查待处理遭遇(优先级最高)
+  | 'ENCOUNTER_ENGAGE' // 决定接受遭遇 → 导航去 e-hentai
+  | 'ENCOUNTER_WAIT' // 已在 e-hentai 站, 等注入分支 accept/reject
+  | 'CHECK_STAMINA' // 战前精力门
+  | 'RECOVER_STAMINA' // 精力不足且可药补 → recover XHR
+  | 'PICK_NEXT' // 选下一靶(等级/RB/GF, arrayDone 去重, GF 计数)
+  | 'STARTING' // 扒 token + 开战 XHR(发出即 reload)
+  | 'IN_BATTLE' // 战斗中: FSM 静默, 交 brain/loop 驱动
+  | 'POST_BATTLE' // 战斗结束落地 ?s=Battle, 准备回前页(M4 掉落统计钩子)
+  | 'RETURN' // openNoFetch(lastHref) 回战斗前页
+  | 'COOLDOWN' // 精力耗尽/无靶/遭遇满 24 → 定时等待
+  | 'STOPPED'; // 连刷关或致命错误 → 停机
+
+/** farm-reader 对当前页的分类 */
+export type FarmPage =
+  | 'in-battle' // inBattle() DOM 在
+  | 'hv-battle-end' // url.endsWith('?s=Battle') 战斗结束落地
+  | 'hv-out' // 其他 HV 页(含 ?s=Battle&ss=xx 选择页)
+  | 'eh-encounter'; // host===e-hentai.org
+
+/** 竞技场连刷上下文(Store 'arena' 键; 每日重置). 翻写 dodying arena 对象 L2504-2535 */
+export interface ArenaStore {
+  array: string[]; // 待战等级/RB 列表(arenaLevels split + reverse; 持久不变, 靠 arrayDone 去重)
+  arrayDone: (number | string)[]; // 今日已完成(去重)
+  token: Record<string, string>; // {等级ID|'gr' → token}
+  gr: number; // 剩余可开 GF 场数
+  date: number; // time(0) ms; UTC 同日判定用
+}
+
+/** 遭遇战一条记录. 翻写 dodying encounter 元素 */
+export interface EncounterRec {
+  href?: string;
+  time: number;
+  encountered?: number;
+}
+
+/** 精力快照(farm-reader 从 Store + DOM 读出; M3 不检测库存药, 故无 has11401/has11402) */
+export interface StaminaSnapshot {
+  cached: number; // Store 缓存的 stamina
+  lastTimeHour: number; // 上次记录的小时戳(floor(ms/3600000))
+  hathperk: boolean; // 影响盲发恢复量预估(+20/+10)
+}
+
+/** farm-reducer 唯一输入(纯数据快照) */
+export interface FarmContext {
+  page: FarmPage;
+  url: string;
+  host: string;
+  hvOrigin: string; // HV 站 origin(engage 拼 url 用)
+  nowMs: number;
+  nowHour: number; // floor(nowMs/3600000)
+  storedState: FarmState; // Store 存的上次 state(续跑依据)
+  arena: ArenaStore;
+  stamina: StaminaSnapshot;
+  encounter: EncounterRec[]; // 去重合并后的今日遭遇记录
+  lastEH: number; // 上次打开 e-hentai 时间
+  lastHref: string; // 战斗前页地址(回前页用)
+  eventHref?: string; // e-hentai eventpane 里的遭遇目标 href 片段
+  cooldownUntil: number; // COOLDOWN 到期时戳
+}
+
+/** farm-reducer 输出的副作用意图(纯数据; executor 翻译成 XHR/导航/Store) */
+export type FarmAction =
+  | { type: 'none'; note?: string }
+  | { type: 'start-battle'; href: 'ar' | 'ar&page=2' | 'rb' | 'gr'; initid: string; token: string; note?: string }
+  | { type: 'navigate'; url: string; note?: string } // openNoFetch 等价(engage/reject/return 共用)
+  | { type: 'recover-stamina'; note?: string }
+  | { type: 'set-cooldown'; untilMs: number; note?: string };
+
+/** reducer 输出 */
+export interface FarmStep {
+  next: FarmState;
+  action: FarmAction;
+  arena?: ArenaStore; // 更新后的 arena(starter 落盘)
+}
+
+/** reducer 配置(starter 从 config 装配; 纯函数不碰单例, 仿 weightCfg) */
+export interface FarmReducerCfg {
+  farmEnabled: boolean;
+  autoEncounter: boolean;
+  restoreStamina: boolean;
+  staminaLow: number;
+  staminaLowWithNat: number;
+  staminaEncounter: number;
+  encounterCdMs: number; // encounterCdMin * 60000
+  grPerDay: number;
+  arenaLevels: string;
+  staminaHathperk: boolean;
+}
+
+/** HUD 展示的连刷状态 */
+export interface FarmHud {
+  state: FarmState;
+  note?: string;
+  cdRemainMs?: number;
+}
