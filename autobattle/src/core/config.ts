@@ -27,7 +27,7 @@ export const DEFAULT_CONFIG = {
   OC_ON: 0.5, // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
   OC_OFF: 0.22,
   HS_MIN_ENEMIES: 2,
-  CANNON_MIN_ENEMIES: 6, // 攒炮最少怪(原4→6): 4-5只小局清场太快、OC攒不满200就清完=攒炮空转还压住近战技; 提到6让小局直接放近战技/平砍, 6+大局才攒炮(能攒满)
+  CANNON_MIN_ENEMIES: 5, // 攒炮最少怪: 活怪≥此值才攒炮/放炮 AOE(曾 4→6 挡小局空转, 现按需改回 5 放宽)
   CANNON_MIN_OC: 200, // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
   CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
   REGEN_HOLD: 12, // 细胞活化放出后多少回合不重放: 覆盖 reader 的 DOM 检测空窗(放出后图标短暂读不到→连放烧蓝); 过窗后仍由 buff 检测主导, reader 失灵也最多每 12 回合放一次
@@ -82,11 +82,11 @@ let current: Config = { ...DEFAULT_CONFIG, ...Store.get<Partial<Config>>('config
 
 // 配置迁移: 旧存档里"后来改过默认值"的键会用旧值盖住新默认(根因: config = {...新默认, ...旧存档}).
 // 版本升级时, 对这些键强制采用新默认(一次性; 之后仍尊重用户面板改动).
-const CONFIG_VERSION = 4;
+const CONFIG_VERSION = 5;
 if (Store.get<number>('configVersion', 0) < CONFIG_VERSION) {
   current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs; // 旧存档 22000(22s) → 1500: 根治"炮放一次后整轮不再放"
   current.OC_ON = DEFAULT_CONFIG.OC_ON; // 0.4 → 0.5: 架式开启对齐游戏 ≥50% 要求, 去掉无效空点
-  current.CANNON_MIN_ENEMIES = DEFAULT_CONFIG.CANNON_MIN_ENEMIES; // 4 → 6: 旧存档强制升级, 小局不再攒炮空转压住近战技
+  current.CANNON_MIN_ENEMIES = DEFAULT_CONFIG.CANNON_MIN_ENEMIES; // v5: 6→5 放宽; 旧存档强制刷新为当前默认(5)
   current.MP_LOW = DEFAULT_CONFIG.MP_LOW; // v4: P9 回蓝口径从 mpFree(扣340预留) 改 mp 直算, 旧存档 0.35 语义失效 → 强制刷新默认 0.45(HUD<45%补); 之后仍尊重面板改动
   Store.set('config', current);
   Store.set('configVersion', CONFIG_VERSION);
