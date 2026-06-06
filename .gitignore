@@ -4,3 +4,6 @@
 .DS_Store
 .idea/
 *.log
+
+# Claude Code 链接 worktree(隔离工作区, 非仓库内容)
+.claude/worktrees/
