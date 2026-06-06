@@ -4,6 +4,17 @@ declare const GM_getValue: (<T>(key: string, def: T) => T) | undefined;
 declare const GM_setValue: ((key: string, val: unknown) => void) | undefined;
 declare const GM_deleteValue: ((key: string) => void) | undefined;
 
+/** Userscript GM XHR(@grant 已含). 仅声明 M3 用到的字段. */
+interface GMXHRDetails {
+  method: string;
+  url: string;
+  data?: string;
+  headers?: Record<string, string>;
+  onload?: (r: { status: number; responseText: string }) => void;
+  onerror?: (r: unknown) => void;
+}
+declare const GM_xmlhttpRequest: ((details: GMXHRDetails) => void) | undefined;
+
 // 页面真实 window(Tampermonkey 沙箱外). 访问 HV 的全局 battle 对象需经此; DOM 操作仍用共享的 document.
 declare const unsafeWindow: Window &
   typeof globalThis & {
