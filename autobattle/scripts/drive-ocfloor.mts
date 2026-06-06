@@ -7,7 +7,8 @@ import type { BattleState } from '../src/types';
 
 const C = { ...DEFAULT_CONFIG };
 const COST = 25;
-const P = (level: 'low' | 'medium' | 'high'): Pressure => ({ level, spReserveLow: false, spCritical: false, hasRed: level !== 'low' });
+// ocFloorOk 只读 pressure.level; hasRed 仅为形状合法填 false(不强行把 medium 等同 hasRed, 避免误导)
+const P = (level: 'low' | 'medium' | 'high'): Pressure => ({ level, spReserveLow: false, spCritical: false, hasRed: false });
 const S = (cannonExists: boolean, cannonOnCd: boolean) => ({ cannonExists, cannonOnCd } as unknown as BattleState);
 
 let pass = 0;
@@ -30,5 +31,7 @@ check('有压力·oc30→维持现状', ocFloorOk(S(true, false), C, P('medium')
 // 6. 开关关 + 无压力 + oc=30 → true (旧行为)
 const Coff = { ...DEFAULT_CONFIG, useShieldBashOcFloor: false };
 check('开关关·无压力·oc30→旧行为', ocFloorOk(S(false, false), Coff, P('low'), 30, COST), true);
+// 7. 无压力 + 炮存在但CD中 → cannonReady=false, 地板降回开架式线125 → 140-25=115<125 → false
+check('无压力·炮CD中·oc140→抑制(地板降回125)', ocFloorOk(S(true, true), C, P('low'), 140, COST), false);
 
 console.log(`\n✅ ocFloorOk 全部 ${pass} 用例通过`);
