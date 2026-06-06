@@ -37,8 +37,9 @@ export function gate(stamina: number, cost: number, low: number, lowWithNat: num
 }
 
 /** 是否盲发恢复(M3: 不检测库存药, restoreStamina 开 + 精力低于 100-恢复量 即发; 库存检测留 M4). 翻写 L2412-2418 简化. */
-export function shouldRecover(snap: StaminaSnapshot, stamina: number, cfg: FarmReducerCfg): boolean {
+export function shouldRecover(_snap: StaminaSnapshot, stamina: number, cfg: FarmReducerCfg): boolean {
   if (!cfg.restoreStamina) return false;
-  const recover = snap.hathperk ? 20 : 10;
+  // 用面板 cfg.staminaHathperk(而非 snap.hathperk), 使 UI 开关真正生效. StaminaSnapshot.hathperk 字段保留供其他消费方使用.
+  const recover = cfg.staminaHathperk ? 20 : 10;
   return stamina <= 100 - recover;
 }
