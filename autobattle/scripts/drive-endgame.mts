@@ -37,5 +37,7 @@ check('红名>2→放行', endgameRedHold(St([e({ hpPct: 40 }), e({ hpPct: 80 })
 // 9. 开关关+残局+血稳 → false
 const Coff = { ...DEFAULT_CONFIG, useEndgameRedOcSave: false };
 check('开关关→放行', endgameRedHold(St(endgame), Coff, 120, 100, false), false);
+// 10. 单红名<50%+血稳 → true(length=1 属残局)
+check('单红名<50%→暂缓', endgameRedHold(St([e({ hpPct: 40 })]), C, 190, 25, false), true);
 
 console.log(`\n✅ endgameRedHold 全部 ${pass} 用例通过`);
