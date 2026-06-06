@@ -86,3 +86,6 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 140; s.cannonExists = false; s.stanceOn = true; run('㉑无压力3杂兵OC140炮不可用架已开[盾击应抑制→平砍]', { state: s }); }
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 150; s.cannonExists = false; s.stanceOn = true; run('㉒无压力3杂兵OC150炮不可用架已开[盾击放行]', { state: s }); }
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 190; s.cannonExists = true; s.cannonOnCd = false; s.stanceOn = true; run('㉓无压力3杂兵OC190炮可用架已开[盾击应抑制→平砍]', { state: s }); }
+
+// ── 残局红名 OC 省留观察(endgameRedHold)── 2红名其一40%、都未晕、架式开、血稳
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 40, hpNow: 4000, debuff: { weaken: true, imperil: true } }), enemy(2, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 2; s.monsterTotal = 2; s.overcharge = 150; s.stanceOn = true; run('㉔残局2红名(其一40%)血稳OC150架开[红名OC技hold→平砍红名]', { state: s }); }

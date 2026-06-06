@@ -6,7 +6,7 @@ import { Exec } from './executor';
 import { rankTargets } from './target-weight';
 import { BleedTimer } from './bleed-timing';
 import type { Action, ActionType, BattleState, EnemyState, WeightConfig, BleedTimerConfig } from '../types';
-import { assessPressure, hasFutureRound, ocFloorOk, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
+import { assessPressure, endgameRedHold, hasFutureRound, ocFloorOk, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
 
 /** 从 config 装配 target-weight 所需的 WeightConfig(模块只认参数, 不碰单例) */
 function weightCfg(C: Config): WeightConfig {
@@ -265,12 +265,12 @@ export class Brain {
     const execRed = selectRedTarget(S, ranked, 'execute');
     if (execRed) {
       // 慈悲(斩杀线处决, 不受架式门槛限制): 加去重拉黑(放不出/处决免疫就不再空点) + 记录尝试供下回合验证 OC 降没降
-      if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+      if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && !endgameRedHold(S, C, oc, 100, struggling) && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
         this.mercifulTry = { eid: execRed.eid, oc };
         return this.hitRed(execRed.eid, { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${execRed.eid}(${execRed.hpPct}%+流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, execRed.eid) });
       }
       // 要害(延迟喂流血): 未流血 + 血量时机到(速率预测/兜底)才喂 — 让 5 道 DoT 刚好覆盖斩杀窗口, 不再一晕就喂
-      if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(execRed, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+      if (C.useVitalStrike && execRed.stunned && !execRed.bleeding && oc >= 50 && !endgameRedHold(S, C, oc, 50, struggling) && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(execRed, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
         return this.hitRed(execRed.eid, { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${execRed.eid}(${execRed.hpPct}%·延迟喂流血·破攒炮)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, execRed.eid) });
     }
     if (!saveOcForCannon) {
@@ -278,15 +278,15 @@ export class Brain {
       // ── 红名处决连招(锁同一红怪串联, 优先于杂兵): 盾击晕 → 要害收割+5流血 → 慈悲25%处决 ──
       if (tgtSp) {
         // 慈悲(连招终点, 100 OC): 红名 25%+流血 → 处决. 同破例: 去重拉黑 + 记录尝试(防对处决免疫的怪空点)
-        if (C.useMercifulBlow && tgtSp.eid !== this.mercifulBlockEid && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
+        if (C.useMercifulBlow && tgtSp.eid !== this.mercifulBlockEid && tgtSp.hpPct < 25 && tgtSp.bleeding && oc >= 100 && !endgameRedHold(S, C, oc, 100, struggling) && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
           this.mercifulTry = { eid: tgtSp.eid, oc };
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) });
         }
         // 要害(连招第2步, 延迟喂流血): 已晕 + 未流血 + 血量时机到才喂. 补 !bleeding 防喂完未到25%又重复喂; 让位架式同前
-        if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+        if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && !endgameRedHold(S, C, oc, 50, struggling) && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(${tgtSp.hpPct}%·延迟喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) });
         // 盾击(连招第1步, 25 OC): 红名未晕 → 上晕眩. 让位架式: 架式未开先攒OC开架式(架式开后靠反击+主动盾击晕)
-        if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+        if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && !endgameRedHold(S, C, oc, 25, struggling) && Exec.skillReady(SK_SPECIAL.shieldBash))
           return this.hitRed(tgtSp.eid, { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) });
       }
       // ── 杂兵减压(红名连招本回合无事 / 无红名): 红名在场或力不从心 → 要害秒已晕杂兵降围殴; 盾击晕杂兵减伤 ──
