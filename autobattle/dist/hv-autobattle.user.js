@@ -165,8 +165,8 @@
     // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
     HS_MIN_ENEMIES: 2,
-    CANNON_MIN_ENEMIES: 5,
-    // 攒炮最少怪: 活怪≥此值才攒炮/放炮 AOE(曾 4→6 挡小局空转, 现按需改回 5 放宽)
+    CANNON_MIN_ENEMIES: 6,
+    // 攒炮最少怪(原4→6): 4-5只小局清场太快、OC攒不满200就清完=攒炮空转还压住近战技; 提到6让小局直接放近战技/平砍, 6+大局才攒炮(能攒满)
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
@@ -244,8 +244,31 @@
     // 速率移动平均窗口(最近 2-3 个主动样本)
     BLEED_MIN_SAMPLES: 1,
     // 走速率主路最少样本数, 不足走兜底
-    BLEED_MIN_RATE: 1
+    BLEED_MIN_RATE: 1,
     // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
+    // ── M3 连刷(farm; 详见 specs/2026-06-06-autobattle-m3-farm-design.md)──
+    farmEnabled: false,
+    // 连刷独立开关(与 enabled 解耦; 二者同开才连刷)
+    autoEncounter: false,
+    // 自动接受遭遇战(跨站 e-hentai; 默认关需主动开)
+    restoreStamina: false,
+    // 战前精力不足喝药恢复(消耗道具; 默认关; M3 盲发, 库存检测留 M4)
+    farmTickMs: 1500,
+    // 连刷 tick 节奏(≥300ms 服务器红线, 留余量)
+    grPerDay: 3,
+    // GF 每日开场数(arena.gr 初值, 跨日重置)
+    arenaLevels: "",
+    // 待战等级/RB 逗号串(逆序消费); 可含 'gr' 代表 GF
+    staminaLow: 60,
+    // 开战精力下限
+    staminaEncounter: 60,
+    // 遭遇战精力下限
+    staminaLowWithNat: 0,
+    // 含 24h 自然恢复的下限
+    encounterCdMin: 30,
+    // 遭遇常规冷却(分钟)
+    staminaHathperk: false
+    // 精力 hathperk(影响盲发恢复量预估 +20/+10)
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 5;
@@ -317,6 +340,12 @@
       if (m1) m1.textContent = `${d.battleType}${round} · T${d.turn}`;
       if (m2) m2.textContent = `怪 ${d.alive}/${d.monsterTotal} · ▶ ${d.action}`;
     });
+    bus.on("farm:state", (f) => {
+      const m1 = document.getElementById("hvab-meta1");
+      if (!m1) return;
+      const cd = f.cdRemainMs && f.cdRemainMs > 0 ? ` · cd ${Math.ceil(f.cdRemainMs / 6e4)}分` : "";
+      m1.textContent = `连刷:${f.state}${f.note ? " · " + f.note : ""}${cd}`;
+    });
     return hud;
   }
   function writeCfg(key, val) {
@@ -369,12 +398,21 @@
     p.appendChild(group("进阶(谨慎改)", numRow("SPARK_RESERVE", "Spark预留MP"), pctRow("BURST_EST", "暴击波预估"), pctRow("MP_FUSE", "MP熔断线"), numRow("HS_MIN_ENEMIES", "穿心最少怪"), numRow("CANNON_MIN_ENEMIES", "炮最少怪")));
     return p;
   }
+  function farmPane() {
+    const p = el("div");
+    p.appendChild(group("连刷总控", swRow("farmEnabled", "启用连刷(需同时开战斗🧠)")));
+    p.appendChild(group("竞技场/GF", numRow("grPerDay", "GF每日场数")));
+    p.appendChild(group("精力(战前门)", swRow("restoreStamina", "不足喝药恢复"), numRow("staminaLow", "开战精力下限"), numRow("staminaEncounter", "遭遇精力下限"), numRow("staminaLowWithNat", "含自然恢复下限")));
+    p.appendChild(group("遭遇战", swRow("autoEncounter", "自动接受遭遇"), numRow("encounterCdMin", "遭遇冷却", "分")));
+    p.appendChild(group("节奏", numRow("farmTickMs", "连刷tick", "ms")));
+    return p;
+  }
   function paneFor(key) {
     switch (key) {
       case "battle":
         return battlePane();
       case "farm":
-        return section("连刷(遭遇 / 竞技场 / GF) · 待 M3 接入");
+        return farmPane();
       case "guard":
         return section("保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入");
       default:
@@ -1454,6 +1492,385 @@
     }
   }
   const brain = new Brain();
+  const MS_PER_DAY$2 = 24 * 36e5;
+  function isNewDay(arena, nowMs) {
+    if (!arena.date) return true;
+    return Math.floor(arena.date / MS_PER_DAY$2) !== Math.floor(nowMs / MS_PER_DAY$2);
+  }
+  function initArenaCtx(prev, arenaLevels, grPerDay, nowMs) {
+    const array = arenaLevels ? arenaLevels.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    array.reverse();
+    return { array, arrayDone: [], token: (prev == null ? void 0 : prev.token) ?? {}, gr: grPerDay, date: nowMs };
+  }
+  function mapHref(key) {
+    if (key === "gr") return "gr";
+    const n = Number(key);
+    if (n >= 105) return "rb";
+    if (n >= 19) return "ar&page=2";
+    return "ar";
+  }
+  function parseGrToken(onclick) {
+    const m = onclick.match(/init_battle\(1, *'(.*?)'\)/);
+    return m ? m[1] : null;
+  }
+  function parseArenaToken(onclick) {
+    const m = onclick.match(/init_battle\((\d+),\d+,'(.*?)'\)/);
+    return m ? { id: m[1], token: m[2] } : null;
+  }
+  function pickNextArena(input) {
+    const arena = {
+      ...input,
+      array: [...input.array],
+      arrayDone: [...input.arrayDone],
+      token: { ...input.token }
+    };
+    const arr = [...arena.array];
+    while (arr.length > 0) {
+      const raw = arr.pop();
+      const num = Number(raw);
+      const id = isNaN(num) ? "gr" : String(num);
+      if (arena.arrayDone.includes(id) || arena.arrayDone.includes(num)) continue;
+      if (id === "gr") {
+        if (arena.gr <= 0) {
+          if (!arena.arrayDone.includes("gr")) arena.arrayDone.push("gr");
+          continue;
+        }
+        const token2 = arena.token.gr;
+        if (!token2) return { kind: "need-token", key: "gr", href: "gr", arena };
+        arena.gr--;
+        return { kind: "battle", key: "gr", href: "gr", initid: "1", token: token2, arena };
+      }
+      const token = arena.token[id];
+      if (!token) return { kind: "need-token", key: id, href: mapHref(id), arena };
+      arena.arrayDone.push(num);
+      return { kind: "battle", key: id, href: mapHref(id), initid: id, token, arena };
+    }
+    return { kind: "empty", arena };
+  }
+  const MS_PER_HOUR$1 = 36e5;
+  function emptyArena(nowMs) {
+    return { array: [], arrayDone: [], token: {}, gr: 0, date: nowMs };
+  }
+  function parseStaminaReadout(root = document) {
+    const el2 = $("#stamina_readout", root);
+    if (!el2) return null;
+    const m = (el2.textContent || "").match(/\d+/);
+    return m ? Number(m[0]) : null;
+  }
+  function isBattleEnd(url) {
+    return url.endsWith("?s=Battle");
+  }
+  function collectTokens(arena) {
+    const next = { ...arena, token: { ...arena.token } };
+    const gf = $('img[src*="startgrindfest.png"]');
+    if (gf) {
+      const t = parseGrToken(gf.getAttribute("onclick") || "");
+      if (t) next.token.gr = t;
+    }
+    $$('img[src*="startchallenge.png"]').forEach((img) => {
+      const p = parseArenaToken(img.getAttribute("onclick") || "");
+      if (p) next.token[p.id] = p.token;
+    });
+    return next;
+  }
+  function readFarm() {
+    const url = location.href;
+    const host = location.host;
+    const nowMs = Date.now();
+    const nowHour = Math.floor(nowMs / MS_PER_HOUR$1);
+    const storedState = Store.get("farmState", "IDLE");
+    const lastHref = Store.get("lastHref", "");
+    const lastEH = Store.get("lastEH", 0);
+    const cooldownUntil = Store.get("farmCooldownUntil", 0);
+    const readout = parseStaminaReadout();
+    if (readout !== null) {
+      Store.set("stamina", readout);
+      Store.set("staminaTime", nowHour);
+    }
+    const stamina = {
+      cached: Store.get("stamina", 0),
+      lastTimeHour: Store.get("staminaTime", 0),
+      hathperk: Store.get("staminaHathperk", false)
+    };
+    let arena = Store.get("arena", emptyArena(nowMs));
+    let encounter = Store.get("encounter", []);
+    let eventHref;
+    let hvOrigin = Store.get("hvUrl", "https://hentaiverse.org");
+    let page;
+    if (host === "e-hentai.org") {
+      page = "eh-encounter";
+      Store.set("lastEH", nowMs);
+      const eventpane = $("#eventpane");
+      if (eventpane) {
+        const a = $("#eventpane>div>a");
+        const seg = a == null ? void 0 : a.href.split("/")[3];
+        if (seg === void 0) encounter = [];
+        encounter.unshift({ href: seg, time: nowMs });
+        Store.set("encounter", encounter);
+        eventHref = seg;
+      } else {
+        for (const e of encounter) {
+          if (e.encountered) continue;
+          if (e.href) {
+            eventHref = e.href;
+            break;
+          }
+        }
+      }
+    } else {
+      hvOrigin = location.origin;
+      Store.set("hvUrl", hvOrigin);
+      if (/\?s=Battle&ss=(ar|gr|rb)/.test(url)) {
+        arena = collectTokens(arena);
+        Store.set("arena", arena);
+      }
+      page = isBattleEnd(url) ? "hv-battle-end" : "hv-out";
+    }
+    return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil };
+  }
+  const STAMINA_COST = {
+    1: 2,
+    3: 4,
+    5: 6,
+    8: 8,
+    9: 10,
+    11: 12,
+    12: 15,
+    13: 20,
+    15: 25,
+    16: 30,
+    17: 35,
+    19: 40,
+    20: 45,
+    21: 50,
+    23: 55,
+    24: 60,
+    26: 65,
+    27: 70,
+    28: 75,
+    29: 80,
+    32: 85,
+    33: 90,
+    34: 95,
+    35: 100,
+    105: 1,
+    106: 1,
+    107: 1,
+    108: 1,
+    109: 1,
+    110: 1,
+    111: 1,
+    112: 1
+  };
+  function computeStamina(snap, nowHour) {
+    return snap.cached + (snap.lastTimeHour ? nowHour - snap.lastTimeHour : 0);
+  }
+  function predictNatural(stamina, nowHour) {
+    return stamina + 24 - nowHour % 24;
+  }
+  function computeCost(key, stamina, grCount, isIsekai) {
+    const base = key === "gr" ? grCount : STAMINA_COST[key] ?? 0;
+    const cost = base * 1 * (stamina >= 60 ? 0.03 : 0.02);
+    return key === "gr" ? cost + 1 : cost;
+  }
+  function gate(stamina, cost, low, lowWithNat, nowHour) {
+    const stmNR = predictNatural(stamina, nowHour);
+    const nrOk = !cost || stmNR - cost >= lowWithNat;
+    if (stamina - cost >= low && nrOk) return 1;
+    if (!nrOk) return -1;
+    return 0;
+  }
+  function shouldRecover(snap, stamina, cfg) {
+    if (!cfg.restoreStamina) return false;
+    const recover = snap.hathperk ? 20 : 10;
+    return stamina <= 100 - recover;
+  }
+  const MS_PER_HOUR = 36e5;
+  const MS_PER_DAY$1 = 24 * MS_PER_HOUR;
+  function computeCooldown(recs, nowMs, lastEH, cdMs) {
+    var _a;
+    const encountered = recs.filter((e) => e.encountered && e.href);
+    const last = ((_a = recs[0]) == null ? void 0 : _a.time) ?? lastEH ?? 0;
+    let cd;
+    if (encountered.length >= 24) cd = Math.floor(recs[0].time / MS_PER_DAY$1 + 1) * MS_PER_DAY$1 - nowMs;
+    else if (!last) cd = 0;
+    else cd = cdMs + last - nowMs;
+    return Math.max(0, cd);
+  }
+  function pickEngageable(recs) {
+    for (const e of recs) {
+      if (e.encountered) continue;
+      if (e.href) return e.href;
+    }
+    return void 0;
+  }
+  const MS_PER_DAY = 24 * 36e5;
+  const MS_30MIN = 30 * 6e4;
+  function nextMidnight(nowMs) {
+    return (Math.floor(nowMs / MS_PER_DAY) + 1) * MS_PER_DAY;
+  }
+  function farmReducer(state, ctx, cfg) {
+    switch (state) {
+      case "IDLE":
+        if (!cfg.farmEnabled) return { next: "STOPPED", action: { type: "none", note: "连刷关" } };
+        return { next: "CHECK_ENCOUNTER", action: { type: "none" } };
+      case "CHECK_ENCOUNTER": {
+        if (cfg.autoEncounter) {
+          const cd = computeCooldown(ctx.encounter, ctx.nowMs, ctx.lastEH, cfg.encounterCdMs);
+          const href = pickEngageable(ctx.encounter);
+          const stamina = computeStamina(ctx.stamina, ctx.nowHour);
+          if (cd === 0 && href && stamina >= cfg.staminaEncounter) {
+            return { next: "ENCOUNTER_ENGAGE", action: { type: "none", note: "有可接遭遇" } };
+          }
+        }
+        return { next: "CHECK_STAMINA", action: { type: "none" } };
+      }
+      case "ENCOUNTER_ENGAGE":
+        return { next: "ENCOUNTER_WAIT", action: { type: "navigate", url: "https://e-hentai.org/news.php?encounter", note: "跳遭遇页" } };
+      case "ENCOUNTER_WAIT": {
+        if (ctx.eventHref) return { next: "IN_BATTLE", action: { type: "navigate", url: `${ctx.hvOrigin}/${ctx.eventHref}`, note: "接受遭遇→跳回HV" } };
+        return { next: "IDLE", action: { type: "navigate", url: ctx.lastHref, note: "无遭遇/过期→回HV" } };
+      }
+      case "CHECK_STAMINA": {
+        const stamina = computeStamina(ctx.stamina, ctx.nowHour);
+        const pick = pickNextArena(ctx.arena);
+        if (pick.kind === "empty") return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: nextMidnight(ctx.nowMs), note: "今日全清" } };
+        const cost = computeCost(pick.key, stamina, ctx.arena.gr);
+        const g = gate(stamina, cost, cfg.staminaLow, cfg.staminaLowWithNat, ctx.nowHour);
+        if (g === 1) return { next: "PICK_NEXT", action: { type: "none" } };
+        if (shouldRecover(ctx.stamina, stamina, cfg)) return { next: "RECOVER_STAMINA", action: { type: "none" } };
+        const until = g === 0 ? nextMidnight(ctx.nowMs) : ctx.nowMs + MS_30MIN;
+        return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: until, note: g === 0 ? "今日精力耗尽" : "等自然恢复" } };
+      }
+      case "RECOVER_STAMINA":
+        return { next: "CHECK_STAMINA", action: { type: "recover-stamina", note: "喝药恢复精力" } };
+      case "PICK_NEXT": {
+        const pick = pickNextArena(ctx.arena);
+        if (pick.kind === "empty") return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: nextMidnight(ctx.nowMs), note: "今日全清" } };
+        if (pick.kind === "need-token") return { next: "PICK_NEXT", action: { type: "navigate", url: `?s=Battle&ss=${pick.href}`, note: `收集 ${pick.href} token` }, arena: pick.arena };
+        return { next: "STARTING", action: { type: "start-battle", href: pick.href, initid: pick.initid, token: pick.token, note: `开战 ${pick.href}#${pick.key}` }, arena: pick.arena };
+      }
+      case "STARTING":
+        return { next: "PICK_NEXT", action: { type: "none", note: "STARTING 兜底重选" } };
+      case "IN_BATTLE":
+        return { next: "POST_BATTLE", action: { type: "none" } };
+      case "POST_BATTLE":
+        return { next: "RETURN", action: { type: "none", note: "战斗结束" } };
+      case "RETURN":
+        return { next: "IDLE", action: { type: "navigate", url: ctx.lastHref, note: "回前页" } };
+      case "COOLDOWN":
+        if (!cfg.farmEnabled) return { next: "STOPPED", action: { type: "none" } };
+        if (ctx.nowMs >= ctx.cooldownUntil) return { next: "IDLE", action: { type: "none", note: "冷却结束" } };
+        return { next: "COOLDOWN", action: { type: "none" } };
+      case "STOPPED":
+        if (cfg.farmEnabled) return { next: "IDLE", action: { type: "none", note: "重新开" } };
+        return { next: "STOPPED", action: { type: "none" } };
+      default:
+        return { next: "IDLE", action: { type: "none" } };
+    }
+  }
+  const MIN_INTERVAL = 300;
+  let lastPost = 0;
+  function gmPost(url, body) {
+    return new Promise((resolve, reject) => {
+      const send = () => {
+        if (typeof GM_xmlhttpRequest !== "function") {
+          reject(new Error("GM_xmlhttpRequest unavailable"));
+          return;
+        }
+        lastPost = Date.now();
+        GM_xmlhttpRequest({
+          method: "POST",
+          url,
+          data: body,
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          onload: (r) => r.status === 200 ? resolve() : reject(new Error(`HTTP ${r.status}`)),
+          onerror: () => reject(new Error("xhr error"))
+        });
+      };
+      const wait = Math.max(0, MIN_INTERVAL - (Date.now() - lastPost));
+      if (wait > 0) setTimeout(send, wait);
+      else send();
+    });
+  }
+  function navigate(url) {
+    window.open(url, "_self");
+  }
+  function startBattle(href, initid, token) {
+    gmPost(`?s=Battle&ss=${href}`, `initid=${initid}&inittoken=${token}`).then(() => {
+      window.location.href = location.href;
+    }).catch((e) => console.error("[HVAB:farm] startBattle 失败", e));
+  }
+  function recoverStamina() {
+    gmPost(location.href, "recover=stamina").then(() => {
+      window.location.href = location.href;
+    }).catch((e) => console.error("[HVAB:farm] recoverStamina 失败", e));
+  }
+  function execFarm(action) {
+    switch (action.type) {
+      case "none":
+        return;
+      case "navigate":
+        navigate(action.url);
+        return;
+      case "start-battle":
+        startBattle(action.href, action.initid, action.token);
+        return;
+      case "recover-stamina":
+        recoverStamina();
+        return;
+      case "set-cooldown":
+        Store.set("farmCooldownUntil", action.untilMs);
+        return;
+    }
+  }
+  let farmBusyUntil = 0;
+  function farmCfg(C) {
+    return {
+      farmEnabled: C.farmEnabled,
+      autoEncounter: C.autoEncounter,
+      restoreStamina: C.restoreStamina,
+      staminaLow: C.staminaLow,
+      staminaLowWithNat: C.staminaLowWithNat,
+      staminaEncounter: C.staminaEncounter,
+      encounterCdMs: C.encounterCdMin * 6e4,
+      grPerDay: C.grPerDay,
+      arenaLevels: C.arenaLevels,
+      staminaHathperk: C.staminaHathperk
+    };
+  }
+  function routeStartup(ctx) {
+    if (ctx.page === "eh-encounter") return "ENCOUNTER_WAIT";
+    if (ctx.page === "in-battle") return "IN_BATTLE";
+    if (ctx.page === "hv-battle-end") return "POST_BATTLE";
+    return ctx.storedState;
+  }
+  function ensureArena(ctx, C) {
+    if (isNewDay(ctx.arena, ctx.nowMs) || ctx.arena.array.length === 0 && C.arenaLevels) {
+      const arena = initArenaCtx(ctx.arena, C.arenaLevels, C.grPerDay, ctx.nowMs);
+      Store.set("arena", arena);
+      return arena;
+    }
+    return ctx.arena;
+  }
+  function farmTick() {
+    if (Date.now() < farmBusyUntil) return;
+    try {
+      const C = config.all();
+      const ctx = readFarm();
+      ctx.arena = ensureArena(ctx, C);
+      const state = routeStartup(ctx);
+      const step = farmReducer(state, ctx, farmCfg(C));
+      Store.set("farmState", step.next);
+      if (step.arena) Store.set("arena", step.arena);
+      const cdRemainMs = step.next === "COOLDOWN" ? Math.max(0, ctx.cooldownUntil - ctx.nowMs) : void 0;
+      bus.emit("farm:state", { state: step.next, note: step.action.note, cdRemainMs });
+      execFarm(step.action);
+      farmBusyUntil = Date.now() + C.farmTickMs;
+    } catch (e) {
+      console.error("[HVAB:farm] farmTick", e);
+    }
+  }
   let lastFp = "";
   let actedAt = 0;
   let busyUntil = 0;
@@ -1608,6 +2025,8 @@
           lastFp = fp;
           reader.prev = S;
         }
+      } else if (config.get("enabled") && config.get("farmEnabled") && !nowIn) {
+        farmTick();
       }
     } catch {
     }
