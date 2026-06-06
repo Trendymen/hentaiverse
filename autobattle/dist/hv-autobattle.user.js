@@ -144,16 +144,18 @@
     // ① 永久预留可放 Spark 的 MP
     BURST_EST: 0.45,
     // ② 满暴击连击波(占血池)
-    PANIC_RED: 0.5,
+    PANIC_RED: 0.35,
     PANIC_NORM: 0.25,
     MP_FUSE: 0.3,
     // ④ MP 熔断阈值
-    HP_HEAL: 0.6,
+    HP_HEAL: 0.55,
+    // ③ 常规喝血线
     STRUGGLE_HP: 0.5,
     // 放弃攒炮的血线阈值(hp 跌破此比例 = 血线下降, 转单体技减压)
     STRUGGLE_STREAK: 2,
     // 连续几次决策跌破 STRUGGLE_HP 才放弃攒炮(去抖, 防单次瞬掉误触发)
-    MP_LOW: 0.35,
+    MP_LOW: 0.45,
+    // 常规回蓝线(HUD「回蓝」滑块): P9 现按 mp/maxMp 直接算(不扣预留), 设多少=HUD多少; mp<45% 就用药水/长效补, 绝不碰终极
     SP_LOW: 0.3,
     SP_RESERVE_RATIO: 0.45,
     // 高压/灵力盾场景的 SP 预留线: 不要求开架式也会补灵力
@@ -167,6 +169,10 @@
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
     // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
+    REGEN_HOLD: 12,
+    // 细胞活化放出后多少回合不重放: 覆盖 reader 的 DOM 检测空窗(放出后图标短暂读不到→连放烧蓝); 过窗后仍由 buff 检测主导, reader 失灵也最多每 12 回合放一次
+    MANAPOT_HOLD: 3,
+    // 回蓝药喝后多少回合常规线(P9)不重复喝: 防长效药慢回看不到效果→同波连喝长效/药水/终极; 急救线(P1/P3/墙倒)不受限
     CANNON_YIELD_OC: 175,
     // 架式让位阈值: 仅 OC≥此值(接近200)才关架式冲刺; OC<此值架式常驻(ehwiki:+100%物理伤害+OC净涨)
     // ── M2 开关/节奏 ──
@@ -234,11 +240,12 @@
     // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
-  const CONFIG_VERSION = 3;
+  const CONFIG_VERSION = 4;
   if (Store.get("configVersion", 0) < CONFIG_VERSION) {
     current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs;
     current.OC_ON = DEFAULT_CONFIG.OC_ON;
     current.CANNON_MIN_ENEMIES = DEFAULT_CONFIG.CANNON_MIN_ENEMIES;
+    current.MP_LOW = DEFAULT_CONFIG.MP_LOW;
     Store.set("config", current);
     Store.set("configVersion", CONFIG_VERSION);
   }
@@ -528,6 +535,7 @@
     Weaken: 212,
     Imperil: 213,
     Slow: 221,
+    Sleep: 222,
     Blind: 231,
     Silence: 232,
     Cure: 311,
@@ -554,8 +562,10 @@
     hPotion: 11195,
     hElixir: 11199,
     mDraught: 11291,
+    mPotion: 11295,
     mElixir: 11299,
     sDraught: 11391,
+    sPotion: 11395,
     scrollProt: 13111
   };
   const GEM = {
@@ -1222,13 +1232,21 @@
         exec: t === "spell" ? () => Exec.skill(id) : t === "item" ? () => Exec.item(id) : () => Exec.attack(id)
       });
       const pickHeal = () => {
-        for (const id of [IT.hElixir, IT.hDraught, IT.hPotion]) {
+        for (const id of [IT.hElixir, IT.hPotion, IT.hDraught]) {
           if (Exec.itemAvailable(id)) return A("item", id);
         }
         return null;
       };
-      const pickMana = () => S.gems.mp ? A("item", S.gems.mp) : !b.mpot.active ? A("item", IT.mDraught) : A("item", IT.mElixir);
-      const pickSpirit = () => S.gems.sp ? A("item", S.gems.sp) : A("item", IT.sDraught);
+      const pickMana = () => {
+        if (S.gems.mp) return A("item", S.gems.mp);
+        for (const id of [IT.mPotion, IT.mElixir]) if (Exec.itemAvailable(id)) return A("item", id);
+        return { type: "defend", exec: Exec.defend, note: "回蓝药耗尽硬抗" };
+      };
+      const pickSpirit = () => {
+        if (S.gems.sp) return A("item", S.gems.sp);
+        for (const id of [IT.sDraught, IT.sPotion]) if (Exec.itemAvailable(id)) return A("item", id);
+        return null;
+      };
       if (S.riddle) {
         const r = this.riddle();
         return r ? { type: "riddle", option: r.option, exec: () => {
@@ -1297,21 +1315,26 @@
       if (C.useShadowVeil && shadowDown && !pressure.spReserveLow && (!C.shadowVeilPressureOnly || pressure.level !== "low") && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(SK.ShadowVeil))
         return { type: "spell", id: SK.ShadowVeil, note: `压:${pressure.level} 影纱`, exec: () => Exec.skill(SK.ShadowVeil) };
       if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A("spell", SK.Haste);
-      if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A("item", IT.hDraught);
-      if ((!b.regen.active || b.regen.turns <= 1) && Exec.skillReady(SK.Regen)) return A("spell", SK.Regen);
-      if (mpFree < C.MP_LOW * MM) {
+      if (heavy && hp < C.HP_HEAL * HM && Exec.itemAvailable(IT.hDraught)) return A("item", IT.hDraught);
+      if ((!b.regen.active || b.regen.turns <= 1) && !S.regenOnCd && Exec.skillReady(SK.Regen)) return A("spell", SK.Regen);
+      if (mp < C.MP_LOW * MM && !S.manaPotOnCd) {
         if (S.gems.mp) return A("item", S.gems.mp);
-        if (!b.mpot.active) return A("item", IT.mDraught);
+        for (const id of [IT.mPotion, IT.mDraught]) if (Exec.itemAvailable(id)) return A("item", id);
       }
-      if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A("item", S.gems.hp) : A("item", IT.hDraught);
+      if (hp < C.HP_HEAL * HM) {
+        if (S.gems.hp) return A("item", S.gems.hp);
+        for (const id of [IT.hDraught, IT.hPotion, IT.hElixir]) if (Exec.itemAvailable(id)) return A("item", id);
+      }
       const control = selectControlDebuff(S, C, ranked, pressure);
       if (control && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(control.id)) {
         if (control.target.is_red_boss) S.lockedRedId = control.target.eid;
         return { type: "spell", id: control.id, note: `${control.note} 压:${pressure.level}`, exec: () => Exec.castHostileOn(control.id, control.target.eid) };
       }
       const spReserveNeed = sp < C.SP_RESERVE_RATIO * SM && (b.spiritShield.active || pressure.level !== "low");
-      if ((sp < C.SP_LOW * SM || spReserveNeed || sp < C.SP_LOW * SM && S.stanceOn) && !b.spot.active)
-        return { ...pickSpirit(), note: spReserveNeed ? "SP:预留不足" : "SP:低线" };
+      if (sp < C.SP_LOW * SM || spReserveNeed || sp < C.SP_LOW * SM && S.stanceOn) {
+        const s = pickSpirit();
+        if (s) return { ...s, note: spReserveNeed ? "SP:预留不足" : "SP:低线" };
+      }
       if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
       const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
@@ -1411,6 +1434,9 @@
   const EXIT_FALSE_STREAK = 4;
   let stuckN = 0;
   let cannonCd = Store.get("cannonCd", 0);
+  let regenCd = 0;
+  let manaPotCd = 0;
+  const MANA_POT_IDS = /* @__PURE__ */ new Set([IT.mDraught, IT.mPotion, IT.mElixir]);
   let cannonRoundSeen = Store.get("cannonRound", -1);
   function nextCannonCooldown(actionType, execResult, currentCd, cooldownTurns) {
     return actionType === "cannon" && execResult === true ? cooldownTurns : currentCd;
@@ -1447,10 +1473,14 @@
             if (S.roundNow > 0 && cannonRoundSeen > 0 && S.roundNow < cannonRoundSeen) cannonCd = 0;
             cannonRoundSeen = S.roundNow;
             if (cannonCd > 0) cannonCd--;
+            if (regenCd > 0) regenCd--;
+            if (manaPotCd > 0) manaPotCd--;
             Store.set("cannonCd", cannonCd);
             Store.set("cannonRound", cannonRoundSeen);
           }
           S.cannonOnCd = cannonCd > 0;
+          S.regenOnCd = regenCd > 0;
+          S.manaPotOnCd = manaPotCd > 0;
           let a = brain.decide(S);
           const sig = `${a.type}:${a.id ?? ""}`;
           if (!changed && sig === lastSig) stuckN++;
@@ -1536,6 +1566,8 @@
                 cannonCd = nextCd;
                 Store.set("cannonCd", cannonCd);
               }
+              if (a.type === "spell" && a.id === SK.Regen && result === true) regenCd = config.get("REGEN_HOLD");
+              if (a.type === "item" && a.id !== void 0 && MANA_POT_IDS.has(a.id) && result === true) manaPotCd = config.get("MANAPOT_HOLD");
             }, delay);
             busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5e3) : 0);
             actedAt = Date.now();

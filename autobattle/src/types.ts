@@ -104,6 +104,8 @@ export interface BattleState {
   gems: { hp: number; mp: number; sp: number; mystic: number }; // 对口恢复宝石 + 独立神秘宝石(Channeling); 0=无
   cannonExists: boolean; // 小马炮在技能栏(攒炮/放炮/OC技能让路共用; OC够看 overcharge≥200, 冷却看 cannonOnCd)
   cannonOnCd: boolean; // 在 50 回合冷却中(loop 按回合追踪注入; reader 读不到冷却, 默认 false)
+  regenOnCd?: boolean; // loop 注入: 细胞活化回合追踪(放出 REGEN_HOLD 回合内不重放, 兜 reader DOM 检测空窗导致的连放烧蓝); reader 不设
+  manaPotOnCd?: boolean; // loop 注入: 回蓝药冷静期(喝后 MANAPOT_HOLD 回合内常规线 P9 不重复喝, 防长效药慢回连喝多种); reader 不设
   scrollReady: boolean;
   firstRound: boolean;
   lockedRedId: number | undefined;

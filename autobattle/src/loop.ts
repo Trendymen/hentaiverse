@@ -5,7 +5,7 @@ import { config } from './core/config';
 import { reader } from './battle/reader';
 import { brain } from './battle/brain';
 import { Exec } from './battle/executor';
-import { actionLabel } from './battle/tables';
+import { actionLabel, SK, IT } from './battle/tables';
 import { bus } from './core/bus';
 import { logger } from './core/logger';
 import { Store } from './core/store';
@@ -24,6 +24,9 @@ const EXIT_FALSE_STREAK = 4; // 连续 4 次 inBattle=false 才判真退出 — 
 let stuckN = 0; // 连续"未推进+同动作"计数: 达阈值=上招放不出→强制脱困
 // 小马炮冷却跨波/轮持续(HV 跳轮 reload 内存全失), 故持久化到 Store: cannonCd=剩余冷却回合, cannonRound=上次轮(检测重开 GrindFest)
 let cannonCd = Store.get<number>('cannonCd', 0);
+let regenCd = 0; // 细胞活化回合追踪(战斗内, 不跨 reload): 放出后 REGEN_HOLD 回合内不重放
+let manaPotCd = 0; // 回蓝药冷静期(战斗内, 不跨 reload): 喝后 MANAPOT_HOLD 回合内常规线不重喝
+const MANA_POT_IDS = new Set<number>([IT.mDraught, IT.mPotion, IT.mElixir]); // 三种回蓝药(宝石不受冷却, 不计入冷静期)
 let cannonRoundSeen = Store.get<number>('cannonRound', -1);
 
 export function nextCannonCooldown(actionType: ActionType, execResult: unknown, currentCd: number, cooldownTurns: number): number {
@@ -75,10 +78,14 @@ function tick(): void {
           if (S.roundNow > 0 && cannonRoundSeen > 0 && S.roundNow < cannonRoundSeen) cannonCd = 0;
           cannonRoundSeen = S.roundNow;
           if (cannonCd > 0) cannonCd--;
+          if (regenCd > 0) regenCd--;
+          if (manaPotCd > 0) manaPotCd--;
           Store.set('cannonCd', cannonCd);
           Store.set('cannonRound', cannonRoundSeen);
         }
         S.cannonOnCd = cannonCd > 0; // 注入冷却态给 brain(reader 读不到冷却)
+        S.regenOnCd = regenCd > 0; // 细胞活化回合追踪(兜 reader DOM 检测空窗)
+        S.manaPotOnCd = manaPotCd > 0; // 回蓝药冷静期(防常规线连喝)
         let a = brain.decide(S);
         // 死循环安全网: stalled(fp 没变=上招没推进)又决策同一招 → 判定该招放不出(法术冷却/物品没货/按钮缺), 连续 2 次强制平砍脱困
         const sig = `${a.type}:${a.id ?? ''}`;
@@ -186,6 +193,9 @@ function tick(): void {
               cannonCd = nextCd;
               Store.set('cannonCd', cannonCd);
             }
+            // 细胞活化/回蓝药回合追踪: 真放出后(result===true)盖冷却戳, 下回合起 changed 递减, 抑制 reader DOM 空窗/长效药慢回导致的重复
+            if (a.type === 'spell' && a.id === SK.Regen && result === true) regenCd = config.get('REGEN_HOLD');
+            if (a.type === 'item' && a.id !== undefined && MANA_POT_IDS.has(a.id) && result === true) manaPotCd = config.get('MANAPOT_HOLD');
           }, delay);
           busyUntil = Date.now() + delay + 150 + (stuckN > 1 ? Math.min(stuckN * 500, 5000) : 0); // 出招后极短锁; 连续放不出(stuckN>1)指数退避减速(stuckN×500, 上限5s), 防网络卡时 300ms 疯狂刷屏
           actedAt = Date.now();

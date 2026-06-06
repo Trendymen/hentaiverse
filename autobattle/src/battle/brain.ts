@@ -85,16 +85,28 @@ export class Brain {
             ? () => Exec.item(id)
             : () => Exec.attack(id),
     });
-    // 体力急救药降级链: 终极体力药 → 体力长效药 → 体力药水, 取背包里第一个"可点"的;
-    // 全部没货/冷却 → 返回 null, 交上层降级(火花/防御), 不再空转点击不存在的药(修死循环根因)
+    // 体力急救药降级链(急救即时优先: 长效药是"每回合慢回"救不了急, 故药水排在长效前):
+    //   终极体力药(即时回满) → 体力药水(即时) → 体力长效药(慢回垫底), 取背包里第一个"可点"的;
+    // 各药不共享冷却, itemAvailable 精确查每种药可点; 全部没货/冷却 → 返回 null, 交上层降级(火花/防御).
     const pickHeal = (): Action | null => {
-      for (const id of [IT.hElixir, IT.hDraught, IT.hPotion]) {
+      for (const id of [IT.hElixir, IT.hPotion, IT.hDraught]) {
         if (Exec.itemAvailable(id)) return A('item', id);
       }
       return null;
     };
-    const pickMana = (): Action => (S.gems.mp ? A('item', S.gems.mp) : !b.mpot.active ? A('item', IT.mDraught) : A('item', IT.mElixir));
-    const pickSpirit = (): Action => (S.gems.sp ? A('item', S.gems.sp) : A('item', IT.sDraught));
+    // 急救回蓝(P1真空/P3熔断/墙倒调用): 省终极优先 —— 魔力宝石(免费) → 法力药水(即时回一截, 够放Spark/脱熔断就行) → 终极法力药(回满兜底);
+    //   长效药慢回救不了急, 不进急救链; 各药独立冷却 itemAvailable 查; 全耗尽 → 防御硬抗.
+    const pickMana = (): Action => {
+      if (S.gems.mp) return A('item', S.gems.mp);
+      for (const id of [IT.mPotion, IT.mElixir]) if (Exec.itemAvailable(id)) return A('item', id);
+      return { type: 'defend', exec: Exec.defend, note: '回蓝药耗尽硬抗' };
+    };
+    // 回灵长效优先(养斗气非急救, 省钱为主): 灵力宝石 → 灵力长效药 → 灵力药水(灵力无终极药); 全耗尽 → null 交上层跳过.
+    const pickSpirit = (): Action | null => {
+      if (S.gems.sp) return A('item', S.gems.sp);
+      for (const id of [IT.sDraught, IT.sPotion]) if (Exec.itemAvailable(id)) return A('item', id);
+      return null;
+    };
 
     // P0 小马图: 留人工
     if (S.riddle) {
@@ -179,27 +191,33 @@ export class Brain {
       return { type: 'spell', id: SK.ShadowVeil, note: `压:${pressure.level} 影纱`, exec: () => Exec.skill(SK.ShadowVeil) };
     // P7 Haste(加 skillReady 守卫: MP不够/冷却时别硬决策放不出的法术→死磕安全网)
     if ((!b.haste.active || b.haste.turns <= 1) && Exec.skillReady(SK.Haste)) return A('spell', SK.Haste);
-    // 重击波垫血(节流)
-    if (heavy && hp < C.HP_HEAL * HM && !b.hpot.active) return A('item', IT.hDraught);
+    // 重击波垫血(预防性, 长效药便宜慢回正合适): 长效药可点才垫, 否则跳过交 P10 降级链(避免点没货的药空转)
+    if (heavy && hp < C.HP_HEAL * HM && Exec.itemAvailable(IT.hDraught)) return A('item', IT.hDraught);
     // P8 Regen(细胞活化, 持续回血). 祝福只增伤不持续回血→祝福期仍需 Regen. 加 skillReady 守卫: MP不够别硬放(GF日志R28: 反复硬放Regen→烧光MP→Spark真空瘫痪10回合)
-    if ((!b.regen.active || b.regen.turns <= 1) && Exec.skillReady(SK.Regen)) return A('spell', SK.Regen);
-    // P9 回 MP(节流: manapot 在=刚喝长效药冷却中不重复喝; Gem 不受冷却)
-    if (mpFree < C.MP_LOW * MM) {
+    if ((!b.regen.active || b.regen.turns <= 1) && !S.regenOnCd && Exec.skillReady(SK.Regen)) return A('spell', SK.Regen);
+    // P9 回 MP(常规省终极, HUD口径直接按 mp/maxMp): 魔力宝石 → 法力药水(50%即时, 主力) → 法力长效药(慢回兜底); 绝不碰终极(终极只留 P3熔断/P1真空);
+    //   mp < MP_LOW 触发(不扣 SPARK_RESERVE, 与 HUD「回蓝」线一致, 所见即所得); 各药独立冷却 itemAvailable 查; manaPotOnCd 冷静期防连喝.
+    if (mp < C.MP_LOW * MM && !S.manaPotOnCd) {
       if (S.gems.mp) return A('item', S.gems.mp);
-      if (!b.mpot.active) return A('item', IT.mDraught);
+      for (const id of [IT.mPotion, IT.mDraught]) if (Exec.itemAvailable(id)) return A('item', id);
     }
-    // P10 回 HP(节流)
-    if (hp < C.HP_HEAL * HM && !b.hpot.active) return S.gems.hp ? A('item', S.gems.hp) : A('item', IT.hDraught);
+    // P10 回 HP(常规长效优先省钱: 生命宝石 → 长效药 → 体力药水 → 终极兜底; itemAvailable 查可点, 长效药冷却中降级到即时药顶上)
+    if (hp < C.HP_HEAL * HM) {
+      if (S.gems.hp) return A('item', S.gems.hp);
+      for (const id of [IT.hDraught, IT.hPotion, IT.hElixir]) if (Exec.itemAvailable(id)) return A('item', id);
+    }
     // P10.5 高压控制: Weaken → Silence → 高价值 Imperil, 用 SP 压力本身触发沉默减压.
     const control = selectControlDebuff(S, C, ranked, pressure);
     if (control && (ch || mpFree >= C.MP_LOW * MM) && Exec.skillReady(control.id)) {
       if (control.target.is_red_boss) S.lockedRedId = control.target.eid;
       return { type: 'spell', id: control.id, note: `${control.note} 压:${pressure.level}`, exec: () => Exec.castHostileOn(control.id, control.target.eid) };
     }
-    // P11 回 SP 喂斗气(节流)
+    // P11 回 SP 喂斗气(长效优先, itemAvailable 查可点; 长效药冷却中降级到灵力药水顶上, 不再干等; 药耗尽则跳过继续后续决策)
     const spReserveNeed = sp < C.SP_RESERVE_RATIO * SM && (b.spiritShield.active || pressure.level !== 'low');
-    if ((sp < C.SP_LOW * SM || spReserveNeed || (sp < C.SP_LOW * SM && S.stanceOn)) && !b.spot.active)
-      return { ...pickSpirit(), note: spReserveNeed ? 'SP:预留不足' : 'SP:低线' };
+    if (sp < C.SP_LOW * SM || spReserveNeed || (sp < C.SP_LOW * SM && S.stanceOn)) {
+      const s = pickSpirit();
+      if (s) return { ...s, note: spReserveNeed ? 'SP:预留不足' : 'SP:低线' };
+    }
     // P11.5 小马炮 AOE(攒满即放, 必须排在架式之上): 不在 50 回合冷却(loop 按回合追踪 cannonOnCd) + OC≥200(炮耗8点斗气).
     //   弃用 opacity 判: OC<200 与冷却同为 opacity:0.5 无法区分(炮死锁根因), 改用回合冷却 + OC 数值.
     //   排在架式之上: 否则 OC 攒到 200 那刻被 P12"开架式"抢走 → 架式烧回<200 → 炮放不出+架式来回开关.
