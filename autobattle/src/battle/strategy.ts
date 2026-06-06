@@ -126,3 +126,11 @@ export function ocFloorOk(S: BattleState, C: Config, pressure: Pressure, oc: num
   const floor = cannonReady ? C.CANNON_YIELD_OC : C.OC_ON * C.OCMAX;
   return oc - cost >= floor;
 }
+
+/** 单红收尾(灰度): 活怪只剩 1 个且是红名 → 关架式攒 OC、处决链解除架式门槛.
+ *  开关关 / ≥2 活怪 / 非红名 → false(维持现状). */
+export function endgameSoloRed(S: BattleState, C: Config): boolean {
+  if (!C.useEndgameStanceOff) return false;
+  const live = S.enemies.filter((e) => e.alive);
+  return live.length === 1 && live[0].is_red_boss;
+}
