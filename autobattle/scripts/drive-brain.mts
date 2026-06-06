@@ -87,5 +87,6 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 150; s.cannonExists = false; s.stanceOn = true; run('㉒无压力3杂兵OC150炮不可用架已开[盾击放行]', { state: s }); }
 { const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 190; s.cannonExists = true; s.cannonOnCd = false; s.stanceOn = true; run('㉓无压力3杂兵OC190炮可用架已开[盾击应抑制→平砍]', { state: s }); }
 
-// ── 残局红名 OC 省留观察(endgameRedHold)── 最终波大波(monsterTotal=10)打到只剩1红名、架式开、血稳
-{ const s = base(); s.roundNow = 10; s.roundAll = 10; s.enemies = [enemy(1, { is_red_boss: true, hpPct: 40, hpNow: 4000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 10; s.overcharge = 150; s.stanceOn = true; run('㉔最终波大波只剩1红名(40%)血稳OC150架开[hold→平砍红名]', { state: s }); }
+// ── 残局红名 OC 省留观察(endgameRedHold)── 最终波(无下一波) vs 有下一波 对比
+{ const s = base(); s.roundNow = 10; s.roundAll = 10; s.enemies = [enemy(1, { is_red_boss: true, hpPct: 40, hpNow: 4000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 10; s.overcharge = 150; s.stanceOn = true; run('㉔最终波大波只剩1红名OC150[无下一波→盾击无脑OC]', { state: s }); }
+{ const s = base(); s.roundNow = 1; s.roundAll = 10; s.enemies = [enemy(1, { is_red_boss: true, hpPct: 40, hpNow: 4000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 10; s.overcharge = 150; s.stanceOn = true; run('㉕有下一波大波只剩1红名OC150[攒炮模式→平砍省OC]', { state: s }); }

@@ -29,11 +29,12 @@
 ## 触发条件(全满足)
 
 1. 本轮怪物总数 > 6(`S.monsterTotal > 6`,大波);
-2. 打到只剩 1 只红名(`live.length === 1 && live[0].is_red_boss`,无其他活怪)。
+2. 打到只剩 1 只红名(`live.length === 1 && live[0].is_red_boss`,无其他活怪);
+3. 有下一轮波(`hasFutureRound(S)`,非最终波)——最终波没有下一波可攒,省 OC 无意义,应无脑 OC 斩杀。
 
-即"大波清场到只剩最后一只红名 boss"这一明确收尾局面才启用省 OC,不看红名血量阈值。
+即"大波清场到只剩最后一只红名 boss、且后面还有波次"这一收尾局面才启用省 OC,不看红名血量阈值。
 
-> 注:`monsterTotal > 6` 且有 future round 时 `shouldSaveOcForCannon` 本就为 true(攒炮模式),连招块被跳过——此时 `endgameRedHold` 的核心作用是 hold 住 `execRed` 块的"破攒炮"慈悲/要害,让大波收尾不破攒炮、继续攒 OC;连招 3 处在最终波(无 future round → 不攒炮)等场景生效。
+> 交互说明:满足条件时(`monsterTotal>6 && hasFutureRound`),`shouldSaveOcForCannon` 本就为 true(攒炮模式),连招块被跳过——`endgameRedHold` 的实际作用是 hold 住 `execRed` 块的"破攒炮"慈悲/要害,让大波收尾不破攒炮、继续攒 OC。连招块 3 处 gate 在当前 `saveOcForCannon` 逻辑下成为防御性冗余(有下一波时攒炮跳过连招;最终波时 `endgameRedHold` 因条件 3 返回 false),保留以防 gate 逻辑变化。
 
 ## 设计
 
@@ -55,12 +56,13 @@
 `Config`/`BattleState` 已在本文件 import,`EnemyState.hpPct` 现成,零新增 import。在 `ocFloorOk` 之后新增:
 
 ```ts
-/** 残局红名 OC 省留: 本轮怪总数>6 的大波、打到只剩 1 只红名、且血稳(非struggling)时,
+/** 残局红名 OC 省留: 本轮怪总数>6 的大波、打到只剩 1 只红名、有下一轮波、且血稳(非struggling)时,
  *  对红名 OC 单体技设175地板(放完仍≥CANNON_YIELD_OC), 攒OC留下轮开局炮.
- *  返回 true = 应暂缓该技、改平砍磨; struggling/非触发/开关关 → false(正常出手). */
+ *  最终波(无下一轮波) → 无脑OC斩杀; struggling/非触发/开关关 → false(正常出手). */
 export function endgameRedHold(S: BattleState, C: Config, oc: number, cost: number, struggling: boolean): boolean {
   if (!C.useEndgameRedOcSave) return false;          // 开关关 → 不暂缓
   if (struggling) return false;                      // 血连降 → 正常斩杀链
+  if (!hasFutureRound(S)) return false;              // 最终波(无下一轮波) → 无脑OC斩杀, 不省
   if (S.monsterTotal <= 6) return false;             // 本轮怪总数≤6(非大波) → 不进入
   const live = S.enemies.filter((e) => e.alive);
   if (live.length !== 1 || !live[0].is_red_boss) return false; // 非"只剩1红名" → 不进入
@@ -108,7 +110,7 @@ useEndgameRedOcSave: true, // 残局(本轮>6怪打到只剩1红名)血稳时, �
 
 ## 测试要点
 
-新增 `autobattle/scripts/drive-endgame.mts` 断言 `endgameRedHold`(`St(enemies, monsterTotal=10)`,`cost` 取 25/50/100):
+新增 `autobattle/scripts/drive-endgame.mts` 断言 `endgameRedHold`(`St(enemies, monsterTotal=10, roundNow=1, roundAll=10)`,默认有下一波;`cost` 取 25/50/100):
 
 1. 大波(mt=10)+只剩1红名+血稳+盾击oc190 → true(165<175,暂缓)
 2. 大波+只剩1红名+血稳+盾击oc200 → false(175≥175,放行消化溢出)
@@ -120,8 +122,10 @@ useEndgameRedOcSave: true, // 残局(本轮>6怪打到只剩1红名)血稳时, �
 8. 大波+只剩1只杂兵(非red)+血稳 → false
 9. 大波+只剩1红名(80%血)+血稳 → true(不看血量阈值)
 10. 开关关(`useEndgameRedOcSave=false`)+大波+只剩1红名 → false
+11. 最终波(`roundNow==roundAll`,无下一波)+大波+只剩1红名 → false(最终波无脑 OC,不省)
+12. 6 怪波(mt=6,非>6)+剩2红名 → false(两条件都不满足,会用 OC 单体)
 
-集成:`drive-brain.mts` 加最终波大波(monsterTotal=10)只剩1红名、血稳、OC 中等场景,确认决策为平砍红名而非盾击/要害/慈悲。
+集成:`drive-brain.mts` 最终波(㉔)与有下一波(㉕)对比——㉔最终波大波只剩1红名 → 盾击晕红名(无脑 OC);㉕有下一波大波只剩1红名 → 平砍红名(攒炮省 OC)。
 
 ## 待实现清单
 

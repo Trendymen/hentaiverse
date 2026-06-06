@@ -7,7 +7,7 @@ import type { BattleState, EnemyState } from '../src/types';
 
 const C = { ...DEFAULT_CONFIG };
 const e = (o: Partial<EnemyState>): EnemyState => ({ alive: true, is_red_boss: true, hpPct: 100, ...o } as EnemyState);
-const St = (enemies: EnemyState[], monsterTotal = 10) => ({ enemies, monsterTotal } as unknown as BattleState);
+const St = (enemies: EnemyState[], monsterTotal = 10, roundNow = 1, roundAll = 10) => ({ enemies, monsterTotal, roundNow, roundAll } as unknown as BattleState);
 
 let pass = 0;
 const check = (name: string, actual: boolean, expected: boolean) => {
@@ -39,5 +39,9 @@ check('大波·1红名80%→暂缓(不看血量)', endgameRedHold(St([e({ hpPct:
 // 10. 开关关+大波+只剩1红名 → false
 const Coff = { ...DEFAULT_CONFIG, useEndgameRedOcSave: false };
 check('开关关→放行', endgameRedHold(St(solo), Coff, 190, 25, false), false);
+// 11. 最终波(roundNow==roundAll, 无下一轮波)+大波+只剩1红名+血稳 → false(最终波无脑OC, 不省)
+check('最终波·大波1红名→放行(无脑OC)', endgameRedHold(St(solo, 10, 10, 10), C, 120, 100, false), false);
+// 12. 6怪波(monsterTotal=6, 非>6)+剩2红名+血稳 → false(两条件都不满足→会用OC单体)
+check('6怪波·2红名→放行(会用OC单体)', endgameRedHold(St([e({ hpPct: 40 }), e({ hpPct: 80 })], 6), C, 120, 100, false), false);
 
 console.log(`\n✅ endgameRedHold 全部 ${pass} 用例通过`);
