@@ -165,8 +165,8 @@
     // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
     HS_MIN_ENEMIES: 2,
-    CANNON_MIN_ENEMIES: 6,
-    // 攒炮最少怪(原4→6): 4-5只小局清场太快、OC攒不满200就清完=攒炮空转还压住近战技; 提到6让小局直接放近战技/平砍, 6+大局才攒炮(能攒满)
+    CANNON_MIN_ENEMIES: 5,
+    // 攒炮最少怪: 活怪≥此值才攒炮/放炮 AOE(曾 4→6 挡小局空转, 现按需改回 5 放宽)
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
@@ -1548,6 +1548,31 @@
     return { kind: "empty", arena };
   }
   const MS_PER_HOUR$1 = 36e5;
+  const MS_PER_DAY$1 = 24 * MS_PER_HOUR$1;
+  function isSameUtcDay(aMs, bMs) {
+    return Math.floor(aMs / MS_PER_DAY$1) === Math.floor(bMs / MS_PER_DAY$1);
+  }
+  function filterToday(recs, nowMs) {
+    return recs.filter((e) => isSameUtcDay(e.time, nowMs));
+  }
+  function computeCooldown(recs, nowMs, lastEH, cdMs) {
+    var _a;
+    const encountered = recs.filter((e) => e.encountered && e.href);
+    const last = ((_a = recs[0]) == null ? void 0 : _a.time) ?? lastEH ?? 0;
+    let cd;
+    if (encountered.length >= 24) cd = Math.floor(recs[0].time / MS_PER_DAY$1 + 1) * MS_PER_DAY$1 - nowMs;
+    else if (!last) cd = 0;
+    else cd = cdMs + last - nowMs;
+    return Math.max(0, cd);
+  }
+  function pickEngageable(recs) {
+    for (const e of recs) {
+      if (e.encountered) continue;
+      if (e.href) return e.href;
+    }
+    return void 0;
+  }
+  const MS_PER_HOUR = 36e5;
   function emptyArena(nowMs) {
     return { array: [], arrayDone: [], token: {}, gr: 0, date: nowMs };
   }
@@ -1577,7 +1602,7 @@
     const url = location.href;
     const host = location.host;
     const nowMs = Date.now();
-    const nowHour = Math.floor(nowMs / MS_PER_HOUR$1);
+    const nowHour = Math.floor(nowMs / MS_PER_HOUR);
     const storedState = Store.get("farmState", "IDLE");
     const lastHref = Store.get("lastHref", "");
     const lastEH = Store.get("lastEH", 0);
@@ -1593,7 +1618,7 @@
       hathperk: Store.get("staminaHathperk", false)
     };
     let arena = Store.get("arena", emptyArena(nowMs));
-    let encounter = Store.get("encounter", []);
+    let encounter = filterToday(Store.get("encounter", []), nowMs);
     let eventHref;
     let hvOrigin = Store.get("hvUrl", "https://hentaiverse.org");
     let page;
@@ -1604,10 +1629,15 @@
       if (eventpane) {
         const a = $("#eventpane>div>a");
         const seg = a == null ? void 0 : a.href.split("/")[3];
-        if (seg === void 0) encounter = [];
-        encounter.unshift({ href: seg, time: nowMs });
-        Store.set("encounter", encounter);
-        eventHref = seg;
+        if (seg === void 0) {
+          encounter = [];
+          eventHref = void 0;
+        } else {
+          encounter.unshift({ href: seg, time: nowMs });
+          encounter = filterToday(encounter, nowMs);
+          Store.set("encounter", encounter);
+          eventHref = seg;
+        }
       } else {
         for (const e of encounter) {
           if (e.encountered) continue;
@@ -1620,6 +1650,7 @@
     } else {
       hvOrigin = location.origin;
       Store.set("hvUrl", hvOrigin);
+      if (!url.endsWith("?s=Battle")) Store.set("lastHref", url);
       if (/\?s=Battle&ss=(ar|gr|rb)/.test(url)) {
         arena = collectTokens(arena);
         Store.set("arena", arena);
@@ -1680,29 +1711,10 @@
     if (!nrOk) return -1;
     return 0;
   }
-  function shouldRecover(snap, stamina, cfg) {
+  function shouldRecover(_snap, stamina, cfg) {
     if (!cfg.restoreStamina) return false;
-    const recover = snap.hathperk ? 20 : 10;
+    const recover = cfg.staminaHathperk ? 20 : 10;
     return stamina <= 100 - recover;
-  }
-  const MS_PER_HOUR = 36e5;
-  const MS_PER_DAY$1 = 24 * MS_PER_HOUR;
-  function computeCooldown(recs, nowMs, lastEH, cdMs) {
-    var _a;
-    const encountered = recs.filter((e) => e.encountered && e.href);
-    const last = ((_a = recs[0]) == null ? void 0 : _a.time) ?? lastEH ?? 0;
-    let cd;
-    if (encountered.length >= 24) cd = Math.floor(recs[0].time / MS_PER_DAY$1 + 1) * MS_PER_DAY$1 - nowMs;
-    else if (!last) cd = 0;
-    else cd = cdMs + last - nowMs;
-    return Math.max(0, cd);
-  }
-  function pickEngageable(recs) {
-    for (const e of recs) {
-      if (e.encountered) continue;
-      if (e.href) return e.href;
-    }
-    return void 0;
   }
   const MS_PER_DAY = 24 * 36e5;
   const MS_30MIN = 30 * 6e4;
@@ -2025,7 +2037,7 @@
           lastFp = fp;
           reader.prev = S;
         }
-      } else if (config.get("enabled") && config.get("farmEnabled") && !nowIn) {
+      } else if (config.get("enabled") && config.get("farmEnabled") && !nowIn && lastInBattle === false) {
         farmTick();
       }
     } catch {
