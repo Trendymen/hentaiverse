@@ -230,6 +230,7 @@ export class Brain {
     // 单红收尾(灰度): 关架式攒 OC, 让处决链在关架式下跑(供 A/C 引用)
     const soloRed = endgameSoloRed(S, C);
     if (soloRed) {
+      this.charging = false; // 清掉跨回合遗留的攒炮冲刺态(多杂兵→单红过渡, 防 soloRed 退出后脏 charging)
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式攒OC; 不自动开(落到 P13+)
     } else {
       const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
@@ -318,7 +319,7 @@ export class Brain {
     const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
     if (trash.length) {
       const t = trash[0];
-      const why = saveOcForCannon ? '攒炮中' : C.useTargetWeight ? 'finWeight最优' : '最低eid';
+      const why = saveOcForCannon ? '攒炮中' : soloRed ? '单红收尾' : C.useTargetWeight ? 'finWeight最优' : '最低eid';
       return { type: 'attack', id: t.eid, note: `平砍杂兵#${t.eid}(${why},${t.hpPct}%${t.status?.PA ? '·破甲' : ''})`, exec: () => Exec.attack(t.eid) };
     }
     if (tgt) {
