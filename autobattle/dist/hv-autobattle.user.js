@@ -212,6 +212,8 @@
     // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
     useShieldBash: true,
     // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
+    useShieldBashOcFloor: true,
+    // 无压力(level==='low')盾击晕杂兵需放完 OC 仍≥地板(炮可用→CANNON_YIELD_OC 175, 否则开架式线 OC_ON*OCMAX 125), 把 OC 留给架式/攒炮; false 退回旧"oc≥25 即晕"(灰度可一键回滚)
     useMercifulBlow: true,
     // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)
     // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
@@ -1173,6 +1175,13 @@
     if (S.alive >= C.CANNON_MIN_ENEMIES) return true;
     return hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES;
   }
+  function ocFloorOk(S, C, pressure, oc, cost) {
+    if (!C.useShieldBashOcFloor) return true;
+    if (pressure.level !== "low") return true;
+    const cannonReady = C.useCannon && S.cannonExists && !S.cannonOnCd;
+    const floor = cannonReady ? C.CANNON_YIELD_OC : C.OC_ON * C.OCMAX;
+    return oc - cost >= floor;
+  }
   function weightCfg(C) {
     return {
       baseHpRatio: C.baseHpRatio,
@@ -1391,7 +1400,7 @@
             return { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${why}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
           }
         }
-        if (C.useShieldBash && oc >= 25) {
+        if (C.useShieldBash && oc >= 25 && ocFloorOk(S, C, pressure, oc, 25)) {
           const toStun = ranked.find((e) => e.alive && !e.is_red_boss && !e.stunned);
           if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
             return { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };
@@ -1451,7 +1460,7 @@
   }
   function fingerprint(S) {
     const buffs = Object.entries(S.buff).filter(([, v]) => v.active).map(([k]) => k).join(",");
-    const foes = S.enemies.map((e) => `${e.eid}:${Object.keys(e.debuff).filter((k) => e.debuff[k]).join("")}`).join(",");
+    const foes = S.enemies.map((e) => `${e.eid}:${e.hpNow}:${Object.keys(e.debuff).filter((k) => e.debuff[k]).join("")}`).join(",");
     return [S.hp, S.mp, S.sp, S.overcharge, S.alive, foes, buffs, S.channeling ? "ch" : ""].join("|");
   }
   function tick() {
