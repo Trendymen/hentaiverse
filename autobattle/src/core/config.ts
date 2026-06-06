@@ -56,7 +56,7 @@ export const DEFAULT_CONFIG = {
   useVitalStrike: true, // 要害强击(实测 onclick=set_hostile_skill, castHostileOn 释放机制确认; 连招打已晕眩目标)
   useShieldBash: true, // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
   useShieldBashOcFloor: true, // 无压力(level==='low')盾击晕杂兵需放完 OC 仍≥地板(炮可用→CANNON_YIELD_OC 175, 否则开架式线 OC_ON*OCMAX 125), 把 OC 留给架式/攒炮; false 退回旧"oc≥25 即晕"(灰度可一键回滚)
-  useEndgameRedOcSave: true, // 残局(仅剩≤2红名+至少1个<50%血)血稳时, 红名OC单体技设175地板(放完仍≥CANNON_YIELD_OC)攒OC留下轮炮; struggling 则正常斩杀链; false 退回旧行为(灰度回退)
+  useEndgameRedOcSave: true, // 残局(本轮>6怪打到只剩1红名)血稳时, 红名OC单体技设175地板(放完仍≥CANNON_YIELD_OC)攒OC留下轮炮; struggling 则正常斩杀链; false 退回旧行为(灰度回退)
   useMercifulBlow: true, // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)
   // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
   useTargetWeight: true, // 总开关; 只控制 P16 是否按权重排序. 血条 bug 修复不受此控制. 2026-06-06 GF/竞技场真机核对通过(切换即时生效·血量+破甲滚雪球排序·无死磕)→ 脱离灰度转默认开
