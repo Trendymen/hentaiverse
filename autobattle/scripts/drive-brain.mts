@@ -103,3 +103,7 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 150; s.cannonOnCd = true; s.cannonCdLeft = 3; s.stanceOn = true; run('㉚6杂兵OC150炮冷却剩3(需3)架开[尾段预判→切架式攒炮]', { state: s }); }
 { const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 150; s.cannonOnCd = true; s.cannonCdLeft = 20; s.stanceOn = true; run('㉛6杂兵OC150炮冷却剩20(需3)架开[远冷却→不切架式·盾击控场]', { state: s }); }
 { const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 190; s.cannonOnCd = true; s.cannonCdLeft = 2; s.stanceOn = true; run('㉜6杂兵OC190炮冷却剩2(需1)架开[高OC防溢出→不切架式·盾击控场]', { state: s }); }
+
+// ── 最后一轮单红不关架式观察 ── 末轮(roundNow===roundAll)攒的OC无下一波可花 → endgameSoloRed 应失效, 回落正常架式滞回打满输出
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 150; s.stanceOn = true; s.roundNow = 10; s.roundAll = 10; run('㉝末轮单红+架开+OC150+开关on[不关架式→维持架开走连招盾击]', { state: s }); }
+{ const s = base(); s.enemies = [enemy(1, { is_red_boss: true, hpPct: 80, hpNow: 8000, debuff: { weaken: true, imperil: true } })]; s.alive = 1; s.monsterTotal = 1; s.overcharge = 150; s.stanceOn = false; s.roundNow = 10; s.roundAll = 10; run('㉞末轮单红+架关+OC150+开关on[OC≥125自动开架式打输出]', { state: s }); }

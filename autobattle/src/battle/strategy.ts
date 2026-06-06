@@ -127,10 +127,13 @@ export function ocFloorOk(S: BattleState, C: Config, pressure: Pressure, oc: num
   return oc - cost >= floor;
 }
 
-/** 单红收尾(灰度): 活怪只剩 1 个且是红名 → 关架式攒 OC、处决链解除架式门槛.
- *  开关关 / ≥2 活怪 / 非红名 → false(维持现状). */
+/** 单红收尾关架式攒 OC(灰度): 活怪只剩 1 红名 且 还有下一波 → 关架式攒 OC、处决链解除架式门槛.
+ *  ⚠必须有下一波(hasFutureRound): 攒的 OC 唯一去处是带到下一波凑 ≥CANNON_MIN_ENEMIES 怪放炮;
+ *    最后一轮单红没有下一波, OC 攒了无处花(炮需≥6怪、慈悲只 <25%, 单红都够不到) → 关架式纯亏 +100% 物理、
+ *    OC 还会封顶 250 空转 → 返回 false 回落正常架式滞回(OC≥125 开架式打满输出, 连招经 stanceOn 照跑).
+ *  开关关 / ≥2 活怪 / 非红名 / 最后一轮 → false(维持现状). */
 export function endgameSoloRed(S: BattleState, C: Config): boolean {
   if (!C.useEndgameStanceOff) return false;
   const live = S.enemies.filter((e) => e.alive);
-  return live.length === 1 && live[0].is_red_boss;
+  return live.length === 1 && live[0].is_red_boss && hasFutureRound(S);
 }
