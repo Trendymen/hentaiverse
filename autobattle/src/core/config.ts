@@ -74,6 +74,18 @@ export const DEFAULT_CONFIG = {
   BLEED_RATE_WINDOW: 3, // 速率移动平均窗口(最近 2-3 个主动样本)
   BLEED_MIN_SAMPLES: 1, // 走速率主路最少样本数, 不足走兜底
   BLEED_MIN_RATE: 1, // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
+  // ── M3 连刷(farm; 详见 specs/2026-06-06-autobattle-m3-farm-design.md)──
+  farmEnabled: false, // 连刷独立开关(与 enabled 解耦; 二者同开才连刷)
+  autoEncounter: false, // 自动接受遭遇战(跨站 e-hentai; 默认关需主动开)
+  restoreStamina: false, // 战前精力不足喝药恢复(消耗道具; 默认关; M3 盲发, 库存检测留 M4)
+  farmTickMs: 1500, // 连刷 tick 节奏(≥300ms 服务器红线, 留余量)
+  grPerDay: 3, // GF 每日开场数(arena.gr 初值, 跨日重置)
+  arenaLevels: '', // 待战等级/RB 逗号串(逆序消费); 可含 'gr' 代表 GF
+  staminaLow: 60, // 开战精力下限
+  staminaEncounter: 60, // 遭遇战精力下限
+  staminaLowWithNat: 0, // 含 24h 自然恢复的下限
+  encounterCdMin: 30, // 遭遇常规冷却(分钟)
+  staminaHathperk: false, // 精力 hathperk(影响盲发恢复量预估 +20/+10)
 };
 
 export type Config = typeof DEFAULT_CONFIG;
