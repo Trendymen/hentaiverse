@@ -115,3 +115,14 @@ export function shouldSaveOcForCannon(S: BattleState, C: Config, pressure: Press
   if (S.alive >= C.CANNON_MIN_ENEMIES) return true;
   return hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES;
 }
+
+/** 无压力时盾击晕杂兵的 OC 经济地板: 放完(扣 cost)后 OC 仍需 ≥ 地板, 把 OC 留给开/维持架式 + 攒炮.
+ *  炮可用时地板抬到攒炮让位线 CANNON_YIELD_OC(为炮跨波预留), 否则用开架式线 OC_ON*OCMAX.
+ *  有压力(level≠'low', 含红名场) 或灰度开关关闭则不设地板, 维持旧行为. */
+export function ocFloorOk(S: BattleState, C: Config, pressure: Pressure, oc: number, cost: number): boolean {
+  if (!C.useShieldBashOcFloor) return true; // 灰度开关关 → 旧行为
+  if (pressure.level !== 'low') return true; // 有压力(hasRed 已强制 medium) → 维持现状
+  const cannonReady = C.useCannon && S.cannonExists && !S.cannonOnCd;
+  const floor = cannonReady ? C.CANNON_YIELD_OC : C.OC_ON * C.OCMAX;
+  return oc - cost >= floor;
+}
