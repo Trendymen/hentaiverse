@@ -165,8 +165,8 @@
     // 灵动架式开启阈值: 游戏要 ≥50% 斗气才能开(原 0.4 → OC 40~50% 点架式是空操作 bug)
     OC_OFF: 0.22,
     HS_MIN_ENEMIES: 2,
-    CANNON_MIN_ENEMIES: 6,
-    // 攒炮最少怪(原4→6): 4-5只小局清场太快、OC攒不满200就清完=攒炮空转还压住近战技; 提到6让小局直接放近战技/平砍, 6+大局才攒炮(能攒满)
+    CANNON_MIN_ENEMIES: 5,
+    // 攒炮最少怪: 活怪≥此值才攒炮/放炮 AOE(曾 4→6 挡小局空转, 现按需改回 5 放宽)
     CANNON_MIN_OC: 200,
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
@@ -214,6 +214,8 @@
     // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
     useShieldBashOcFloor: true,
     // 无压力(level==='low')盾击晕杂兵需放完 OC 仍≥地板(炮可用→CANNON_YIELD_OC 175, 否则开架式线 OC_ON*OCMAX 125), 把 OC 留给架式/攒炮; false 退回旧"oc≥25 即晕"(灰度可一键回滚)
+    useEndgameStanceOff: true,
+    // 单红收尾(只剩1红名)关架式攒OC, 让盾击→要害→慈悲处决链在关架式下跑(解除连招stanceOn门槛+强制不攒炮); false 退回旧"架式常开磨"(灰度回退)
     useMercifulBlow: true,
     // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)
     // ── 目标权重系统(翻写 dodying finWeight; 详见 specs/2026-06-05-autobattle-target-weight-design.md)──
@@ -244,7 +246,7 @@
     // 速率有效下限(%/回合); ≤ 此值视为无效走兜底
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
-  const CONFIG_VERSION = 4;
+  const CONFIG_VERSION = 5;
   if (Store.get("configVersion", 0) < CONFIG_VERSION) {
     current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs;
     current.OC_ON = DEFAULT_CONFIG.OC_ON;
@@ -1182,6 +1184,11 @@
     const floor = cannonReady ? C.CANNON_YIELD_OC : C.OC_ON * C.OCMAX;
     return oc - cost >= floor;
   }
+  function endgameSoloRed(S, C) {
+    if (!C.useEndgameStanceOff) return false;
+    const live = S.enemies.filter((e) => e.alive);
+    return live.length === 1 && live[0].is_red_boss;
+  }
   function weightCfg(C) {
     return {
       baseHpRatio: C.baseHpRatio,
@@ -1348,14 +1355,20 @@
       }
       if (C.useCannon && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES && oc >= C.CANNON_MIN_OC)
         return { type: "cannon", exec: Exec.cannon };
-      const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
-      if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
-      if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
-      if (this.charging) {
+      const soloRed = endgameSoloRed(S, C);
+      if (soloRed) {
+        this.charging = false;
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
-        if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: "stance", exec: Exec.stance };
-        if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
+        const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && S.alive >= C.CANNON_MIN_ENEMIES;
+        if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
+        if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
+        if (this.charging) {
+          if (S.stanceOn) return { type: "stance", exec: Exec.stance };
+        } else {
+          if (oc >= C.OC_ON * C.OCMAX && !S.stanceOn && !pressure.spReserveLow) return { type: "stance", exec: Exec.stance };
+          if (oc < C.OC_OFF * C.OCMAX && S.stanceOn) return { type: "stance", exec: Exec.stance };
+        }
       }
       const tgt = selectRedTarget(S, ranked, "control");
       if (tgt == null ? void 0 : tgt.is_red_boss) {
@@ -1371,7 +1384,7 @@
         return A("spell", SK.Heartseeker);
       const struggling = this.lowHpStreak >= C.STRUGGLE_STREAK;
       const finalRound = !hasFutureRound(S);
-      const saveOcForCannon = shouldSaveOcForCannon(S, C, pressure, struggling);
+      const saveOcForCannon = !soloRed && shouldSaveOcForCannon(S, C, pressure, struggling);
       const execRed = selectRedTarget(S, ranked, "execute");
       if (execRed) {
         if (C.useMercifulBlow && execRed.eid !== this.mercifulBlockEid && execRed.hpPct < 25 && execRed.bleeding && oc >= 100 && Exec.skillReady(SK_SPECIAL.mercifulBlow)) {
@@ -1388,9 +1401,9 @@
             this.mercifulTry = { eid: tgtSp.eid, oc };
             return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.mercifulBlow, note: `慈悲处决红名#${tgtSp.eid}(${tgtSp.hpPct}%+流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.mercifulBlow, tgtSp.eid) });
           }
-          if (C.useVitalStrike && S.stanceOn && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
+          if (C.useVitalStrike && (S.stanceOn || soloRed) && tgtSp.stunned && !tgtSp.bleeding && oc >= 50 && (!C.useDelayedBleed || this.bleedTimer.shouldFeed(tgtSp, bleedCfg(C))) && Exec.skillReady(SK_SPECIAL.vitalStrike))
             return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.vitalStrike, note: `要害收割红名#${tgtSp.eid}(${tgtSp.hpPct}%·延迟喂流血)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, tgtSp.eid) });
-          if (C.useShieldBash && S.stanceOn && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
+          if (C.useShieldBash && (S.stanceOn || soloRed) && !tgtSp.stunned && oc >= 25 && Exec.skillReady(SK_SPECIAL.shieldBash))
             return this.hitRed(tgtSp.eid, { type: "spell", id: SK_SPECIAL.shieldBash, note: `盾击晕红名#${tgtSp.eid}(连招1步)`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, tgtSp.eid) });
         }
         if (C.useVitalStrike && (hasRed || struggling || finalRound || pressure.level !== "low") && oc >= 50) {
@@ -1412,7 +1425,7 @@
       const trash = ranked.filter((e) => !e.is_red_boss && e.alive);
       if (trash.length) {
         const t = trash[0];
-        const why = saveOcForCannon ? "攒炮中" : C.useTargetWeight ? "finWeight最优" : "最低eid";
+        const why = saveOcForCannon ? "攒炮中" : soloRed ? "单红收尾" : C.useTargetWeight ? "finWeight最优" : "最低eid";
         return { type: "attack", id: t.eid, note: `平砍杂兵#${t.eid}(${why},${t.hpPct}%${((_a = t.status) == null ? void 0 : _a.PA) ? "·破甲" : ""})`, exec: () => Exec.attack(t.eid) };
       }
       if (tgt) {
