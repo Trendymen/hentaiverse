@@ -10,6 +10,7 @@ import { bus } from './core/bus';
 import { logger } from './core/logger';
 import { Store } from './core/store';
 import type { ActionType, BattleState } from './types';
+import { farmTick } from './engine/starter';
 
 let lastFp = '';
 let actedAt = 0;
@@ -207,6 +208,9 @@ function tick(): void {
         lastFp = fp;
         reader.prev = S; // 每回合更新(firstRound/lastDmg/lockedRedId 正确推进, 不再自锁)
       }
+    } else if (config.get('enabled') && config.get('farmEnabled') && !nowIn) {
+      // M3 连刷: 仅战斗外 + 连刷开关开. farmTick 内部 farmBusyUntil 节流到 farmTickMs, 故此处不查 busyUntil.
+      farmTick();
     }
   } catch {
     /* tick 不能崩, 否则循环断 */
