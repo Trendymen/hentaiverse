@@ -126,3 +126,16 @@ export function ocFloorOk(S: BattleState, C: Config, pressure: Pressure, oc: num
   const floor = cannonReady ? C.CANNON_YIELD_OC : C.OC_ON * C.OCMAX;
   return oc - cost >= floor;
 }
+
+/** 残局红名 OC 省留: 仅剩≤2红名(无杂兵)且至少1个<50%血、且血稳(非struggling)时,
+ *  对红名 OC 单体技设175地板(放完仍≥CANNON_YIELD_OC), 攒OC留下轮开局炮.
+ *  返回 true = 应暂缓该技、改平砍磨; struggling/非残局/开关关 → false(正常出手). */
+export function endgameRedHold(S: BattleState, C: Config, oc: number, cost: number, struggling: boolean): boolean {
+  if (!C.useEndgameRedOcSave) return false; // 开关关 → 不暂缓
+  if (struggling) return false; // 血连降 → 正常斩杀链
+  const live = S.enemies.filter((e) => e.alive);
+  if (live.length === 0 || live.length > 2) return false; // 残局红名数上限 2
+  if (!live.every((e) => e.is_red_boss)) return false; // 有杂兵 → 非残局
+  if (!live.some((e) => e.hpPct < 50)) return false; // 没有红名<50% → 还没到收尾
+  return oc - cost < C.CANNON_YIELD_OC; // 放完<175 → 暂缓攒OC; 放完≥175 → 不暂缓(消化溢出)
+}
