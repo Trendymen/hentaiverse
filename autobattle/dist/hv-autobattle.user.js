@@ -171,6 +171,8 @@
     // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
     CANNON_CD_TURNS: 50,
     // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
+    CANNON_OC_GAIN_EST: 20,
+    // 关架式平砍攒OC的每回合估值: 仅用于冷却尾段预判窗口 turnsToReady=ceil((200-oc)/此值). 估高→攒得晚(更防250溢出但可能没攒满), 估低→攒得早(更易及时但易溢出). 按实战日志可调
     REGEN_HOLD: 12,
     // 细胞活化放出后多少回合不重放: 覆盖 reader 的 DOM 检测空窗(放出后图标短暂读不到→连放烧蓝); 过窗后仍由 buff 检测主导, reader 失灵也最多每 12 回合放一次
     MANAPOT_HOLD: 3,
@@ -1360,7 +1362,10 @@
         this.charging = false;
         if (S.stanceOn) return { type: "stance", exec: Exec.stance };
       } else {
-        const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && (S.alive >= C.CANNON_MIN_ENEMIES || hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES);
+        const enemyOk = S.alive >= C.CANNON_MIN_ENEMIES || hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES;
+        const turnsToReady = Math.max(1, Math.ceil((C.CANNON_MIN_OC - oc) / C.CANNON_OC_GAIN_EST));
+        const cannonComing = !S.cannonOnCd || (S.cannonCdLeft ?? 0) > 0 && (S.cannonCdLeft ?? 0) <= turnsToReady;
+        const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && enemyOk && cannonComing;
         if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
         if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
         if (this.charging) {
@@ -1506,6 +1511,7 @@
             Store.set("cannonRound", cannonRoundSeen);
           }
           S.cannonOnCd = cannonCd > 0;
+          S.cannonCdLeft = cannonCd;
           S.regenOnCd = regenCd > 0;
           S.manaPotOnCd = manaPotCd > 0;
           let a = brain.decide(S);

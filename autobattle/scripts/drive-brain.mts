@@ -98,3 +98,8 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 
 // ── 跨波预判攒炮观察 ── 当前波剩2杂兵但本波大波(monsterTotal8)+有下一波: 放宽 cannonCtx 应关架式冲刺
 { const s = base(); s.enemies = many(2); s.alive = 2; s.monsterTotal = 8; s.overcharge = 125; s.stanceOn = true; run('㉙当前波剩2杂兵+本波8怪+有下一波OC125架开[跨波预判→切架式攒炮]', { state: s }); }
+
+// ── 冷却尾段预判攒炮观察 ── turnsToReady=ceil((200-oc)/CANNON_OC_GAIN_EST 20); 冷却剩余≤turnsToReady 才提前关架式(防溢出)
+{ const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 150; s.cannonOnCd = true; s.cannonCdLeft = 3; s.stanceOn = true; run('㉚6杂兵OC150炮冷却剩3(需3)架开[尾段预判→切架式攒炮]', { state: s }); }
+{ const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 150; s.cannonOnCd = true; s.cannonCdLeft = 20; s.stanceOn = true; run('㉛6杂兵OC150炮冷却剩20(需3)架开[远冷却→不切架式·盾击控场]', { state: s }); }
+{ const s = base(); s.enemies = many(6); s.alive = 6; s.monsterTotal = 6; s.overcharge = 190; s.cannonOnCd = true; s.cannonCdLeft = 2; s.stanceOn = true; run('㉜6杂兵OC190炮冷却剩2(需1)架开[高OC防溢出→不切架式·盾击控场]', { state: s }); }

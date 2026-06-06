@@ -226,6 +226,7 @@ export class Brain {
     // P12 灵动架式开关(滞回) + 攒炮让位
     //   多杂兵(够怪+炮在栏+不冷却) + OC≥开架式线 OC_ON×OCMAX(50%=125) → 关架式全程冲刺攒炮, 让 OC 冲到 200 放炮 AOE 清场.
     //   跨波预判: 当前波打到剩 1-2 只(alive<MIN)但本波是大波(monsterTotal≥MIN)+有下一波 → 因下一波怪数≥当前波(GF/竞技场单调不减), 下一波保证够放炮, 也提前关架式攒OC给下一波开局炮.
+    //   冷却尾段预判: 炮在冷却但剩余 ≤ 从当前 OC 攒满 200 所需回合(turnsToReady, 防太早攒冲到 250 溢出) → 视同"炮将可用", 提前关架式攒, 冷却一结束 P11.5 即放.
     //   trade-off: 早关架式(125)比原临门关(175)多损失架式+100%物理平砍, 但多杂兵时换更快炮AOE; 仅 cannonCtx 场景, 非攒炮波(怪不够/无炮)架式照常滞回常驻.
     //   ⚠滞回防抖(GF 实测 66 次切架式 bug): charging 状态滞回(进入≥125 / 退出 OC_OFF×OCMAX=55 / 放炮归0 / 炮不可用), 区间[55,125]防横跳, 冲刺期只切一次架式.
     // 单红收尾(灰度): 关架式攒 OC, 让处决链在关架式下跑(供 A/C 引用)
@@ -234,7 +235,11 @@ export class Brain {
       this.charging = false; // 清掉跨回合遗留的攒炮冲刺态(多杂兵→单红过渡, 防 soloRed 退出后脏 charging)
       if (S.stanceOn) return { type: 'stance', exec: Exec.stance }; // 关架式攒OC; 不自动开(落到 P13+)
     } else {
-      const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && !S.cannonOnCd && (S.alive >= C.CANNON_MIN_ENEMIES || (hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES));
+      const enemyOk = S.alive >= C.CANNON_MIN_ENEMIES || (hasFutureRound(S) && S.monsterTotal >= C.CANNON_MIN_ENEMIES);
+      // 炮将可用: 不在冷却, 或冷却尾段(剩余 ≤ 从当前 OC 攒满 200 所需回合, 防太早攒到 250 溢出). turnsToReady 动态随 OC 收窄, OC 越高启动越晚.
+      const turnsToReady = Math.max(1, Math.ceil((C.CANNON_MIN_OC - oc) / C.CANNON_OC_GAIN_EST));
+      const cannonComing = !S.cannonOnCd || ((S.cannonCdLeft ?? 0) > 0 && (S.cannonCdLeft ?? 0) <= turnsToReady);
+      const cannonCtx = C.useCannon && C.cannonYieldStance && S.cannonExists && enemyOk && cannonComing;
       if (cannonCtx && oc >= C.OC_ON * C.OCMAX && oc < C.CANNON_MIN_OC) this.charging = true;
       if (!cannonCtx || oc < C.OC_OFF * C.OCMAX || oc >= C.CANNON_MIN_OC) this.charging = false;
       if (this.charging) {

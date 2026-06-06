@@ -87,6 +87,7 @@ function tick(): void {
           Store.set('cannonRound', cannonRoundSeen);
         }
         S.cannonOnCd = cannonCd > 0; // 注入冷却态给 brain(reader 读不到冷却)
+        S.cannonCdLeft = cannonCd; // 注入剩余冷却回合: P12 冷却尾段预判(剩几回合就提前关架式攒OC, 冷却完即放)
         S.regenOnCd = regenCd > 0; // 细胞活化回合追踪(兜 reader DOM 检测空窗)
         S.manaPotOnCd = manaPotCd > 0; // 回蓝药冷静期(防常规线连喝)
         let a = brain.decide(S);

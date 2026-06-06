@@ -30,6 +30,7 @@ export const DEFAULT_CONFIG = {
   CANNON_MIN_ENEMIES: 5, // 攒炮最少怪: 活怪≥此值才攒炮/放炮 AOE(曾 4→6 挡小局空转, 现按需改回 5 放宽)
   CANNON_MIN_OC: 200, // 小马炮需 200 斗气(满 250); 不够则游戏把按钮置灰(opacity:0.5)
   CANNON_CD_TURNS: 50, // 小马炮放完后 50 回合冷却(实测确认, 跨波/轮持续). loop 用 Store 持久化追踪(跨 reload 保留)
+  CANNON_OC_GAIN_EST: 20, // 关架式平砍攒OC的每回合估值: 仅用于冷却尾段预判窗口 turnsToReady=ceil((200-oc)/此值). 估高→攒得晚(更防250溢出但可能没攒满), 估低→攒得早(更易及时但易溢出). 按实战日志可调
   REGEN_HOLD: 12, // 细胞活化放出后多少回合不重放: 覆盖 reader 的 DOM 检测空窗(放出后图标短暂读不到→连放烧蓝); 过窗后仍由 buff 检测主导, reader 失灵也最多每 12 回合放一次
   MANAPOT_HOLD: 3, // 回蓝药喝后多少回合常规线(P9)不重复喝: 防长效药慢回看不到效果→同波连喝长效/药水/终极; 急救线(P1/P3/墙倒)不受限
   CANNON_YIELD_OC: 175, // 接近200的线: 现仅用作 ocFloorOk 炮可用时的盾击地板(为炮预留); P12 攒炮冲刺起始已改用开架式线 OC_ON×OCMAX(50%=125)
