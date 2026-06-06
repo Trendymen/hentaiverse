@@ -6,7 +6,7 @@ import { Exec } from './executor';
 import { rankTargets } from './target-weight';
 import { BleedTimer } from './bleed-timing';
 import type { Action, ActionType, BattleState, EnemyState, WeightConfig, BleedTimerConfig } from '../types';
-import { assessPressure, hasFutureRound, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
+import { assessPressure, hasFutureRound, ocFloorOk, selectControlDebuff, selectRedTarget, shouldSaveOcForCannon } from './strategy';
 
 /** 从 config 装配 target-weight 所需的 WeightConfig(模块只认参数, 不碰单例) */
 function weightCfg(C: Config): WeightConfig {
@@ -297,7 +297,7 @@ export class Brain {
           return { type: 'spell', id: SK_SPECIAL.vitalStrike, note: `要害秒杂兵#${stunTrash.eid}(${why}减压)`, exec: () => Exec.castHostileOn(SK_SPECIAL.vitalStrike, stunTrash.eid) };
         }
       }
-      if (C.useShieldBash && oc >= 25) {
+      if (C.useShieldBash && oc >= 25 && ocFloorOk(S, C, pressure, oc, 25)) {
         const toStun = ranked.find((e) => e.alive && !e.is_red_boss && !e.stunned);
         if (toStun && Exec.skillReady(SK_SPECIAL.shieldBash))
           return { type: 'spell', id: SK_SPECIAL.shieldBash, note: `盾击晕杂兵#${toStun.eid}`, exec: () => Exec.castHostileOn(SK_SPECIAL.shieldBash, toStun.eid) };

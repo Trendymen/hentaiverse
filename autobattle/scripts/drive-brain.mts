@@ -81,3 +81,8 @@ run('①满状态/单怪/全墙/无OC', { state: base() });
 { const s = base(); s.lastDmg = 8000; s.enemies = many(4, { status: { We: true } }); s.alive = 4; s.monsterTotal = 4; run('⑱高伤压力+缺影纱', { cfg: { usePressureControl: true, useShadowVeil: true }, state: s }); }
 { const s = base(); s.lastDmg = 8000; s.enemies = many(4); s.alive = 4; s.monsterTotal = 4; (s.buff as Record<string, unknown>).shadowVeil = { active: true, turns: 5 }; run('⑲高伤压力[先虚弱]', { cfg: { usePressureControl: true, useShadowVeil: true }, state: s }); }
 { const s = base(); s.roundNow = 10; s.roundAll = 10; s.enemies = [enemy(1, { stunned: true, hpNow: 5000 }), enemy(2, { stunned: true, hpNow: 1000 })]; s.alive = 2; s.monsterTotal = 4; s.overcharge = 50; run('⑳最终波2怪+OC50[不攒炮]', { state: s }); }
+
+// ── 无压力盾击 OC 预留地板观察(ocFloorOk)── stanceOn=true 绕过架式切换层, 直接观察盾击分支
+{ const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 140; s.cannonExists = false; s.stanceOn = true; run('㉑无压力3杂兵OC140炮不可用架已开[盾击应抑制→平砍]', { state: s }); }
+{ const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 150; s.cannonExists = false; s.stanceOn = true; run('㉒无压力3杂兵OC150炮不可用架已开[盾击放行]', { state: s }); }
+{ const s = base(); s.enemies = many(3); s.alive = 3; s.monsterTotal = 3; s.overcharge = 190; s.cannonExists = true; s.cannonOnCd = false; s.stanceOn = true; run('㉓无压力3杂兵OC190炮可用架已开[盾击应抑制→平砍]', { state: s }); }
