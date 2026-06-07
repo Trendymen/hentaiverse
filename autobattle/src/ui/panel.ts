@@ -35,6 +35,15 @@ function farmPane(): HTMLElement {
   return p;
 }
 
+/** 提醒 tab: riddle 配置(M5/riddle 接入) */
+function notifyPane(): HTMLElement {
+  const p = el('div');
+  p.appendChild(group('小马题辅助', swRow('useRiddleAssist', '启用辅助'), swRow('riddlePopup', '弹窗答题'), swRow('riddleHotkeys', '数字快捷键'), swRow('riddleChartOverlay', '图鉴浮层')));
+  p.appendChild(group('提醒', swRow('riddleAlarm', '音频警报'), swRow('riddleNotify', '桌面通知'), numRow('riddleUrgentSec', '催答秒数', 's')));
+  p.appendChild(group('采集/识别', swRow('riddleCollect', '采集训练样本'), swRow('riddleAutoRecognize', '自动识别(CNN未来)')));
+  return p;
+}
+
 function paneFor(key: string): HTMLElement {
   switch (key) {
     case 'battle':
@@ -43,10 +52,12 @@ function paneFor(key: string): HTMLElement {
       return farmPane();
     case 'guard':
       return section('保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入');
+    case 'notify':
+      return notifyPane();
     case 'stats':
       return statsPane();
     default:
-      return section('提醒杂项(告警 / 异世界 / 小马) · 待 M5 接入');
+      return section('提醒杂项 · 待接入');
   }
 }
 
