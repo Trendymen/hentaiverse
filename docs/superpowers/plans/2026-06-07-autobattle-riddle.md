@@ -338,6 +338,51 @@ git commit -m "feat(riddle): notify 音频警报 + 桌面通知(GM_notification)
 
 ---
 
+## Task 5.4: panel.ts 提醒 tab riddle 配置组（DOM 无关）
+
+**Files:** Modify: `autobattle/src/ui/panel.ts`
+
+- [ ] **Step 1: 加 notifyPane() 函数（battlePane/farmPane 之后）**
+
+```typescript
+/** 提醒 tab: riddle 配置(M5/riddle 接入) */
+function notifyPane(): HTMLElement {
+  const p = el('div');
+  p.appendChild(group('小马题辅助', swRow('useRiddleAssist', '启用辅助'), swRow('riddlePopup', '弹窗答题'), swRow('riddleHotkeys', '数字快捷键'), swRow('riddleChartOverlay', '图鉴浮层')));
+  p.appendChild(group('提醒', swRow('riddleAlarm', '音频警报'), swRow('riddleNotify', '桌面通知'), numRow('riddleUrgentSec', '催答秒数', 's')));
+  p.appendChild(group('采集/识别', swRow('riddleCollect', '采集训练样本'), swRow('riddleAutoRecognize', '自动识别(CNN未来)')));
+  return p;
+}
+```
+
+- [ ] **Step 2: paneFor 的 `default`(notify) 改为 `case 'notify': return notifyPane();`**
+
+```typescript
+    case 'guard':
+      return section('保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入');
+    case 'notify':
+      return notifyPane();
+    default:
+      return section('提醒杂项 · 待接入');
+  }
+```
+
+> 导出/清空采集按钮依赖 collector IO(批 2)，本 task 只做 9 个配置控件; 按钮留批 2 Task 10。
+
+- [ ] **Step 3: typecheck + build**
+
+Run: `cd autobattle && npm run typecheck && npm run build 2>&1 | tail -2`
+Expected: PASS + 构建成功。swRow/numRow 的 key 都是 Task 2 已加入 Config 的 riddle 键。
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add autobattle/src/ui/panel.ts
+git commit -m "feat(riddle): panel 提醒 tab riddle 配置组(9 键控件)"
+```
+
+---
+
 ## Task 5.5: 批 1 构建确认
 
 - [ ] **Step 1: build + node-check**
@@ -444,7 +489,7 @@ export async function clearSamples(): Promise<void>;
 - **reader.ts:244**：`riddle` 检测从 `!!#riddlecounter` 适配新版（用 detect.ts 的信号或新选择器）。**待样本**。
 - **brain.ts**：P0 riddle 分支保留；`brain.riddle()` 实现为 `recognize` 接口（现 return null=人工；`riddleAutoRecognize` + CNN 就绪未来填充）。
 - **loop.ts**：tick 检测到小马题 → 暂停战斗决策 + 激活 riddle 子系统（detect→notify→mountUI→采集；弹窗按 riddlePopup）。打断战斗优先。
-- **panel.ts**：提醒(notify)tab 加 riddle 配置组（9 键 swRow/numRow）+ 导出/清空采集按钮。
+- **panel.ts**：9 键配置组已在批 1 Task 5.4 完成; 本 task 仅加导出/清空采集按钮（依赖 collector IO）。
 - 装配 `riddleCfg(C): RiddleConfig`（仿 weightCfg）。
 
 **验证**：typecheck + build + 真机端到端（小马题→提醒→UI→人工答→采集；useRiddleAssist=false 零回归）。**Commit** `feat(riddle): 集成 reader/brain/loop/panel`。
