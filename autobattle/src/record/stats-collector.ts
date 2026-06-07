@@ -60,6 +60,7 @@ export function initStatsCollector(): void {
       cur.exp += d.exp; cur.credit += d.credit;
       for (const k in d.drops) cur.drops[k] = (cur.drops[k] || 0) + d.drops[k];
       cur.battles += 1;
+      lastRoundSeen = -1;   // 本场结束, 重置波次游标(下一场首波必触发累计)
       cur.activeMs += Math.max(0, e.endedAt - e.startedAt);
       Store.set(STATS_KEY, cur);
       // 归档单场聚合摘要(玩家向多场对比; 限 archiveMaxBattles)
