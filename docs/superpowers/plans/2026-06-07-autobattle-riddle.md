@@ -399,9 +399,13 @@ git commit -m "build(riddle): 批1 DOM无关产物(类型/config/快捷键/采�
 
 ---
 
-# 批 2：DOM 依赖（待用户抓小马题 DOM HTML 样本，spec §9）
+# 方向调整（2026-06-07）：启发式辅助提到批 1.5
 
-> **阻塞前置**：以下 task 需要小马题真实 DOM HTML（题目图元素类型+跨域、6 checkbox 选择器+小马名对应、Submit 选择器、倒计时 DOM、对错反馈）。用户下次遇小马题抓 `#riddlemaster` 区域 outerHTML 后，把下列每个 task 的「待样本确定」项填实再执行。各 task 已给接口契约 + 实现骨架 + 验证方式。
+用户要求"批 1 做到原版功能或更强、能单独使用"。鉴于无真实 DOM 样本（用户当前无答题页面），**辅助功能改用启发式 DOM 定位**（靠 MANE6 名 + "Submit Answer"/"Select ALL ponies" 文本/结构特征，不依赖精确 id；优先试旧版已知 id 退回启发式），现在就做（批 1.5：detect/submit/ui/快捷键绑定/loop 集成）。真机可用性待用户下次遇小马题验证微调。**只有采集截图/CNN（Task 9，需精确题图像素+跨域）仍留批 2 待精确样本。**
+
+# 批 1.5 / 批 2：DOM 依赖（启发式实现，真机调试）
+
+> Task 6/7/8/10 用启发式 DOM 定位现做（批 1.5）；Task 9（采集截图）+ CNN 留批 2 待精确题图 DOM。
 
 ## Task 6: riddle/detect.ts（检测+解析）— 待样本
 
