@@ -33,8 +33,9 @@ export const CSS = `
 .hvab-in{opacity:.8;display:inline-flex;align-items:center;gap:2px}
 .hvab-in em{font-style:normal;opacity:.55;font-size:14px}
 .hvab-row input[type=number]{width:46px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:14px monospace;padding:1px 4px;text-align:right}
+.hvab-row input[type=text]{width:92px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:14px monospace;padding:1px 4px}
 /* 提权压过 HV hvg.css 的 input[type=number]:hover/:focus(米白底→白字看不清), 保持深色主题深底白字+蓝边 */
-#hvab-panel .hvab-row input[type=number]:hover,#hvab-panel .hvab-row input[type=number]:focus{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(140,160,220,.7);outline:none}
+#hvab-panel .hvab-row input[type=number]:hover,#hvab-panel .hvab-row input[type=number]:focus,#hvab-panel .hvab-row input[type=text]:hover,#hvab-panel .hvab-row input[type=text]:focus{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(140,160,220,.7);outline:none}
 .hvab-row input[type=checkbox]{accent-color:#3a7;width:15px;height:15px;cursor:pointer}
 #hvab-logbtn{cursor:pointer;border:0;background:none;color:#9aa;font-size:14px;padding:0}
 #hvab-log{position:fixed;right:10px;bottom:10px;z-index:100000;width:min(480px,92vw);max-height:74vh;flex-direction:column;background:rgba(16,18,28,.975);backdrop-filter:blur(9px);border:1px solid rgba(120,140,200,.38);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.6);display:none;color:#dce3f0}

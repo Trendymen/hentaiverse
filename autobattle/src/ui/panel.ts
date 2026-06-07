@@ -1,5 +1,5 @@
 import { el } from '../core/dom';
-import { group, pctRow, numRow, swRow, section } from './components';
+import { group, pctRow, numRow, swRow, textRow, section } from './components';
 import { config } from '../core/config';
 import { statsPane } from './stats';
 
@@ -28,7 +28,7 @@ function battlePane(): HTMLElement {
 function farmPane(): HTMLElement {
   const p = el('div');
   p.appendChild(group('连刷总控', swRow('farmEnabled', '启用连刷(需同时开战斗🧠)'), swRow('autoSwitchIsekai', '刷完切异世界续刷'), swRow('autoSkipDefeated', '战败也续刷(默认关=停机)'), numRow('ISEKAI_SWITCH_GUARD_MIN', '切世界防抖', '分')));
-  p.appendChild(group('竞技场/GF', numRow('grPerDay', 'GF每日场数')));
+  p.appendChild(group('竞技场/GF', textRow('arenaLevels', '待刷列表', 'gr,5,105'), numRow('grPerDay', 'GF每日场数')));
   p.appendChild(group('精力(战前门)', swRow('restoreStamina', '不足喝药恢复'), numRow('staminaLow', '开战精力下限'), numRow('staminaEncounter', '遭遇精力下限'), numRow('staminaLowWithNat', '含自然恢复下限')));
   p.appendChild(group('遭遇战', swRow('autoEncounter', '自动接受遭遇'), numRow('encounterCdMin', '遭遇冷却', '分')));
   p.appendChild(group('节奏', numRow('farmTickMs', '连刷tick', 'ms')));

@@ -2,7 +2,7 @@ import { el } from '../core/dom';
 import { config, type Config } from '../core/config';
 
 // UI 层动态 key 读写配置. set 经 unknown 中转绕过泛型约束(运行时 next[key]=val 正常).
-function writeCfg(key: keyof Config, val: number | boolean): void {
+function writeCfg(key: keyof Config, val: number | boolean | string): void {
   (config.set as unknown as (k: keyof Config, v: unknown) => void)(key, val);
 }
 
@@ -29,6 +29,15 @@ export function numRow(key: keyof Config, label: string, unit = ''): HTMLElement
   const input = row.querySelector<HTMLInputElement>('input')!;
   input.value = String(Number(config.get(key)));
   input.onchange = () => writeCfg(key, parseFloat(input.value) || 0);
+  return row;
+}
+
+/** 文本行(逗号串等字符串配置). */
+export function textRow(key: keyof Config, label: string, hint = ''): HTMLElement {
+  const row = el('label', { class: 'hvab-row' }, `<span>${label}</span><span class="hvab-in"><input type="text"><em>${hint}</em></span>`);
+  const input = row.querySelector<HTMLInputElement>('input')!;
+  input.value = String(config.get(key) ?? '');
+  input.onchange = () => writeCfg(key, input.value.trim());
   return row;
 }
 

@@ -113,6 +113,19 @@ export const DEFAULT_CONFIG = {
 
 export type Config = typeof DEFAULT_CONFIG;
 
+const FARM_WAKE_KEYS = new Set<keyof Config>([
+  'farmEnabled',
+  'autoEncounter',
+  'restoreStamina',
+  'grPerDay',
+  'arenaLevels',
+  'staminaLow',
+  'staminaEncounter',
+  'staminaLowWithNat',
+  'autoSwitchIsekai',
+  'autoSkipDefeated',
+]);
+
 // 单一真相: 模块加载时合并默认值 + 持久化覆盖; 之后所有读写统一走 config.get/set, 落盘到 Store 'config' 键.
 let current: Config = { ...DEFAULT_CONFIG, ...Store.get<Partial<Config>>('config', {}) };
 
@@ -133,10 +146,15 @@ export const config = {
     return current[key];
   },
   set<K extends keyof Config>(key: K, val: Config[K]): void {
+    const changed = !Object.is(current[key], val);
     const next: Config = { ...current };
     next[key] = val;
     current = next;
     Store.set('config', current);
+    if (changed && FARM_WAKE_KEYS.has(key)) {
+      Store.set('farmState', 'IDLE');
+      Store.set('farmCooldownUntil', 0);
+    }
   },
   all(): Config {
     return current;
