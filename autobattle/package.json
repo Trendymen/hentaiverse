@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "open:tm": "node scripts/open-userscript.mjs",
+    "open:tm:print": "node scripts/open-userscript.mjs --print",
+    "install:tm": "npm run build && npm run open:tm",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
