@@ -15,6 +15,8 @@ interface GMXHRDetails {
 }
 declare const GM_xmlhttpRequest: ((details: GMXHRDetails) => void) | undefined;
 
+declare const GM_notification: ((details: { title?: string; text?: string; timeout?: number }) => void) | undefined;
+
 // 页面真实 window(Tampermonkey 沙箱外). 访问 HV 的全局 battle 对象需经此; DOM 操作仍用共享的 document.
 declare const unsafeWindow: Window &
   typeof globalThis & {
