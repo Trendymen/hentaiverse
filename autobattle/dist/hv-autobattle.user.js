@@ -267,11 +267,18 @@
     // 含 24h 自然恢复的下限
     encounterCdMin: 30,
     // 遭遇常规冷却(分钟)
-    staminaHathperk: false
+    staminaHathperk: false,
     // 精力 hathperk(影响盲发恢复量预估 +20/+10)
+    // ── M3 增量: 异世界续刷 + 战败退出 ──
+    autoSwitchIsekai: false,
+    // 异世界自动续刷(本世界刷完后切异世界; 默认关)
+    ISEKAI_SWITCH_GUARD_MIN: 10,
+    // 切换异世界最小间隔(分钟; 防频繁切换)
+    autoSkipDefeated: false
+    // 战败后跳过该靶继续连刷(false=停刷)
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
-  const CONFIG_VERSION = 5;
+  const CONFIG_VERSION = 6;
   if (Store.get("configVersion", 0) < CONFIG_VERSION) {
     current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs;
     current.OC_ON = DEFAULT_CONFIG.OC_ON;
@@ -400,7 +407,7 @@
   }
   function farmPane() {
     const p = el("div");
-    p.appendChild(group("连刷总控", swRow("farmEnabled", "启用连刷(需同时开战斗🧠)")));
+    p.appendChild(group("连刷总控", swRow("farmEnabled", "启用连刷(需同时开战斗🧠)"), swRow("autoSwitchIsekai", "刷完切异世界续刷"), swRow("autoSkipDefeated", "战败也续刷(默认关=停机)"), numRow("ISEKAI_SWITCH_GUARD_MIN", "切世界防抖", "分")));
     p.appendChild(group("竞技场/GF", numRow("grPerDay", "GF每日场数")));
     p.appendChild(group("精力(战前门)", swRow("restoreStamina", "不足喝药恢复"), numRow("staminaLow", "开战精力下限"), numRow("staminaEncounter", "遭遇精力下限"), numRow("staminaLowWithNat", "含自然恢复下限")));
     p.appendChild(group("遭遇战", swRow("autoEncounter", "自动接受遭遇"), numRow("encounterCdMin", "遭遇冷却", "分")));
@@ -1599,6 +1606,7 @@
     return next;
   }
   function readFarm() {
+    var _a;
     const url = location.href;
     const host = location.host;
     const nowMs = Date.now();
@@ -1657,7 +1665,10 @@
       }
       page = isBattleEnd(url) ? "hv-battle-end" : "hv-out";
     }
-    return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil };
+    const isIsekai = url.includes("isekai");
+    const lastIsekaiSwitch = Store.get("lastIsekaiSwitch", 0);
+    const defeated = page === "hv-battle-end" && /You have been defeated/i.test(((_a = document.body) == null ? void 0 : _a.textContent) ?? "");
+    return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil, isIsekai, lastIsekaiSwitch, defeated };
   }
   const STAMINA_COST = {
     1: 2,
@@ -1721,6 +1732,13 @@
   function nextMidnight(nowMs) {
     return (Math.floor(nowMs / MS_PER_DAY) + 1) * MS_PER_DAY;
   }
+  function onWaitlistEmpty(ctx, cfg) {
+    if (cfg.autoSwitchIsekai && ctx.nowMs - ctx.lastIsekaiSwitch > cfg.isekaiGuardMs) {
+      const url = `${ctx.hvOrigin}/${ctx.isIsekai ? "" : "isekai/"}`;
+      return { next: "IDLE", action: { type: "switch-isekai", url, note: `切${ctx.isIsekai ? "恒定" : "异"}世界续刷` } };
+    }
+    return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: nextMidnight(ctx.nowMs), note: "今日全清" } };
+  }
   function farmReducer(state, ctx, cfg) {
     switch (state) {
       case "IDLE":
@@ -1746,7 +1764,7 @@
       case "CHECK_STAMINA": {
         const stamina = computeStamina(ctx.stamina, ctx.nowHour);
         const pick = pickNextArena(ctx.arena);
-        if (pick.kind === "empty") return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: nextMidnight(ctx.nowMs), note: "今日全清" } };
+        if (pick.kind === "empty") return onWaitlistEmpty(ctx, cfg);
         const cost = computeCost(pick.key, stamina, ctx.arena.gr);
         const g = gate(stamina, cost, cfg.staminaLow, cfg.staminaLowWithNat, ctx.nowHour);
         if (g === 1) return { next: "PICK_NEXT", action: { type: "none" } };
@@ -1758,7 +1776,7 @@
         return { next: "CHECK_STAMINA", action: { type: "recover-stamina", note: "喝药恢复精力" } };
       case "PICK_NEXT": {
         const pick = pickNextArena(ctx.arena);
-        if (pick.kind === "empty") return { next: "COOLDOWN", action: { type: "set-cooldown", untilMs: nextMidnight(ctx.nowMs), note: "今日全清" } };
+        if (pick.kind === "empty") return onWaitlistEmpty(ctx, cfg);
         if (pick.kind === "need-token") return { next: "PICK_NEXT", action: { type: "navigate", url: `?s=Battle&ss=${pick.href}`, note: `收集 ${pick.href} token` }, arena: pick.arena };
         return { next: "STARTING", action: { type: "start-battle", href: pick.href, initid: pick.initid, token: pick.token, note: `开战 ${pick.href}#${pick.key}` }, arena: pick.arena };
       }
@@ -1767,7 +1785,8 @@
       case "IN_BATTLE":
         return { next: "POST_BATTLE", action: { type: "none" } };
       case "POST_BATTLE":
-        return { next: "RETURN", action: { type: "none", note: "战斗结束" } };
+        if (ctx.defeated && !cfg.autoSkipDefeated) return { next: "STOPPED", action: { type: "stop-farm", note: "战败停机等人工" } };
+        return { next: "RETURN", action: { type: "none", note: ctx.defeated ? "战败→续刷" : "战斗结束" } };
       case "RETURN":
         return { next: "IDLE", action: { type: "navigate", url: ctx.lastHref, note: "回前页" } };
       case "COOLDOWN":
@@ -1834,6 +1853,13 @@
       case "set-cooldown":
         Store.set("farmCooldownUntil", action.untilMs);
         return;
+      case "switch-isekai":
+        Store.set("lastIsekaiSwitch", Date.now());
+        window.open(action.url, "_self");
+        return;
+      case "stop-farm":
+        config.set("farmEnabled", false);
+        return;
     }
   }
   let farmBusyUntil = 0;
@@ -1848,7 +1874,11 @@
       encounterCdMs: C.encounterCdMin * 6e4,
       grPerDay: C.grPerDay,
       arenaLevels: C.arenaLevels,
-      staminaHathperk: C.staminaHathperk
+      staminaHathperk: C.staminaHathperk,
+      // ── M3 增量: 异世界续刷 + 战败退出 ──
+      autoSwitchIsekai: C.autoSwitchIsekai,
+      isekaiGuardMs: C.ISEKAI_SWITCH_GUARD_MIN * 6e4,
+      autoSkipDefeated: C.autoSkipDefeated
     };
   }
   function routeStartup(ctx) {
