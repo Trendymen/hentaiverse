@@ -8,6 +8,7 @@ import { logger } from './core/logger';
 import { bus } from './core/bus';
 import { startLoop } from './loop';
 import { setLastBattle, getLastBattle } from './core/net-cache';
+import { initStatsCollector } from './record/stats-collector';
 
 // ── document-start: 最早 hook XHR/fetch 旁路(只读不改) ──
 // 在 HV 的 battle 对象绑定发送引用之前注入, 才能捕获战斗响应(M2 解析 buff 剩余回合/精确斗气).
@@ -107,6 +108,7 @@ function mountUI(): void {
 
 // ── 入口 ──
 hookNet(); // document-start: 立即 hook, 早于一切业务请求
+initStatsCollector(); // 挂载 bus 订阅者(battle:round/battle:end), 早于 startLoop
 window.addEventListener('beforeunload', () => logger.flush()); // reload/关页前落盘: 通用兜底所有未落盘缓冲(continue/手动刷新/GF跳轮/退出皆 reload)
 onReady(() => {
   mountUI(); // body 就绪后挂载 UI
