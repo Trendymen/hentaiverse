@@ -1,5 +1,6 @@
 // 连刷副作用执行(写层). 把 FarmAction 翻译成 XHR/导航/Store. 不做任何决策(从不读 state). 对齐 battle/executor.ts.
 // 翻写 dodying $ajax.open(POST+reload) L144-146 / openNoFetch(window.open _self) L147 / recover=stamina L2418.
+import { config } from '../core/config';
 import { gmPost } from '../core/gm-http';
 import { Store } from '../core/store';
 import type { FarmAction } from '../types';
@@ -43,6 +44,13 @@ export function execFarm(action: FarmAction): void {
       return;
     case 'set-cooldown':
       Store.set('farmCooldownUntil', action.untilMs);
+      return;
+    case 'switch-isekai':
+      Store.set('lastIsekaiSwitch', Date.now());
+      window.open(action.url, '_self');
+      return;
+    case 'stop-farm':
+      config.set('farmEnabled', false); // 关连刷开关; STOPPED 因 farmEnabled=false 不自动回 IDLE, 等人工重开
       return;
   }
 }
