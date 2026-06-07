@@ -7,10 +7,10 @@ import { config } from './core/config';
 import { logger } from './core/logger';
 import { bus } from './core/bus';
 import { startLoop } from './loop';
+import { setLastBattle, getLastBattle } from './core/net-cache';
 
 // ── document-start: 最早 hook XHR/fetch 旁路(只读不改) ──
 // 在 HV 的 battle 对象绑定发送引用之前注入, 才能捕获战斗响应(M2 解析 buff 剩余回合/精确斗气).
-let lastBattleResponse: string | null = null;
 
 function hookNet(): void {
   const xo = XMLHttpRequest.prototype.open;
@@ -21,7 +21,7 @@ function hookNet(): void {
   };
   XMLHttpRequest.prototype.send = function (this: XMLHttpRequest & { __url?: string }, body?: Document | XMLHttpRequestBodyInit | null) {
     this.addEventListener('load', () => {
-      if (/\/json|Battle|api/i.test(this.__url || '')) lastBattleResponse = this.responseText; // HV 战斗 endpoint 实测 = POST /json(原 /Battle|api/ 不匹配 → 捕获不到)
+      if (/\/json|Battle|api/i.test(this.__url || '')) setLastBattle(this.responseText); // HV 战斗 endpoint 实测 = POST /json(原 /Battle|api/ 不匹配 → 捕获不到)
     });
     return xs.call(this, body);
   };
@@ -36,7 +36,7 @@ function hookNet(): void {
           rp.clone()
             .text()
             .then((t) => {
-              lastBattleResponse = t;
+              setLastBattle(t);
             })
             .catch(() => {});
         }
@@ -97,7 +97,7 @@ function mountUI(): void {
 {
   const w = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window) as unknown as { __hvab: unknown };
   w.__hvab = {
-    getLastBattle: () => lastBattleResponse,
+    getLastBattle,
     config,
     log: () => logger.all(),
     logText: () => logger.toText(),
