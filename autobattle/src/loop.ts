@@ -9,6 +9,8 @@ import { actionLabel, SK, IT } from './battle/tables';
 import { bus } from './core/bus';
 import { logger } from './core/logger';
 import { Store } from './core/store';
+import { getLastBattle } from './core/net-cache';
+import { parseRoundFromJson, deriveBattleCode } from './record/battle-code';
 import type { ActionType, BattleState } from './types';
 import { farmTick } from './engine/starter';
 
@@ -29,6 +31,8 @@ let regenCd = 0; // 细胞活化回合追踪(战斗内, 不跨 reload): 放出�
 let manaPotCd = 0; // 回蓝药冷静期(战斗内, 不跨 reload): 喝后 MANAPOT_HOLD 回合内常规线不重喝
 const MANA_POT_IDS = new Set<number>([IT.mDraught, IT.mPotion, IT.mElixir]); // 三种回蓝药(宝石不受冷却, 不计入冷静期)
 let cannonRoundSeen = Store.get<number>('cannonRound', -1);
+let curBattleId = Store.get<string>('curBattleId', '');
+let battleStartTs = Store.get<number>('curBattleStart', 0);
 
 export function nextCannonCooldown(actionType: ActionType, execResult: unknown, currentCd: number, cooldownTurns: number): number {
   return actionType === 'cannon' && execResult === true ? cooldownTurns : currentCd;
@@ -78,6 +82,35 @@ function tick(): void {
       const stalled = Date.now() - actedAt > 2500; // 2.5s 状态没推进 → 上一招可能无效, 强制重新决策换招(防自锁死)
       if (changed || stalled) {
         if (changed) {
+          // 记录埋点(决策零改): battleId 切换沿 + battle:end. 仅新增 emit/Store 读写, 不动其下 cannonCd 逻辑.
+          const raw = getLastBattle();
+          const rj = parseRoundFromJson(raw);
+          const rNow = rj?.roundNow ?? S.roundNow;
+          const rAll = rj?.roundAll ?? S.roundAll;
+          const isNewBattle = !curBattleId || (rNow > 0 && cannonRoundSeen > 0 && rNow < cannonRoundSeen);
+          if (isNewBattle) {
+            if (curBattleId) {
+              const victorious = /You are Victorious/i.test(raw || '');
+              bus.emit('battle:end', {
+                battleId: curBattleId,
+                battleCode: Store.get<string>('curBattleCode', ''),
+                level: Store.get<number | null>('curLevel', null),
+                roundAll: Store.get<number>('curRoundAll', 0),
+                victorious,
+                finalRawJson: raw,
+                startedAt: battleStartTs,
+                endedAt: Date.now(),
+              });
+            }
+            const meta = deriveBattleCode(S.battleType, rAll, config.get('arenaTiers'));
+            curBattleId = `${meta.battleCode}@${Date.now()}`;
+            battleStartTs = Date.now();
+            Store.set('curBattleId', curBattleId);
+            Store.set('curBattleStart', battleStartTs);
+            Store.set('curBattleCode', meta.battleCode);
+            Store.set('curLevel', meta.level);
+            Store.set('curRoundAll', rAll);
+          }
           // 炮冷却跨 reload 持久化: 轮数倒退(R30→R1=重开 GrindFest)→ 新战斗清零; 否则真新回合 -1
           if (S.roundNow > 0 && cannonRoundSeen > 0 && S.roundNow < cannonRoundSeen) cannonCd = 0;
           cannonRoundSeen = S.roundNow;
@@ -154,7 +187,7 @@ function tick(): void {
         const foe = reds.length
           ? reds.map((e) => `红#${e.eid} ${e.hpPct}% ${e.stunned ? '已晕' : '未晕'} ${e.bleeding ? '流血' : '无血'}`).join(' ')
           : undefined;
-        logger.push({
+        const rec = {
           round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
           turn,
           oc: S.overcharge,
@@ -168,6 +201,22 @@ function tick(): void {
           action: actionLabel(a),
           note,
           foe,
+        };
+        logger.push(rec);
+        // 记录埋点(决策零改): battle:round → stats-collector 累计. 复用刚 push 的 LogRecord(同源同回合, DRY).
+        bus.emit('battle:round', {
+          battleId: curBattleId,
+          battleCode: Store.get<string>('curBattleCode', ''),
+          level: Store.get<number | null>('curLevel', null),
+          roundNow: S.roundNow,
+          roundAll: S.roundAll,
+          turn,
+          action: { type: a.type, id: a.id },
+          actionLabel: actionLabel(a),
+          record: rec,
+          rawJson: getLastBattle(),
+          bossThisWave: S.enemies.filter((e) => e.alive && e.is_red_boss).length,
+          isRetry: !changed || stuckN >= 2,
         });
         if (a.type === 'continue') logger.flush(); // 继续下一波 battle_continue() 会 reload 页面 → 立即落盘, 防这条(及3s防抖内未落盘缓冲)随 reload 丢失
 
