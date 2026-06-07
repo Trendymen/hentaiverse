@@ -2,6 +2,8 @@ import { el } from '../core/dom';
 import { group, pctRow, numRow, swRow, textRow, section } from './components';
 import { config } from '../core/config';
 import { statsPane } from './stats';
+import { unlockAudio, playAlarm, sendDesktop, requestNotifyPermission } from '../riddle/notify';
+import { preloadRiddleWindow } from '../riddle/submit';
 
 const TABS = [
   { key: 'battle', label: '战斗' },
@@ -41,6 +43,19 @@ function notifyPane(): HTMLElement {
   p.appendChild(group('小马题辅助', swRow('useRiddleAssist', '启用辅助'), swRow('riddlePopup', '弹窗答题'), swRow('riddleHotkeys', '数字快捷键'), swRow('riddleChartOverlay', '图鉴浮层')));
   p.appendChild(group('提醒', swRow('riddleAlarm', '音频警报'), swRow('riddleNotify', '桌面通知'), numRow('riddleUrgentSec', '催答秒数', 's')));
   p.appendChild(group('采集/识别', swRow('riddleCollect', '采集训练样本'), swRow('riddleAutoRecognize', '自动识别(CNN未来)')));
+
+  // 测试/预处理按钮：挂机前点一次，当场确认音频/通知/弹窗就绪
+  const preBtn = el('button');
+  preBtn.textContent = '🔊 测试/预处理';
+  preBtn.onclick = () => {
+    try { unlockAudio(); } catch { /* 不致命 */ }
+    try { playAlarm(); } catch { /* 不致命 */ }
+    try { requestNotifyPermission(); } catch { /* 不致命 */ }
+    try { sendDesktop('小马题辅助', '预处理完成: 音频/通知/弹窗已就绪'); } catch { /* 不致命 */ }
+    try { preloadRiddleWindow(); } catch { /* 不致命 */ }
+  };
+  p.appendChild(group('预处理/测试', preBtn));
+
   return p;
 }
 

@@ -9,10 +9,18 @@ import { type RiddleConfig } from './types';
 import { type Config } from '../core/config';
 import { config } from '../core/config';
 import { detectRiddle } from './detect';
-import { playAlarm, sendDesktop } from './notify';
+import { playAlarm, sendDesktop, unlockAudio } from './notify';
 import { mountRiddleUI } from './ui';
 import { submitRiddle, openRiddleWindow } from './submit';
 import type { PonyName } from './types';
+
+// ── 首次用户交互自动解锁音频（注册一次性监听）──────────────────────────────────
+(function registerAudioUnlock() {
+  try {
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+  } catch { /* 注册失败不致命 */ }
+})();
 
 // ── 模块级状态（题目生命周期）──
 let active = false;         // 上一 tick 是否有小马题
