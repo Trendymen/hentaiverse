@@ -118,5 +118,10 @@ export function readFarm(): FarmContext {
     page = isBattleEnd(url) ? 'hv-battle-end' : 'hv-out';
   }
 
-  return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil };
+  // ── M3 增量: 异世界续刷 + 战败退出 ──
+  const isIsekai = Store.get<boolean>('isIsekai', false);
+  const lastIsekaiSwitch = Store.get<number>('lastIsekaiSwitch', 0);
+  const defeated = Store.get<boolean>('farmDefeated', false);
+
+  return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil, isIsekai, lastIsekaiSwitch, defeated };
 }

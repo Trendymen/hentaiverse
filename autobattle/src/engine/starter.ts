@@ -23,6 +23,10 @@ export function farmCfg(C: Config): FarmReducerCfg {
     grPerDay: C.grPerDay,
     arenaLevels: C.arenaLevels,
     staminaHathperk: C.staminaHathperk,
+    // ── M3 增量: 异世界续刷 + 战败退出 ──
+    autoSwitchIsekai: C.autoSwitchIsekai,
+    isekaiGuardMs: C.ISEKAI_SWITCH_GUARD_MIN * 60_000,
+    autoSkipDefeated: C.autoSkipDefeated,
   };
 }
 

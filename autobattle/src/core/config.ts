@@ -86,6 +86,10 @@ export const DEFAULT_CONFIG = {
   staminaLowWithNat: 0, // 含 24h 自然恢复的下限
   encounterCdMin: 30, // 遭遇常规冷却(分钟)
   staminaHathperk: false, // 精力 hathperk(影响盲发恢复量预估 +20/+10)
+  // ── M3 增量: 异世界续刷 + 战败退出 ──
+  autoSwitchIsekai: false, // 异世界自动续刷(本世界刷完后切异世界; 默认关)
+  ISEKAI_SWITCH_GUARD_MIN: 10, // 切换异世界最小间隔(分钟; 防频繁切换)
+  autoSkipDefeated: false, // 战败后跳过该靶继续连刷(false=停刷)
 };
 
 export type Config = typeof DEFAULT_CONFIG;
@@ -95,7 +99,7 @@ let current: Config = { ...DEFAULT_CONFIG, ...Store.get<Partial<Config>>('config
 
 // 配置迁移: 旧存档里"后来改过默认值"的键会用旧值盖住新默认(根因: config = {...新默认, ...旧存档}).
 // 版本升级时, 对这些键强制采用新默认(一次性; 之后仍尊重用户面板改动).
-const CONFIG_VERSION = 5;
+const CONFIG_VERSION = 6;
 if (Store.get<number>('configVersion', 0) < CONFIG_VERSION) {
   current.cannonCdMs = DEFAULT_CONFIG.cannonCdMs; // 旧存档 22000(22s) → 1500: 根治"炮放一次后整轮不再放"
   current.OC_ON = DEFAULT_CONFIG.OC_ON; // 0.4 → 0.5: 架式开启对齐游戏 ≥50% 要求, 去掉无效空点

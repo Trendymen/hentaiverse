@@ -240,6 +240,10 @@ export interface FarmContext {
   lastHref: string; // 战斗前页地址(回前页用)
   eventHref?: string; // e-hentai eventpane 里的遭遇目标 href 片段
   cooldownUntil: number; // COOLDOWN 到期时戳
+  // ── M3 增量: 异世界续刷 + 战败退出 ──
+  isIsekai: boolean; // 当前连刷目标是否为异世界(影响 PICK_NEXT 靶选与 switch-isekai 触发)
+  lastIsekaiSwitch: number; // 上次切换异世界时间戳(ms; 防抖用; 0=未切过)
+  defeated: boolean; // 上次战斗是否以战败结束(true → PICK_NEXT/COOLDOWN 跳过该靶或触发 stop-farm)
 }
 
 /** farm-reducer 输出的副作用意图(纯数据; executor 翻译成 XHR/导航/Store) */
@@ -248,7 +252,10 @@ export type FarmAction =
   | { type: 'start-battle'; href: 'ar' | 'ar&page=2' | 'rb' | 'gr'; initid: string; token: string; note?: string }
   | { type: 'navigate'; url: string; note?: string } // openNoFetch 等价(engage/reject/return 共用)
   | { type: 'recover-stamina'; note?: string }
-  | { type: 'set-cooldown'; untilMs: number; note?: string };
+  | { type: 'set-cooldown'; untilMs: number; note?: string }
+  // ── M3 增量: 异世界续刷 + 战败退出 ──
+  | { type: 'switch-isekai'; url: string; note?: string } // 切换到异世界页面(isIsekai 翻转后导航)
+  | { type: 'stop-farm'; note?: string }; // 战败/不可恢复错误 → 停止连刷(置 STOPPED)
 
 /** reducer 输出 */
 export interface FarmStep {
@@ -269,6 +276,10 @@ export interface FarmReducerCfg {
   grPerDay: number;
   arenaLevels: string;
   staminaHathperk: boolean;
+  // ── M3 增量: 异世界续刷 + 战败退出 ──
+  autoSwitchIsekai: boolean; // 异世界自动续刷开关(本世界刷完后切异世界)
+  isekaiGuardMs: number; // 切换异世界最小间隔(ms; ISEKAI_SWITCH_GUARD_MIN*60000)
+  autoSkipDefeated: boolean; // 战败后自动跳过该靶继续连刷(false=停刷)
 }
 
 /** HUD 展示的连刷状态 */
