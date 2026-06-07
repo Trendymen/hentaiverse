@@ -1,0 +1,21 @@
+// ==UserScript==
+// @name                RiddleLimiter Plus
+// @namespace       hentaiverse.org
+// @description      
+// @match               http://hentaiverse.org/*
+// @version             1.0
+// ==/UserScript==
+if (document.getElementById('riddlemaster')) {
+  var options = ['A', 'B', 'C'];
+  var bar = document.body.appendChild(document.createElement('div'));
+  bar.style.cssText = "z-index:1000; width:710px; height: 40px; position:absolute; top: 50px; left: 345px; display: table; border-spacing: 5px; ";
+  for (i in options) {
+    var button = bar.appendChild(document.createElement('div'));
+    button.style.cssText = "border:red solid 4px;10px; display: table-cell; cursor:pointer";
+    button.value=options[i];
+
+    button.onclick=function(){document.getElementById('riddlemaster').value=this.value; document.getElementById('riddleform').submit();};
+    button.onmouseover=function(){this.style.background='rgba(63,207,208,0.20)';};
+    button.onmouseout=function(){this.style.background='';};
+  }
+}
