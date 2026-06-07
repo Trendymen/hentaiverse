@@ -1,12 +1,14 @@
 import { el } from '../core/dom';
 import { group, pctRow, numRow, swRow, section } from './components';
 import { config } from '../core/config';
+import { statsPane } from './stats';
 
 const TABS = [
   { key: 'battle', label: '战斗' },
   { key: 'farm', label: '连刷' },
   { key: 'guard', label: '保护' },
   { key: 'notify', label: '提醒' },
+  { key: 'stats', label: '收益' },
 ] as const;
 
 /** 战斗 tab: 接入 M2 决策配置 */
@@ -41,6 +43,8 @@ function paneFor(key: string): HTMLElement {
       return farmPane();
     case 'guard':
       return section('保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入');
+    case 'stats':
+      return statsPane();
     default:
       return section('提醒杂项(告警 / 异世界 / 小马) · 待 M5 接入');
   }
