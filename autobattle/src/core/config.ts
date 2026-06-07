@@ -109,6 +109,16 @@ export const DEFAULT_CONFIG = {
     { roundAll: 75, level: 200, name: '命运三女神与树' }, { roundAll: 80, level: 225, name: '世界末日' },
     { roundAll: 85, level: 250, name: '永恒黑暗' }, { roundAll: 90, level: 300, name: '与龙共舞' },
   ] as { roundAll: number; level: number; name: string }[],
+  // ── 小马题自动答题(riddle; 详见 specs/2026-06-07-autobattle-riddle-design.md)──
+  useRiddleAssist: true, // 小马题辅助总开关
+  riddlePopup: true, // 弹窗模式(独立窗答, 绕后台标签节流)
+  riddleHotkeys: true, // 数字 1-6 / Enter / Esc 快捷键
+  riddleAlarm: true, // 音频警报
+  riddleNotify: true, // 桌面通知 GM_notification
+  riddleChartOverlay: true, // PONY CHART 图鉴浮层
+  riddleCollect: true, // 数据采集(IndexedDB, 铺路 CNN)
+  riddleUrgentSec: 8, // 催答提醒触发秒数(倒计时 ≤ 此值加急)
+  riddleAutoRecognize: false, // 自动识别(CNN; 现 stub 无效, 未来接入后生效)
 };
 
 export type Config = typeof DEFAULT_CONFIG;
