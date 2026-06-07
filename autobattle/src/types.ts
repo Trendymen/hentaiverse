@@ -133,6 +133,8 @@ export interface BusEvents {
   'ui:toggle': boolean;
   'battle:active': boolean; // loop 检测 inBattle 跨 tick 变化: true=进战斗(下一轮恢复日志窗口), false=退出战斗(关窗口+清记忆)
   'farm:state': FarmHud; // M3 连刷: 当前 FSM 状态 → HUD 战斗外展示
+  'battle:round': RoundSample;
+  'battle:end': BattleEnd;
 }
 
 /** target-weight 纯函数输入(EnemyState 的结构子集; EnemyState 鸭子类型可直接传) */
@@ -288,3 +290,49 @@ export interface FarmHud {
   note?: string;
   cdRemainMs?: number;
 }
+
+// ── 记录与分析(record)类型. 详见 specs/2026-06-07-autobattle-record-analysis-design.md ──
+
+/** 竞技场准入等级映射项(config.arenaTiers; roundAll↔准入等级↔名称) */
+export interface ArenaTier { roundAll: number; level: number; name: string; }
+
+/** 每回合采集样本(loop emit battle:round) */
+export interface RoundSample {
+  battleId: string;          // 同场关联(每 tick 从 Store curBattleId 读)
+  battleCode: string;        // 'AR-Lv130-流亡之途' / 'GF' / 'AR-R50'(失配退化)
+  level: number | null;      // 竞技场准入等级; 非竞技场/失配为 null
+  roundNow: number; roundAll: number; turn: number;
+  action: { type: string; id?: number };  // brain 决策【结构化】(供技能/物品次数; 非中文串)
+  actionLabel: string;       // 中文可读
+  record: LogRecord;         // 复用决策日志(同源同回合)
+  rawJson: string | null;    // 当回合 /json 原始(冷启动缺失为 null)
+  bossThisWave: number;      // 本波 boss 数 = enemies.filter(is_red_boss).length
+  isRetry: boolean;          // stalled/安全网重试 → 订阅者跳过(防重复计数)
+}
+
+/** 一场结束(loop 在 battleId 切换沿 emit battle:end) */
+export interface BattleEnd {
+  battleId: string; battleCode: string; level: number | null;
+  roundAll: number; victorious: boolean;
+  finalRawJson: string | null;   // 末回合 /json(含掉落 textlog)
+  startedAt: number; endedAt: number;
+}
+
+/** A 收益累计(Store hvab_stats) */
+export interface StatsAccum {
+  startTime: number; activeMs: number;
+  exp: number; credit: number;
+  battles: number; rounds: number; turns: number; monsters: number; bosses: number;
+  drops: Record<string, number>;
+  restore: Record<string, number>;
+  items: Record<string, number>;
+  magic: Record<string, number>;
+  damage: Record<string, number>;
+  proficiency: Record<string, number>;
+  hurt: { avg: number; pavg: number; mavg: number; total: number; count: number; mp: number; oc: number };
+  self: { evade: number; miss: number; focus: number };
+}
+
+/** monsterDB: 怪名 → {mid, 各等级满血} */
+export type MonsterDB = Record<string, { mid: number } & Record<number, number>>;
+export type MonsterMID = Record<number, { mid: number } & Record<number, number>>;
