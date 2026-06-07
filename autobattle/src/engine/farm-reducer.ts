@@ -12,6 +12,15 @@ function nextMidnight(nowMs: number): number {
   return (Math.floor(nowMs / MS_PER_DAY) + 1) * MS_PER_DAY;
 }
 
+/** 待战表清空时的去向: 异世界续刷(防死循环窗内不切) 或 COOLDOWN 等次日 */
+function onWaitlistEmpty(ctx: FarmContext, cfg: FarmReducerCfg): FarmStep {
+  if (cfg.autoSwitchIsekai && ctx.nowMs - ctx.lastIsekaiSwitch > cfg.isekaiGuardMs) {
+    const url = `${ctx.hvOrigin}/${ctx.isIsekai ? '' : 'isekai/'}`;
+    return { next: 'IDLE', action: { type: 'switch-isekai', url, note: `切${ctx.isIsekai ? '恒定' : '异'}世界续刷` } };
+  }
+  return { next: 'COOLDOWN', action: { type: 'set-cooldown', untilMs: nextMidnight(ctx.nowMs), note: '今日全清' } };
+}
+
 export function farmReducer(state: FarmState, ctx: FarmContext, cfg: FarmReducerCfg): FarmStep {
   switch (state) {
     case 'IDLE':
@@ -42,7 +51,7 @@ export function farmReducer(state: FarmState, ctx: FarmContext, cfg: FarmReducer
     case 'CHECK_STAMINA': {
       const stamina = computeStamina(ctx.stamina, ctx.nowHour);
       const pick = pickNextArena(ctx.arena);
-      if (pick.kind === 'empty') return { next: 'COOLDOWN', action: { type: 'set-cooldown', untilMs: nextMidnight(ctx.nowMs), note: '今日全清' } };
+      if (pick.kind === 'empty') return onWaitlistEmpty(ctx, cfg);
       const cost = computeCost(pick.key!, stamina, ctx.arena.gr, false);
       const g = gate(stamina, cost, cfg.staminaLow, cfg.staminaLowWithNat, ctx.nowHour);
       if (g === 1) return { next: 'PICK_NEXT', action: { type: 'none' } };
@@ -56,7 +65,7 @@ export function farmReducer(state: FarmState, ctx: FarmContext, cfg: FarmReducer
 
     case 'PICK_NEXT': {
       const pick = pickNextArena(ctx.arena);
-      if (pick.kind === 'empty') return { next: 'COOLDOWN', action: { type: 'set-cooldown', untilMs: nextMidnight(ctx.nowMs), note: '今日全清' } };
+      if (pick.kind === 'empty') return onWaitlistEmpty(ctx, cfg);
       if (pick.kind === 'need-token') return { next: 'PICK_NEXT', action: { type: 'navigate', url: `?s=Battle&ss=${pick.href}`, note: `收集 ${pick.href} token` }, arena: pick.arena };
       return { next: 'STARTING', action: { type: 'start-battle', href: pick.href!, initid: pick.initid!, token: pick.token!, note: `开战 ${pick.href}#${pick.key}` }, arena: pick.arena };
     }
@@ -70,7 +79,8 @@ export function farmReducer(state: FarmState, ctx: FarmContext, cfg: FarmReducer
       return { next: 'POST_BATTLE', action: { type: 'none' } };
 
     case 'POST_BATTLE':
-      return { next: 'RETURN', action: { type: 'none', note: '战斗结束' } };
+      if (ctx.defeated && !cfg.autoSkipDefeated) return { next: 'STOPPED', action: { type: 'stop-farm', note: '战败停机等人工' } };
+      return { next: 'RETURN', action: { type: 'none', note: ctx.defeated ? '战败→续刷' : '战斗结束' } };
 
     case 'RETURN':
       return { next: 'IDLE', action: { type: 'navigate', url: ctx.lastHref, note: '回前页' } };
