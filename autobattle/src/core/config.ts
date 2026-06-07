@@ -90,6 +90,25 @@ export const DEFAULT_CONFIG = {
   autoSwitchIsekai: false, // 异世界自动续刷(本世界刷完后切异世界; 默认关)
   ISEKAI_SWITCH_GUARD_MIN: 10, // 切换异世界最小间隔(分钟; 防频繁切换)
   autoSkipDefeated: false, // 战败后跳过该靶继续连刷(false=停刷)
+  // ── 记录与分析里程碑(详见 specs/2026-06-07-autobattle-record-analysis-design.md)──
+  recordEnabled: true,        // A 收益统计总开关
+  recordArchive: false,       // B 调优日志总开关(阶段2; 重存储默认关)
+  cacheMonsterHP: true,       // monsterDB 落盘
+  dropQuality: 6,             // 装备品质门槛(0Crude..7Peerless; 默认6=Legendary起记)
+  archiveMaxBattles: 200,     // B 最多留几场(阶段2)
+  archiveKeepPerLevel: 20,    // 每准入等级最多留几场(阶段2)
+  statsRateMode: 'session' as 'session' | 'active',  // 速率口径(阶段3)
+  showPlayerLevel: true,      // 显示玩家角色等级(阶段3)
+  // 竞技场准入等级映射(截图底本, 覆盖 Lv.80~300; 失配→level=null+AR-R${roundAll})
+  arenaTiers: [
+    { roundAll: 25, level: 80, name: '力量流失' }, { roundAll: 30, level: 90, name: '杀戮地带' },
+    { roundAll: 35, level: 100, name: '最终阶段' }, { roundAll: 40, level: 110, name: '无尽旅程' },
+    { roundAll: 45, level: 120, name: '梦陨之时' }, { roundAll: 50, level: 130, name: '流亡之途' },
+    { roundAll: 55, level: 140, name: '封印之力' }, { roundAll: 60, level: 150, name: '崭新之翼' },
+    { roundAll: 65, level: 165, name: '弑神之路' }, { roundAll: 70, level: 180, name: '死亡前夜' },
+    { roundAll: 75, level: 200, name: '命运三女神与树' }, { roundAll: 80, level: 225, name: '世界末日' },
+    { roundAll: 85, level: 250, name: '永恒黑暗' }, { roundAll: 90, level: 300, name: '与龙共舞' },
+  ] as { roundAll: number; level: number; name: string }[],
 };
 
 export type Config = typeof DEFAULT_CONFIG;
