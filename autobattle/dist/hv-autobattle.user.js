@@ -310,7 +310,26 @@
       { roundAll: 80, level: 225, name: "世界末日" },
       { roundAll: 85, level: 250, name: "永恒黑暗" },
       { roundAll: 90, level: 300, name: "与龙共舞" }
-    ]
+    ],
+    // ── 小马题自动答题(riddle; 详见 specs/2026-06-07-autobattle-riddle-design.md)──
+    useRiddleAssist: true,
+    // 小马题辅助总开关
+    riddlePopup: true,
+    // 弹窗模式(独立窗答, 绕后台标签节流)
+    riddleHotkeys: true,
+    // 数字 1-6 / Enter / Esc 快捷键
+    riddleAlarm: true,
+    // 音频警报
+    riddleNotify: true,
+    // 桌面通知 GM_notification
+    riddleChartOverlay: true,
+    // PONY CHART 图鉴浮层
+    riddleCollect: true,
+    // 数据采集(IndexedDB, 铺路 CNN)
+    riddleUrgentSec: 8,
+    // 催答提醒触发秒数(倒计时 ≤ 此值加急)
+    riddleAutoRecognize: false
+    // 自动识别(CNN; 现 stub 无效, 未来接入后生效)
   };
   const FARM_WAKE_KEYS = /* @__PURE__ */ new Set([
     "farmEnabled",
@@ -496,6 +515,13 @@
     p.appendChild(group("节奏", numRow("farmTickMs", "连刷tick", "ms")));
     return p;
   }
+  function notifyPane() {
+    const p = el("div");
+    p.appendChild(group("小马题辅助", swRow("useRiddleAssist", "启用辅助"), swRow("riddlePopup", "弹窗答题"), swRow("riddleHotkeys", "数字快捷键"), swRow("riddleChartOverlay", "图鉴浮层")));
+    p.appendChild(group("提醒", swRow("riddleAlarm", "音频警报"), swRow("riddleNotify", "桌面通知"), numRow("riddleUrgentSec", "催答秒数", "s")));
+    p.appendChild(group("采集/识别", swRow("riddleCollect", "采集训练样本"), swRow("riddleAutoRecognize", "自动识别(CNN未来)")));
+    return p;
+  }
   function paneFor(key) {
     switch (key) {
       case "battle":
@@ -504,10 +530,12 @@
         return farmPane();
       case "guard":
         return section("保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入");
+      case "notify":
+        return notifyPane();
       case "stats":
         return statsPane();
       default:
-        return section("提醒杂项(告警 / 异世界 / 小马) · 待 M5 接入");
+        return section("提醒杂项 · 待接入");
     }
   }
   function createPanel() {
