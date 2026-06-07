@@ -132,7 +132,17 @@ export function deriveBattleCode(battleType: string, roundAll: number, tier: Are
 
 > 双重判定: 只有 `battleType==='竞技场'`(ss=ar) 才查 arenaTiers, 避免 GF/RB 的 roundAll 偶然撞 25~90。GF 持久战 roundAll 通常很大, 天然不撞。
 
-> **reader 现状(已确认可复用, reader 零改)**: `reader.read()` 输出的 `BattleState` 已含 `battleType`(reader.ts:228 由 URL `ss` 经 `SS_CN` 映射: `ar`=竞技场 / `gr`=压榨界 / `rb`=浴血擂台 / `ba`=遭遇战) 与 `roundAll`(reader.ts:31 从 `R N/M` 解析)。记录模块直接消费 loop 传入 `battle:round` 的 `S`(BattleState), **无需新增任何读取**。`deriveBattleCode` 的 `battleType` 入参即 `S.battleType`、`roundAll` 即 `S.roundAll`。
+> **识别数据源(经 hvc.js.bak 官方脚本 + 汉化实测修正)**: 三条硬事实——
+> ① HV 官方 /json 响应**无结构化 round/drop/exp(真值)/credit 字段**, 全埋在 `textlog[]`(数组 `{t:html, c:cls}`) 与 `pane_completion`(HTML) 里(hvc.js.bak Battle.process_action L888-940);
+> ② HV **无全局 battle 数据对象**(`window.battle` 是 UI 控制器, 无 roundAll/roundType; dodying 的 `g('battle').roundAll` 实为它自己从 textlog 解析后回填 L3242, 非 HV 原生 → `unsafeWindow.battle.roundAll` 拿不到, **已否决**);
+> ③ **汉化脚本改写渲染后 DOM 的 textlog 文本**(实测: `Spawned Monster`→`生成怪物`、`Initializing Grindfest (Round 2/1000)` 整行被吞) → **从渲染 DOM 解析英文模式不可靠**。
+>
+> 因此**统一从 main hook 抓的 /json 原始响应解析**(未经汉化的英文原文, B 调优日志本就存它):
+> - **roundNow/roundAll**: 解析 `textlog[].t` 的 `Round N / M`(英文原文; GF 实测 1000 轮)
+> - **battleType**: 用 URL `ss` 经 `SS_CN` 映射(reader.ts:228; ar=竞技场/gr=压榨界/rb=浴血擂台/ba=遭遇战; **不受汉化影响**)
+> - 渲染后 DOM `#textlog` 仅作 /json 缺失的**最后兜底**(汉化下不可靠); 缓存再兜底(roundAll 一场固定)
+>
+> 实现: `record/battle-code.ts` 加纯函数 `parseRoundFromJson(rawJson): {roundNow, roundAll} | null`(解析 textlog[].t); `deriveBattleCode`/`resolveArenaTier` 不变。掉落(§5.1)/Spawned(§5.3)同理一律喂 /json 原始 textlog/pane_completion, 不喂汉化 DOM。GF roundAll=1000 不入 arenaTiers(battleType≠竞技场不查表), battleCode=`GF`。
 
 ## 5. A 收益统计(玩家向)
 
@@ -249,7 +259,7 @@ arenaTiers: [ /* §4.3 的 14 行竞技场映射表 */ ],
 | `core/logger.ts` | 极小: 透传可选 `battleCode`; 环形职责不变 |
 | `main.ts` | `lastBattleResponse` 提模块级 + `export getLastBattle()`; init 两订阅者; beforeunload 加 flush |
 | `loop.ts` | `logger.push` 后 emit `battle:round`; continue/退出战斗处 emit `battle:end`; 非战斗分支低频 `tryReadLevel()`(决策逻辑零改) |
-| `battle/reader.ts` | 零改(复用 parseSpawnHp; battle:round 载荷取自 loop 已读的 S) |
+| `battle/reader.ts` | 零改(复用 parseSpawnHp 纯函数, 但记录模块喂 /json 原始 textlog 而非汉化 DOM; reader 自身 DOM 解析降级为 /json 缺失兜底) |
 | `ui/log.ts` | 加「归档对比」模式(异步 idb 渲染 + 切换 + 单场展开 + 导出) |
 | `ui/panel.ts` | 加 `stats` tab |
 | `ui/hud.ts` | 可选: 显示玩家 Lv + 会话 EXP·h |
@@ -269,6 +279,8 @@ arenaTiers: [ /* §4.3 的 14 行竞技场映射表 */ ],
 | 掉落必须读 span color(/json 是 HTML 字符串) | 中 | 解析 /json pane HTML 的 color; DOM 兜底 |
 | IndexedDB 在 Tampermonkey/unsafeWindow 沙箱行为 | 中 | 阶段2 先验证持久/配额; 不可用则降级(仅 disable B, A 照常) |
 | roundAll 撞号(GF/RB 撞竞技场 25~90) | 低 | 双重判定: battleType===竞技场 才查 arenaTiers |
+| **汉化脚本改写渲染后 DOM textlog 文本**(Spawned Monster→生成怪物 / Round 行被吞; 实测) | 高 | **一律从 /json 原始响应(未汉化英文)解析**轮数/掉落/Spawned; DOM 仅 /json 缺失最后兜底(汉化下不可靠) |
+| HV 无结构化 round/drop/exp 字段、无全局 battle 数据对象 | — | 已确认(hvc.js.bak); 轮数从 /json textlog[].t 的 Round N/M 解析, 掉落从 pane_completion+textlog HTML |
 | 跨 reload in-progress 场丢失 | 低 | 逐回合直写 rounds(非内存 buffer)根治 |
 | B raw 体量大 | 中 | archiveMaxBattles + 每等级保留 + recordArchive 默认关 |
 | logger 职责过载 | — | raw 移出 logger 到 B 订阅者, logger 只透传 battleCode |
@@ -286,7 +298,7 @@ arenaTiers: [ /* §4.3 的 14 行竞技场映射表 */ ],
 | 文件 | 职责 | 纯/副作用 | 行 | 阶段 |
 |---|---|---|---|---|
 | `core/idb.ts` | IndexedDB Promise 封装 | 副作用 | ~120 | 2 |
-| `record/battle-code.ts` | resolveArenaTier/deriveBattleCode | 纯 | ~50 | 1 |
+| `record/battle-code.ts` | resolveArenaTier/deriveBattleCode/parseRoundFromJson(全纯函数; parseRoundFromJson 解析 /json textlog[].t 的 Round N/M) | 纯 | ~70 | 1 |
 | `record/drop-parse.ts` | 掉落颜色分类(翻写 dropMonitor) | 纯 | ~90 | 1 |
 | `record/usage-parse.ts` | 逐回合 7 类(翻写 recordUsage) | 纯 | ~140 | 1 |
 | `record/monster-db.ts` | monsterDB upsert | 纯 | ~80 | 1 |
