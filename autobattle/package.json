@@ -1,6 +1,6 @@
 {
   "name": "hv-autobattle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "HV 单手盾战现代化半自动辅助(独立重写)",

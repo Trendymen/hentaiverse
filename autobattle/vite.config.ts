@@ -8,7 +8,7 @@ export default defineConfig({
       userscript: {
         name: '[HV] 自动战斗 · 盾战大脑', // 仅中文, 不做多语言
         namespace: 'https://github.com/local/hv-autobattle',
-        version: '0.1.0',
+        version: '0.1.1',
         description: 'HV 单手盾战现代化半自动辅助(独立重写,忠实翻写 dodying 引擎)',
         author: 'local',
         match: ['*://hentaiverse.org/*', '*://alt.hentaiverse.org/*', '*://e-hentai.org/*'],
