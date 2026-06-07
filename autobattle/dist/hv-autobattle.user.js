@@ -488,6 +488,139 @@
     });
     return p;
   }
+  let _ctx = null;
+  function getCtx() {
+    try {
+      if (!_ctx) {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        _ctx = new Ctor();
+      }
+      return _ctx;
+    } catch {
+      return null;
+    }
+  }
+  function unlockAudio() {
+    try {
+      const ctx = getCtx();
+      if (!ctx) return;
+      const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+      resume.then(() => {
+        try {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 1e-3;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.05);
+        } catch {
+        }
+      }).catch(() => {
+      });
+    } catch {
+    }
+  }
+  function playAlarm(times = 2) {
+    try {
+      const ctx = getCtx();
+      if (!ctx) return;
+      const doPlay = () => {
+        try {
+          for (let i = 0; i < times; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 880;
+            gain.gain.value = 0.2;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            const t = ctx.currentTime + i * 0.35;
+            osc.start(t);
+            osc.stop(t + 0.2);
+          }
+        } catch {
+        }
+      };
+      if (ctx.state === "suspended") {
+        ctx.resume().then(doPlay).catch(() => {
+        });
+      } else {
+        doPlay();
+      }
+    } catch {
+    }
+  }
+  function requestNotifyPermission() {
+    try {
+      if (typeof GM_notification === "function") return;
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {
+        });
+      }
+    } catch {
+    }
+  }
+  function sendDesktop(title, text) {
+    try {
+      if (typeof GM_notification === "function") {
+        GM_notification({ title, text, timeout: 5e3 });
+        return;
+      }
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: text });
+      }
+    } catch {
+    }
+  }
+  function submitRiddle(state, selected) {
+    if (!state.present) return;
+    const selectedSet = new Set(selected);
+    for (const option of state.options) {
+      const shouldCheck = selectedSet.has(option.name);
+      if (option.el.checked !== shouldCheck) {
+        option.el.checked = shouldCheck;
+        try {
+          option.el.dispatchEvent(new Event("change", { bubbles: true }));
+        } catch {
+        }
+      }
+    }
+    if (state.submitEl) {
+      try {
+        state.submitEl.click();
+      } catch {
+      }
+    }
+  }
+  function openRiddleWindow() {
+    try {
+      window.open(
+        location.href,
+        "riddleWindow",
+        "resizable,scrollbars,width=1241,height=707"
+      );
+    } catch {
+    }
+  }
+  function preloadRiddleWindow() {
+    try {
+      const win = window.open(
+        location.href,
+        "riddleWindow",
+        "resizable,scrollbars,width=1241,height=707"
+      );
+      if (win) {
+        setTimeout(() => {
+          try {
+            win.close();
+          } catch {
+          }
+        }, 200);
+      }
+    } catch {
+    }
+  }
   const TABS = [
     { key: "battle", label: "战斗" },
     { key: "farm", label: "连刷" },
@@ -520,6 +653,31 @@
     p.appendChild(group("小马题辅助", swRow("useRiddleAssist", "启用辅助"), swRow("riddlePopup", "弹窗答题"), swRow("riddleHotkeys", "数字快捷键"), swRow("riddleChartOverlay", "图鉴浮层")));
     p.appendChild(group("提醒", swRow("riddleAlarm", "音频警报"), swRow("riddleNotify", "桌面通知"), numRow("riddleUrgentSec", "催答秒数", "s")));
     p.appendChild(group("采集/识别", swRow("riddleCollect", "采集训练样本"), swRow("riddleAutoRecognize", "自动识别(CNN未来)")));
+    const preBtn = el("button");
+    preBtn.textContent = "🔊 测试/预处理";
+    preBtn.onclick = () => {
+      try {
+        unlockAudio();
+      } catch {
+      }
+      try {
+        playAlarm();
+      } catch {
+      }
+      try {
+        requestNotifyPermission();
+      } catch {
+      }
+      try {
+        sendDesktop("小马题辅助", "预处理完成: 音频/通知/弹窗已就绪");
+      } catch {
+      }
+      try {
+        preloadRiddleWindow();
+      } catch {
+      }
+    };
+    p.appendChild(group("预处理/测试", preBtn));
     return p;
   }
   function paneFor(key) {
@@ -2118,12 +2276,12 @@
     return best;
   }
   function ancestorUpBy(el2, steps) {
-    let cur = el2;
+    let cur2 = el2;
     for (let i = 0; i < steps; i++) {
-      if (!cur.parentElement || cur.parentElement === document.body) break;
-      cur = cur.parentElement;
+      if (!cur2.parentElement || cur2.parentElement === document.body) break;
+      cur2 = cur2.parentElement;
     }
-    return cur;
+    return cur2;
   }
   function detectRiddle(root = document) {
     var _a, _b;
@@ -2185,37 +2343,6 @@
       return absent;
     }
   }
-  function playAlarm(times = 2) {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx();
-      for (let i = 0; i < times; i++) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.value = 880;
-        gain.gain.value = 0.2;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        const t = ctx.currentTime + i * 0.35;
-        osc.start(t);
-        osc.stop(t + 0.2);
-      }
-    } catch {
-    }
-  }
-  function sendDesktop(title, text) {
-    try {
-      if (typeof GM_notification === "function") {
-        GM_notification({ title, text, timeout: 5e3 });
-        return;
-      }
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, { body: text });
-      }
-    } catch {
-    }
-  }
   function mapRiddleKey(key, count) {
     if (/^[1-9]$/.test(key)) {
       const index = Number(key) - 1;
@@ -2224,36 +2351,6 @@
     if (key === "Enter") return { kind: "submit" };
     if (key === "Escape") return { kind: "mute" };
     return { kind: "none" };
-  }
-  function submitRiddle(state, selected) {
-    if (!state.present) return;
-    const selectedSet = new Set(selected);
-    for (const option of state.options) {
-      const shouldCheck = selectedSet.has(option.name);
-      if (option.el.checked !== shouldCheck) {
-        option.el.checked = shouldCheck;
-        try {
-          option.el.dispatchEvent(new Event("change", { bubbles: true }));
-        } catch {
-        }
-      }
-    }
-    if (state.submitEl) {
-      try {
-        state.submitEl.click();
-      } catch {
-      }
-    }
-  }
-  function openRiddleWindow() {
-    try {
-      window.open(
-        location.href,
-        "riddleWindow",
-        "resizable,scrollbars,width=1241,height=707"
-      );
-    } catch {
-    }
   }
   const ROOT_ID = "hvab-riddle-ui";
   const CHART_ID = "hvab-riddle-chart";
@@ -2764,6 +2861,13 @@
       }
     };
   }
+  (function registerAudioUnlock() {
+    try {
+      document.addEventListener("click", unlockAudio, { once: true });
+      document.addEventListener("keydown", unlockAudio, { once: true });
+    } catch {
+    }
+  })();
   let active = false;
   let submitted = false;
   let unmount = null;
