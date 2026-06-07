@@ -117,7 +117,7 @@ export const DEFAULT_CONFIG = {
   riddleNotify: true, // 桌面通知 GM_notification
   riddleChartOverlay: true, // PONY CHART 图鉴浮层
   riddleCollect: true, // 数据采集(IndexedDB, 铺路 CNN)
-  riddleUrgentSec: 8, // 催答提醒触发秒数(倒计时 ≤ 此值加急)
+  riddleUrgentSec: 10, // 剩此秒数(默认10): 有已勾选→超时自动提交已勾的; 一只没勾→加急催答提醒
   riddleAutoRecognize: false, // 自动识别(CNN; 现 stub 无效, 未来接入后生效)
 };
 

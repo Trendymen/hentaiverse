@@ -13,6 +13,7 @@ import { getLastBattle } from './core/net-cache';
 import { parseRoundFromJson, deriveBattleCode } from './record/battle-code';
 import type { ActionType, BattleState } from './types';
 import { farmTick } from './engine/starter';
+import { tickRiddle } from './riddle';
 
 let lastFp = '';
 let actedAt = 0;
@@ -75,6 +76,8 @@ function tick(): void {
     lastInBattle = false;
   }
   try {
+    // 小马题辅助：独立于 enabled，useRiddleAssist 门控，战斗外也要工作
+    if (config.get('useRiddleAssist')) { try { tickRiddle(); } catch {} }
     if (config.get('enabled') && nowIn && Date.now() >= busyUntil) {
       const S = reader.read();
       const fp = fingerprint(S);
