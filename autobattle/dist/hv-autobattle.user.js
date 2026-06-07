@@ -274,8 +274,42 @@
     // 异世界自动续刷(本世界刷完后切异世界; 默认关)
     ISEKAI_SWITCH_GUARD_MIN: 10,
     // 切换异世界最小间隔(分钟; 防频繁切换)
-    autoSkipDefeated: false
+    autoSkipDefeated: false,
     // 战败后跳过该靶继续连刷(false=停刷)
+    // ── 记录与分析里程碑(详见 specs/2026-06-07-autobattle-record-analysis-design.md)──
+    recordEnabled: true,
+    // A 收益统计总开关
+    recordArchive: false,
+    // B 调优日志总开关(阶段2; 重存储默认关)
+    cacheMonsterHP: true,
+    // monsterDB 落盘
+    dropQuality: 6,
+    // 装备品质门槛(0Crude..7Peerless; 默认6=Legendary起记)
+    archiveMaxBattles: 200,
+    // B 最多留几场(阶段2)
+    archiveKeepPerLevel: 20,
+    // 每准入等级最多留几场(阶段2)
+    statsRateMode: "session",
+    // 速率口径(阶段3)
+    showPlayerLevel: true,
+    // 显示玩家角色等级(阶段3)
+    // 竞技场准入等级映射(截图底本, 覆盖 Lv.80~300; 失配→level=null+AR-R${roundAll})
+    arenaTiers: [
+      { roundAll: 25, level: 80, name: "力量流失" },
+      { roundAll: 30, level: 90, name: "杀戮地带" },
+      { roundAll: 35, level: 100, name: "最终阶段" },
+      { roundAll: 40, level: 110, name: "无尽旅程" },
+      { roundAll: 45, level: 120, name: "梦陨之时" },
+      { roundAll: 50, level: 130, name: "流亡之途" },
+      { roundAll: 55, level: 140, name: "封印之力" },
+      { roundAll: 60, level: 150, name: "崭新之翼" },
+      { roundAll: 65, level: 165, name: "弑神之路" },
+      { roundAll: 70, level: 180, name: "死亡前夜" },
+      { roundAll: 75, level: 200, name: "命运三女神与树" },
+      { roundAll: 80, level: 225, name: "世界末日" },
+      { roundAll: 85, level: 250, name: "永恒黑暗" },
+      { roundAll: 90, level: 300, name: "与龙共舞" }
+    ]
   };
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 6;
@@ -358,10 +392,10 @@
   function writeCfg(key, val) {
     config.set(key, val);
   }
-  function group(title, ...rows) {
+  function group(title, ...rows2) {
     const g = el("div", { class: "hvab-grp" });
     g.appendChild(el("div", { class: "hvab-gh" }, title));
-    rows.forEach((r) => g.appendChild(r));
+    rows2.forEach((r) => g.appendChild(r));
     return g;
   }
   function pctRow(key, label) {
@@ -388,11 +422,34 @@
   function section(title) {
     return el("div", { class: "hvab-section" }, `<div class="hvab-empty">${title}</div>`);
   }
+  function rows(title, obj) {
+    const items = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    if (!items.length) return "";
+    return `<div class="hvab-gh">${title}</div>` + items.map(([k, v]) => `<div class="hvab-row"><span>${k}</span><span>${v}</span></div>`).join("");
+  }
+  function statsPane() {
+    const p = el("div", { id: "hvab-stats-pane" });
+    const render = () => {
+      const s = Store.get("stats", null);
+      if (!s) {
+        p.innerHTML = '<div class="hvab-empty">暂无记录 · 打一场即出</div>';
+        return;
+      }
+      const h = Math.max(1e-3, (Date.now() - s.startTime) / 36e5);
+      p.innerHTML = `<div class="hvab-gh">收益(本会话)</div><div class="hvab-row"><span>EXP</span><span>${s.exp} (${Math.round(s.exp / h)}/h)</span></div><div class="hvab-row"><span>Credit</span><span>${s.credit} (${Math.round(s.credit / h)}/h)</span></div><div class="hvab-row"><span>场次/回合/怪</span><span>${s.battles}/${s.rounds}/${s.monsters}</span></div>` + rows("掉落", s.drops) + rows("技能次数", s.magic) + rows("物品次数", s.items) + rows("伤害", s.damage) + rows("回复", s.restore) + `<div class="hvab-gh">受伤</div><div class="hvab-row"><span>总/物理均/魔法均</span><span>${s.hurt.total}/${Math.round(s.hurt.pavg)}/${Math.round(s.hurt.mavg)}</span></div>`;
+    };
+    render();
+    bus.on("battle:end", () => {
+      if (p.offsetParent) render();
+    });
+    return p;
+  }
   const TABS = [
     { key: "battle", label: "战斗" },
     { key: "farm", label: "连刷" },
     { key: "guard", label: "保护" },
-    { key: "notify", label: "提醒" }
+    { key: "notify", label: "提醒" },
+    { key: "stats", label: "收益" }
   ];
   function battlePane() {
     const p = el("div");
@@ -422,6 +479,8 @@
         return farmPane();
       case "guard":
         return section("保护后勤(精力 / 无响应 / 修复 / 库存) · 待 M4 接入");
+      case "stats":
+        return statsPane();
       default:
         return section("提醒杂项(告警 / 异世界 / 小马) · 待 M5 接入");
     }
@@ -1499,6 +1558,39 @@
     }
   }
   const brain = new Brain();
+  let last = null;
+  function setLastBattle(text) {
+    last = text;
+  }
+  function getLastBattle() {
+    return last;
+  }
+  function extractTextlog(rawJson) {
+    if (!rawJson) return [];
+    try {
+      const d = JSON.parse(rawJson);
+      return Array.isArray(d.textlog) ? d.textlog.map((e) => e.t ?? "") : [];
+    } catch {
+      return [];
+    }
+  }
+  function parseRoundFromJson(rawJson) {
+    const text = extractTextlog(rawJson).join("\n");
+    const m = text.match(/Round\s*(\d+)\s*\/\s*(\d+)/i);
+    return m ? { roundNow: +m[1], roundAll: +m[2] } : null;
+  }
+  function resolveArenaTier(roundAll, tiers) {
+    return tiers.find((t) => t.roundAll === roundAll) ?? null;
+  }
+  function deriveBattleCode(battleType, roundAll, tiers) {
+    if (battleType === "竞技场") {
+      const tier = resolveArenaTier(roundAll, tiers);
+      return tier ? { battleCode: `AR-Lv${tier.level}-${tier.name}`, level: tier.level } : { battleCode: `AR-R${roundAll}`, level: null };
+    }
+    if (battleType === "压榨界") return { battleCode: "GF", level: null };
+    const kind = battleType === "浴血擂台" ? "RB" : battleType === "遭遇战" ? "BA" : "BT";
+    return { battleCode: roundAll ? `${kind}-${roundAll}` : kind, level: null };
+  }
   const MS_PER_DAY$2 = 24 * 36e5;
   function isNewDay(arena, nowMs) {
     if (!arena.date) return true;
@@ -1565,11 +1657,11 @@
   function computeCooldown(recs, nowMs, lastEH, cdMs) {
     var _a;
     const encountered = recs.filter((e) => e.encountered && e.href);
-    const last = ((_a = recs[0]) == null ? void 0 : _a.time) ?? lastEH ?? 0;
+    const last2 = ((_a = recs[0]) == null ? void 0 : _a.time) ?? lastEH ?? 0;
     let cd;
     if (encountered.length >= 24) cd = Math.floor(recs[0].time / MS_PER_DAY$1 + 1) * MS_PER_DAY$1 - nowMs;
-    else if (!last) cd = 0;
-    else cd = cdMs + last - nowMs;
+    else if (!last2) cd = 0;
+    else cd = cdMs + last2 - nowMs;
     return Math.max(0, cd);
   }
   function pickEngageable(recs) {
@@ -1929,6 +2021,8 @@
   let manaPotCd = 0;
   const MANA_POT_IDS = /* @__PURE__ */ new Set([IT.mDraught, IT.mPotion, IT.mElixir]);
   let cannonRoundSeen = Store.get("cannonRound", -1);
+  let curBattleId = Store.get("curBattleId", "");
+  let battleStartTs = Store.get("curBattleStart", 0);
   function nextCannonCooldown(actionType, execResult, currentCd, cooldownTurns) {
     return actionType === "cannon" && execResult === true ? cooldownTurns : currentCd;
   }
@@ -1961,6 +2055,34 @@
         const stalled = Date.now() - actedAt > 2500;
         if (changed || stalled) {
           if (changed) {
+            const raw = getLastBattle();
+            const rj = parseRoundFromJson(raw);
+            const rNow = (rj == null ? void 0 : rj.roundNow) ?? S.roundNow;
+            const rAll = (rj == null ? void 0 : rj.roundAll) ?? S.roundAll;
+            const isNewBattle = !curBattleId || rNow > 0 && cannonRoundSeen > 0 && rNow < cannonRoundSeen;
+            if (isNewBattle) {
+              if (curBattleId) {
+                const victorious = /You are Victorious/i.test(raw || "");
+                bus.emit("battle:end", {
+                  battleId: curBattleId,
+                  battleCode: Store.get("curBattleCode", ""),
+                  level: Store.get("curLevel", null),
+                  roundAll: Store.get("curRoundAll", 0),
+                  victorious,
+                  finalRawJson: raw,
+                  startedAt: battleStartTs,
+                  endedAt: Date.now()
+                });
+              }
+              const meta = deriveBattleCode(S.battleType, rAll, config.get("arenaTiers"));
+              curBattleId = `${meta.battleCode}@${Date.now()}`;
+              battleStartTs = Date.now();
+              Store.set("curBattleId", curBattleId);
+              Store.set("curBattleStart", battleStartTs);
+              Store.set("curBattleCode", meta.battleCode);
+              Store.set("curLevel", meta.level);
+              Store.set("curRoundAll", rAll);
+            }
             if (S.roundNow > 0 && cannonRoundSeen > 0 && S.roundNow < cannonRoundSeen) cannonCd = 0;
             cannonRoundSeen = S.roundNow;
             if (cannonCd > 0) cannonCd--;
@@ -2022,7 +2144,7 @@
           }
           const reds = S.enemies.filter((e) => e.alive && e.is_red_boss);
           const foe = reds.length ? reds.map((e) => `红#${e.eid} ${e.hpPct}% ${e.stunned ? "已晕" : "未晕"} ${e.bleeding ? "流血" : "无血"}`).join(" ") : void 0;
-          logger.push({
+          const rec = {
             round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
             turn,
             oc: S.overcharge,
@@ -2036,6 +2158,21 @@
             action: actionLabel(a),
             note,
             foe
+          };
+          logger.push(rec);
+          bus.emit("battle:round", {
+            battleId: curBattleId,
+            battleCode: Store.get("curBattleCode", ""),
+            level: Store.get("curLevel", null),
+            roundNow: S.roundNow,
+            roundAll: S.roundAll,
+            turn,
+            action: { type: a.type, id: a.id },
+            actionLabel: actionLabel(a),
+            record: rec,
+            rawJson: getLastBattle(),
+            bossThisWave: S.enemies.filter((e) => e.alive && e.is_red_boss).length,
+            isRetry: !changed || stuckN >= 2
           });
           if (a.type === "continue") logger.flush();
           if (a == null ? void 0 : a.exec) {
@@ -2095,7 +2232,177 @@
       slowPoll();
     }
   }
-  let lastBattleResponse = null;
+  const QUALITIES = ["Crude", "Fair", "Average", "Superior", "Exquisite", "Magnificent", "Legendary", "Peerless"];
+  function parseDrops(lines, dropQuality) {
+    const out = { exp: 0, credit: 0, drops: {} };
+    for (const line of lines) {
+      if (/You are Victorious/i.test(line)) break;
+      const eg = line.match(/You gain (\d+) (EXP|Credit)/i);
+      if (eg) {
+        if (/exp/i.test(eg[2])) out.exp += +eg[1];
+        else out.credit += +eg[1];
+        continue;
+      }
+      const sm = line.match(/color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)[^>]*>([^<]+)</i);
+      if (!sm) continue;
+      const r = sm[1], g = sm[2], b = sm[3], name = sm[4].trim();
+      if (r === "255" && g === "0" && b === "0") {
+        const q = QUALITIES.findIndex((x) => name.includes(x));
+        if (q === -1 || q >= dropQuality) {
+          const type = name.split(/\s+/).pop() || name;
+          const key = `Equipment of ${type}`;
+          out.drops[key] = (out.drops[key] || 0) + 1;
+        }
+      } else if (r === "186" && g === "5" && b === "180") {
+        const cm = name.match(/(\d+)x (Crystal of \w+)/);
+        if (cm) out.drops[cm[2]] = (out.drops[cm[2]] || 0) + +cm[1];
+        else out.drops[name] = (out.drops[name] || 0) + 1;
+      } else if (r === "168" && g === "144" && b === "0") {
+        const nm = name.match(/\d+/);
+        if (nm) out.credit += +nm[0];
+      } else {
+        out.drops[name] = (out.drops[name] || 0) + 1;
+      }
+    }
+    return out;
+  }
+  function emptyStats(nowMs) {
+    return {
+      startTime: nowMs,
+      activeMs: 0,
+      exp: 0,
+      credit: 0,
+      battles: 0,
+      rounds: 0,
+      turns: 0,
+      monsters: 0,
+      bosses: 0,
+      drops: {},
+      restore: {},
+      items: {},
+      magic: {},
+      damage: {},
+      proficiency: {},
+      hurt: { avg: 0, pavg: 0, mavg: 0, total: 0, count: 0, mp: 0, oc: 0 },
+      self: { evade: 0, miss: 0, focus: 0 }
+    };
+  }
+  function accumulateUsage(s, action, lines) {
+    if (action.type === "spell" && action.id !== void 0) s.magic["#" + action.id] = (s.magic["#" + action.id] || 0) + 1;
+    else if (action.type === "item" && action.id !== void 0) s.items["#" + action.id] = (s.items["#" + action.id] || 0) + 1;
+    for (const line of lines) {
+      let m = line.match(/you for (\d+) ([a-zA-Z]+) damage/i);
+      if (m) {
+        const n = +m[1], type = m[2].toLowerCase();
+        s.hurt.total += n;
+        s.hurt.count++;
+        if (/pierc|crush|slash/.test(type)) {
+          s.hurt.pavg = (s.hurt.pavg * (s.hurt.count - 1) + n) / s.hurt.count;
+        } else {
+          s.hurt.mavg = (s.hurt.mavg * (s.hurt.count - 1) + n) / s.hurt.count;
+        }
+        s.hurt.avg = s.hurt.total / s.hurt.count;
+        continue;
+      }
+      m = line.match(/hits .+ for (\d+) (\w+) damage/i);
+      if (m) {
+        s.damage[m[2].toLowerCase()] = (s.damage[m[2].toLowerCase()] || 0) + +m[1];
+        continue;
+      }
+      if (/\bevade/i.test(line)) s.self.evade++;
+      else if (/\bmiss/i.test(line)) s.self.miss++;
+      else if (/\bfocus/i.test(line)) s.self.focus++;
+      m = line.match(/restores? (\d+) points? of (\w+)/i);
+      if (m) s.restore[m[2].toLowerCase()] = (s.restore[m[2].toLowerCase()] || 0) + +m[1];
+    }
+  }
+  function parseSpawns(lines) {
+    const out = [];
+    const re = /Spawned Monster [A-Z]:\s*MID=(\d+)\s*\(([^)]+)\)\s*LV=(\d+)\s*HP=(\d+)/;
+    for (const line of lines) {
+      const m = line.match(re);
+      if (m) out.push({ mid: +m[1], name: m[2].trim(), lv: +m[3], hp: +m[4] });
+    }
+    return out;
+  }
+  function upsertMonster(db, midMap, s) {
+    const cur2 = db[s.name];
+    if (cur2 && cur2.mid !== s.mid) {
+      midMap[cur2.mid] = cur2;
+      delete db[s.name];
+    }
+    if (midMap[s.mid]) {
+      db[s.name] = midMap[s.mid];
+      delete midMap[s.mid];
+    }
+    const rec = db[s.name] ?? { mid: s.mid };
+    rec.mid = s.mid;
+    rec[s.lv] = s.hp;
+    db[s.name] = rec;
+  }
+  const STATS_KEY = "stats";
+  const STATS_OLD_KEY = "statsOld";
+  const MDB_KEY = "monsterDB";
+  const MMID_KEY = "monsterMID";
+  let cur = null;
+  let lastRoundSeen = -1;
+  function loadStats(nowMs) {
+    return Store.get(STATS_KEY, emptyStats(nowMs));
+  }
+  function initStatsCollector() {
+    bus.on("battle:round", (r) => {
+      try {
+        if (r.isRetry) return;
+        if (!config.get("recordEnabled")) return;
+        if (!cur) cur = loadStats(Date.now());
+        const lines = extractTextlog(r.rawJson);
+        accumulateUsage(cur, r.action, lines);
+        if (config.get("cacheMonsterHP")) {
+          const db = Store.get(MDB_KEY, {});
+          const mid = Store.get(MMID_KEY, {});
+          let changed = false;
+          for (const sp of parseSpawns(lines)) {
+            upsertMonster(db, mid, sp);
+            changed = true;
+          }
+          if (changed) {
+            Store.set(MDB_KEY, db);
+            Store.set(MMID_KEY, mid);
+          }
+        }
+        cur.turns += 1;
+        if (r.roundNow !== lastRoundSeen) {
+          cur.rounds += 1;
+          cur.bosses += r.bossThisWave;
+          cur.monsters += r.record.total;
+          lastRoundSeen = r.roundNow;
+        }
+        Store.set(STATS_KEY, cur);
+      } catch {
+      }
+    });
+    bus.on("battle:end", (e) => {
+      try {
+        if (!config.get("recordEnabled")) return;
+        if (!cur) cur = loadStats(Date.now());
+        const lines = extractTextlog(e.finalRawJson);
+        const d = parseDrops(lines, config.get("dropQuality"));
+        cur.exp += d.exp;
+        cur.credit += d.credit;
+        for (const k in d.drops) cur.drops[k] = (cur.drops[k] || 0) + d.drops[k];
+        cur.battles += 1;
+        lastRoundSeen = -1;
+        cur.activeMs += Math.max(0, e.endedAt - e.startedAt);
+        Store.set(STATS_KEY, cur);
+        const old = Store.get(STATS_OLD_KEY, []);
+        old.push({ battleCode: e.battleCode, level: e.level, exp: d.exp, credit: d.credit, endedAt: e.endedAt });
+        const keep = config.get("archiveMaxBattles");
+        Store.set(STATS_OLD_KEY, old.slice(-keep));
+        void e.battleId;
+      } catch {
+      }
+    });
+  }
   function hookNet() {
     const xo = XMLHttpRequest.prototype.open;
     const xs = XMLHttpRequest.prototype.send;
@@ -2105,7 +2412,7 @@
     };
     XMLHttpRequest.prototype.send = function(body) {
       this.addEventListener("load", () => {
-        if (/\/json|Battle|api/i.test(this.__url || "")) lastBattleResponse = this.responseText;
+        if (/\/json|Battle|api/i.test(this.__url || "")) setLastBattle(this.responseText);
       });
       return xs.call(this, body);
     };
@@ -2117,7 +2424,7 @@
         return f.apply(window, args).then((rp) => {
           if (/\/json|Battle|api/i.test(url)) {
             rp.clone().text().then((t) => {
-              lastBattleResponse = t;
+              setLastBattle(t);
             }).catch(() => {
             });
           }
@@ -2167,7 +2474,7 @@
   {
     const w = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
     w.__hvab = {
-      getLastBattle: () => lastBattleResponse,
+      getLastBattle,
       config,
       log: () => logger.all(),
       logText: () => logger.toText(),
@@ -2175,6 +2482,7 @@
     };
   }
   hookNet();
+  initStatsCollector();
   window.addEventListener("beforeunload", () => logger.flush());
   onReady(() => {
     mountUI();
