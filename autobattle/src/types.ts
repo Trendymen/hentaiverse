@@ -40,6 +40,7 @@ export interface LogRecord {
   stance: boolean;
   action: string; // 中文动作名
   note: string; // 诊断, 如 "炮:冷却" / "炮:OC 150/200" / ""
+  foe?: string; // 红名敌情(仅红名在场时附): "红#4 40% 未晕 无血" — 供反击晕/流血时机诊断, 杂兵波留空不污染行宽
 }
 
 /** 单个 buff/debuff 状态 */

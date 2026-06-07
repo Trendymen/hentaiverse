@@ -148,23 +148,12 @@ function tick(): void {
           if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
           else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
         }
-        // debug 埋点(红名/boss 识别 + 晕眩/流血/减益): 配合"要害+慈悲破例靠盾战反击晕红名"验证 —
-        //   看 reader 认红名(is_red_boss)对不对 + 红名到底晕没晕(stunned)/有没有流血(bleeding) + 当回合决策. console 用 HVAB:foes 过滤. 验证后连同 mkey_0 埋点一并清.
-        {
-          const foes = S.enemies.filter((e) => e.alive);
-          const reds = foes.filter((e) => e.is_red_boss);
-          if (foes.length)
-            console.log(
-              `[HVAB:foes] ▶${actionLabel(a)} | 活${foes.length} 红${reds.length} | ` +
-                foes.map((e) => `#${e.eid}${e.is_red_boss ? '红' : ''}${e.stunned ? '晕' : ''}${e.bleeding ? '血' : ''}:${e.hpPct}%`).join(' ') +
-                (reds.length
-                  ? ' || ' +
-                    reds
-                      .map((e) => `红名#${e.eid}(${e.name || '?'}) ${e.hpPct}% ${e.stunned ? '已晕' : '未晕'} ${e.bleeding ? '流血' : '无血'} [${Object.keys(e.debuff || {}).filter((k) => e.debuff[k]).join(',') || '无减益'}]`)
-                      .join(' / ')
-                  : ''),
-            );
-        }
+        // 红名敌情(并入导出日志, 取代旧 [HVAB:foes] console 埋点): 仅红名在场时附, 供"反击晕红名/要害喂血时机"诊断 —
+        //   看 reader 认红名(is_red_boss)对不对 + 红名每回合晕没晕(stunned)/有没有流血(bleeding); 杂兵波留空不污染行宽.
+        const reds = S.enemies.filter((e) => e.alive && e.is_red_boss);
+        const foe = reds.length
+          ? reds.map((e) => `红#${e.eid} ${e.hpPct}% ${e.stunned ? '已晕' : '未晕'} ${e.bleeding ? '流血' : '无血'}`).join(' ')
+          : undefined;
         logger.push({
           round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
           turn,
@@ -178,6 +167,7 @@ function tick(): void {
           stance: S.stanceOn,
           action: actionLabel(a),
           note,
+          foe,
         });
         if (a.type === 'continue') logger.flush(); // 继续下一波 battle_continue() 会 reload 页面 → 立即落盘, 防这条(及3s防抖内未落盘缓冲)随 reload 丢失
 

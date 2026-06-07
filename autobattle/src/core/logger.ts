@@ -23,7 +23,7 @@ function scheduleSave(): void {
 /** 一条记录 → 可读行(等宽对齐) */
 export function fmtLine(r: LogRecord): string {
   const p = (n: number, w: number) => String(n).padStart(w);
-  return `${r.round.padEnd(7)} T${p(r.turn, 2)} | OC ${p(r.oc, 3)} ${r.cannon} | 怪${r.alive}/${r.total} | HP${p(r.hp, 3)} MP${p(r.mp, 3)} SP${p(r.sp, 3)} | 架${r.stance ? '开' : '关'} | ▶ ${r.action}${r.note ? '  « ' + r.note : ''}`;
+  return `${r.round.padEnd(7)} T${p(r.turn, 2)} | OC ${p(r.oc, 3)} ${r.cannon} | 怪${r.alive}/${r.total} | HP${p(r.hp, 3)} MP${p(r.mp, 3)} SP${p(r.sp, 3)} | 架${r.stance ? '开' : '关'} | ▶ ${r.action}${r.note ? '  « ' + r.note : ''}${r.foe ? '  ‖ ' + r.foe : ''}`;
 }
 
 export const logger = {
