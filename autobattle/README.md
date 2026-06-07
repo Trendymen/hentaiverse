@@ -9,13 +9,13 @@ cd autobattle
 npm install
 npm run dev        # 开发模式, 控制台给出油猴安装链接(热更新)
 npm run build      # 构建 dist/hv-autobattle.user.js(不压缩可调试)
-npm run install:tm # 构建后用 Chrome 打开 dist, 交给 Tampermonkey 更新/安装
+npm run install:tm # 构建后临时起 localhost 安装地址, 交给 Tampermonkey 更新/安装
 npm run typecheck  # tsc 类型检查
 ```
 
 ## 安装
 
-把 `dist/hv-autobattle.user.js` 安装进 Tampermonkey,刷新 HV 页面。改了 `src/` 后跑 `npm run install:tm`,脚本会先构建再用 Chrome 打开本地 userscript URL,交给 Tampermonkey 弹出更新/安装确认。
+把 `dist/hv-autobattle.user.js` 安装进 Tampermonkey,刷新 HV 页面。改了 `src/` 后跑 `npm run install:tm`,脚本会先构建,再临时启动 `http://127.0.0.1:53180/hv-autobattle.user.js` 并用 Chrome 打开,交给 Tampermonkey 弹出更新/安装确认; 不再直接打开 `file://*.user.js`,避免触发浏览器保存文件弹窗。
 
 ## 结构
 
