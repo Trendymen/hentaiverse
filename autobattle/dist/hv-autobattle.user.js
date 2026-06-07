@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         [HV] 自动战斗 · 盾战大脑
 // @namespace    https://github.com/local/hv-autobattle
-// @version      0.1.0
+// @version      0.1.1
 // @author       local
 // @description  HV 单手盾战现代化半自动辅助(独立重写,忠实翻写 dodying 引擎)
 // @match        *://hentaiverse.org/*
