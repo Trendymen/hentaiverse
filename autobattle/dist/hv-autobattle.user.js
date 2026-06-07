@@ -326,8 +326,8 @@
     // PONY CHART 图鉴浮层
     riddleCollect: true,
     // 数据采集(IndexedDB, 铺路 CNN)
-    riddleUrgentSec: 8,
-    // 催答提醒触发秒数(倒计时 ≤ 此值加急)
+    riddleUrgentSec: 10,
+    // 剩此秒数(默认10): 有已勾选→超时自动提交已勾的; 一只没勾→加急催答提醒
     riddleAutoRecognize: false
     // 自动识别(CNN; 现 stub 无效, 未来接入后生效)
   };
@@ -542,15 +542,15 @@
     const panel = el("div", { id: "hvab-panel" });
     const tabs = el("div", { class: "hvab-tabs" });
     const panes = el("div", { class: "hvab-panes" });
-    let active = config.get("activeTab");
+    let active2 = config.get("activeTab");
     const render = () => {
-      tabs.querySelectorAll(".hvab-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === active));
-      panes.querySelectorAll(".hvab-tabpane").forEach((p) => p.classList.toggle("active", p.dataset.pane === active));
+      tabs.querySelectorAll(".hvab-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === active2));
+      panes.querySelectorAll(".hvab-tabpane").forEach((p) => p.classList.toggle("active", p.dataset.pane === active2));
     };
     for (const t of TABS) {
       const btn = el("button", { class: "hvab-tab", "data-tab": t.key }, t.label);
       btn.onclick = () => {
-        active = t.key;
+        active2 = t.key;
         config.set("activeTab", t.key);
         render();
       };
@@ -2062,6 +2062,793 @@
       console.error("[HVAB:farm] farmTick", e);
     }
   }
+  const MANE6 = [
+    "Twilight Sparkle",
+    "Rarity",
+    "Fluttershy",
+    "Rainbow Dash",
+    "Pinkie Pie",
+    "Applejack"
+  ];
+  const RIDDLE_SIGNALS = ["Submit Answer", "Select ALL ponies", "PONY CHART"];
+  function hasText(root, needle) {
+    var _a;
+    try {
+      return ((_a = root.textContent) == null ? void 0 : _a.includes(needle)) ?? false;
+    } catch {
+      return false;
+    }
+  }
+  function labelText(box) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    try {
+      const viaApi = (_c = (_b = (_a = box.labels) == null ? void 0 : _a[0]) == null ? void 0 : _b.textContent) == null ? void 0 : _c.trim();
+      if (viaApi) return viaApi;
+      const viaClosest = (_e = (_d = box.closest("label")) == null ? void 0 : _d.textContent) == null ? void 0 : _e.trim();
+      if (viaClosest) return viaClosest;
+      const viaParent = (_g = (_f = box.parentElement) == null ? void 0 : _f.textContent) == null ? void 0 : _g.trim();
+      if (viaParent) return viaParent;
+    } catch {
+    }
+    return "";
+  }
+  function parseFirstDigits(text) {
+    const m = text.match(/\d+/);
+    return m ? Number(m[0]) : null;
+  }
+  function pickLargestMedia(container) {
+    if (!container) return null;
+    let best = null;
+    let bestArea = -1;
+    try {
+      container.querySelectorAll("img, canvas").forEach((el2) => {
+        let area = 0;
+        if (el2 instanceof HTMLImageElement) {
+          area = (el2.naturalWidth || el2.width) * (el2.naturalHeight || el2.height);
+        } else if (el2 instanceof HTMLCanvasElement) {
+          area = el2.width * el2.height;
+        }
+        if (area > bestArea) {
+          bestArea = area;
+          best = el2;
+        }
+      });
+    } catch {
+    }
+    return best;
+  }
+  function ancestorUpBy(el2, steps) {
+    let cur = el2;
+    for (let i = 0; i < steps; i++) {
+      if (!cur.parentElement || cur.parentElement === document.body) break;
+      cur = cur.parentElement;
+    }
+    return cur;
+  }
+  function detectRiddle(root = document) {
+    var _a, _b;
+    const absent = {
+      present: false,
+      options: [],
+      submitEl: null,
+      imageEl: null,
+      secondsLeft: null
+    };
+    try {
+      const options = [];
+      const checkboxes = root.querySelectorAll("input[type=checkbox]");
+      checkboxes.forEach((box) => {
+        const text = labelText(box);
+        const matched = MANE6.find((n) => text.includes(n));
+        if (matched) {
+          options.push({ name: matched, el: box });
+        }
+      });
+      const present = options.length >= 1 && RIDDLE_SIGNALS.some((sig) => hasText(root, sig));
+      if (!present) return absent;
+      let submitEl = null;
+      const candidates = root.querySelectorAll(
+        "button, input[type=button], input[type=submit], a, div, span"
+      );
+      for (const el2 of candidates) {
+        const label = (el2 instanceof HTMLInputElement ? el2.value : el2.textContent) ?? "";
+        if (label.trim() === "Submit Answer") {
+          submitEl = el2;
+          break;
+        }
+      }
+      let imageEl = null;
+      if (options.length > 0) {
+        const container = ancestorUpBy(options[0].el, 4);
+        imageEl = pickLargestMedia(container);
+      }
+      if (!imageEl) {
+        imageEl = pickLargestMedia(root);
+      }
+      let secondsLeft = null;
+      const counterEl = (_a = root.querySelector) == null ? void 0 : _a.call(root, "#riddlecounter");
+      if (counterEl == null ? void 0 : counterEl.textContent) {
+        secondsLeft = parseFirstDigits(counterEl.textContent.trim());
+      }
+      if (secondsLeft === null && (submitEl == null ? void 0 : submitEl.parentElement)) {
+        const siblings = Array.from(submitEl.parentElement.childNodes);
+        for (const node of siblings) {
+          const t = ((_b = node.textContent) == null ? void 0 : _b.trim()) ?? "";
+          if (/^\d+$/.test(t)) {
+            secondsLeft = Number(t);
+            break;
+          }
+        }
+      }
+      return { present, options, submitEl, imageEl, secondsLeft };
+    } catch {
+      return absent;
+    }
+  }
+  function playAlarm(times = 2) {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      for (let i = 0; i < times; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 880;
+        gain.gain.value = 0.2;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const t = ctx.currentTime + i * 0.35;
+        osc.start(t);
+        osc.stop(t + 0.2);
+      }
+    } catch {
+    }
+  }
+  function sendDesktop(title, text) {
+    try {
+      if (typeof GM_notification === "function") {
+        GM_notification({ title, text, timeout: 5e3 });
+        return;
+      }
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body: text });
+      }
+    } catch {
+    }
+  }
+  function mapRiddleKey(key, count) {
+    if (/^[1-9]$/.test(key)) {
+      const index = Number(key) - 1;
+      return index < count ? { kind: "toggle", index } : { kind: "none" };
+    }
+    if (key === "Enter") return { kind: "submit" };
+    if (key === "Escape") return { kind: "mute" };
+    return { kind: "none" };
+  }
+  function submitRiddle(state, selected) {
+    if (!state.present) return;
+    const selectedSet = new Set(selected);
+    for (const option of state.options) {
+      const shouldCheck = selectedSet.has(option.name);
+      if (option.el.checked !== shouldCheck) {
+        option.el.checked = shouldCheck;
+        try {
+          option.el.dispatchEvent(new Event("change", { bubbles: true }));
+        } catch {
+        }
+      }
+    }
+    if (state.submitEl) {
+      try {
+        state.submitEl.click();
+      } catch {
+      }
+    }
+  }
+  function openRiddleWindow() {
+    try {
+      window.open(
+        location.href,
+        "riddleWindow",
+        "resizable,scrollbars,width=1241,height=707"
+      );
+    } catch {
+    }
+  }
+  const ROOT_ID = "hvab-riddle-ui";
+  const CHART_ID = "hvab-riddle-chart";
+  const STYLES = `
+#${ROOT_ID} {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font: 14px/1.4 system-ui, -apple-system, sans-serif;
+  color: #dce3f0;
+  pointer-events: auto;
+  /* 防止意外拉伸, 最大宽度 600px */
+  max-width: 600px;
+  width: max-content;
+}
+#${ROOT_ID} .rui-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(22, 24, 36, .94);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(120, 140, 200, .3);
+  border-radius: 10px;
+  padding: 5px 14px;
+  font-size: 14px;
+  min-width: 160px;
+  justify-content: space-between;
+}
+#${ROOT_ID} .rui-title {
+  font-weight: 600;
+  letter-spacing: .5px;
+  opacity: .85;
+}
+#${ROOT_ID} .rui-timer {
+  font: bold 20px monospace;
+  min-width: 2.5ch;
+  text-align: right;
+  color: #7ce;
+  transition: color .3s;
+}
+#${ROOT_ID} .rui-timer.urgent {
+  color: #f66;
+  animation: rui-blink .6s step-end infinite;
+}
+@keyframes rui-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .3; }
+}
+#${ROOT_ID} .rui-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+/* 大按钮: 每个约 90x56px */
+#${ROOT_ID} .rui-pony-btn {
+  position: relative;
+  width: 90px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(32, 36, 52, .95);
+  border: 2px solid rgba(100, 120, 180, .35);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .08s;
+  box-shadow: 0 3px 10px rgba(0,0,0,.4);
+  padding: 6px 4px;
+  user-select: none;
+}
+#${ROOT_ID} .rui-pony-btn:hover {
+  background: rgba(44, 50, 72, .98);
+  border-color: rgba(140, 160, 220, .6);
+  transform: translateY(-1px);
+}
+#${ROOT_ID} .rui-pony-btn.selected {
+  background: rgba(30, 100, 60, .9);
+  border-color: #3d9;
+  box-shadow: 0 0 12px rgba(50, 200, 120, .45);
+}
+#${ROOT_ID} .rui-pony-btn .rui-seq {
+  font-size: 11px;
+  opacity: .55;
+  position: absolute;
+  top: 4px;
+  left: 7px;
+}
+#${ROOT_ID} .rui-pony-btn .rui-name {
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.3;
+  word-break: break-word;
+  max-width: 82px;
+}
+#${ROOT_ID} .rui-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#${ROOT_ID} .rui-submit-btn {
+  padding: 8px 28px;
+  background: #2a6;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  font: bold 15px system-ui;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,.4);
+  transition: background .15s, transform .08s;
+}
+#${ROOT_ID} .rui-submit-btn:hover {
+  background: #3b8;
+  transform: translateY(-1px);
+}
+#${ROOT_ID} .rui-chart-btn {
+  padding: 8px 14px;
+  background: rgba(60, 70, 100, .9);
+  border: 1px solid rgba(120, 140, 200, .35);
+  border-radius: 8px;
+  color: #bcd;
+  font: 14px system-ui;
+  cursor: pointer;
+  transition: background .15s;
+}
+#${ROOT_ID} .rui-chart-btn:hover {
+  background: rgba(70, 82, 120, .95);
+}
+#${ROOT_ID} .rui-close-btn {
+  padding: 4px 8px;
+  background: rgba(100, 30, 30, .7);
+  border: 0;
+  border-radius: 6px;
+  color: #faa;
+  font: 14px system-ui;
+  cursor: pointer;
+  opacity: .7;
+  transition: opacity .15s;
+}
+#${ROOT_ID} .rui-close-btn:hover {
+  opacity: 1;
+}
+/* 图鉴浮层 */
+#${CHART_ID} {
+  position: fixed;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999998;
+  background: rgba(16, 18, 28, .97);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(120, 140, 200, .35);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #dce3f0;
+  font: 14px/1.5 system-ui;
+  max-width: 520px;
+  width: max-content;
+  box-shadow: 0 8px 28px rgba(0,0,0,.6);
+}
+#${CHART_ID} .rchart-title {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .5px;
+  margin-bottom: 8px;
+  opacity: .9;
+}
+#${CHART_ID} .rchart-img-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+#${CHART_ID} .rchart-img-wrap img {
+  max-width: 200px;
+  max-height: 160px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.1);
+  cursor: pointer;
+}
+#${CHART_ID} .rchart-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  opacity: .55;
+  text-align: center;
+}
+`;
+  function ensureStyle() {
+    const styleId = "hvab-riddle-style";
+    if (document.getElementById(styleId)) return;
+    try {
+      const s = document.createElement("style");
+      s.id = styleId;
+      s.textContent = STYLES;
+      (document.head || document.documentElement).appendChild(s);
+    } catch {
+    }
+  }
+  function collectSelected(state) {
+    const result = [];
+    for (const opt of state.options) {
+      try {
+        if (opt.el.checked) result.push(opt.name);
+      } catch {
+      }
+    }
+    return result;
+  }
+  function toggleOption(opt, btn) {
+    try {
+      opt.el.checked = !opt.el.checked;
+      opt.el.dispatchEvent(new Event("change", { bubbles: true }));
+      btn.classList.toggle("selected", opt.el.checked);
+    } catch {
+    }
+  }
+  function syncBtnHighlights(options, btnEls) {
+    options.forEach((opt, i) => {
+      try {
+        const btn = btnEls[i];
+        if (btn) btn.classList.toggle("selected", opt.el.checked);
+      } catch {
+      }
+    });
+  }
+  function buildChartOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = CHART_ID;
+    const title = document.createElement("div");
+    title.className = "rchart-title";
+    title.textContent = "📖 PONY CHART — 小马图鉴";
+    overlay.appendChild(title);
+    const imgWrap = document.createElement("div");
+    imgWrap.className = "rchart-img-wrap";
+    const chartImgs = [];
+    try {
+      document.querySelectorAll("img").forEach((img) => {
+        const src = (img.src || img.getAttribute("src") || "").toLowerCase();
+        const alt = (img.alt || "").toLowerCase();
+        if (/pony|chart|riddle|mane|sparkle|rarity|fluttershy|rainbow|pinkie|applejack/i.test(src + alt)) {
+          chartImgs.push(img);
+        }
+      });
+    } catch {
+    }
+    if (chartImgs.length > 0) {
+      const sorted = chartImgs.slice().sort(
+        (a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight
+      ).slice(0, 3);
+      for (const img of sorted) {
+        const clone = document.createElement("img");
+        clone.src = img.src;
+        clone.alt = img.alt || "pony chart";
+        clone.title = "点击在新标签页打开大图";
+        clone.onclick = () => {
+          try {
+            window.open(img.src, "_blank");
+          } catch {
+          }
+        };
+        imgWrap.appendChild(clone);
+      }
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.style.cssText = "padding:16px 20px;opacity:.55;font-size:13px;text-align:center";
+      placeholder.textContent = "页面内未检测到 PONY CHART 图片。\n请参考 HV Wiki 或截图备忘。\n(后续版本将内置参考图)";
+      placeholder.style.whiteSpace = "pre-line";
+      imgWrap.appendChild(placeholder);
+    }
+    overlay.appendChild(imgWrap);
+    const hint = document.createElement("div");
+    hint.className = "rchart-hint";
+    hint.textContent = "点击图片可在新标签页查看大图";
+    overlay.appendChild(hint);
+    return overlay;
+  }
+  function mountRiddleUI(state, cfg) {
+    const existingRoot = document.getElementById(ROOT_ID);
+    if (existingRoot) {
+      try {
+        existingRoot.dispatchEvent(new CustomEvent("hvab-unmount"));
+      } catch {
+      }
+      existingRoot.remove();
+    }
+    const existingChart = document.getElementById(CHART_ID);
+    if (existingChart) existingChart.remove();
+    if (!state.present || state.options.length === 0) {
+      return () => {
+      };
+    }
+    ensureStyle();
+    const root = document.createElement("div");
+    root.id = ROOT_ID;
+    const header = document.createElement("div");
+    header.className = "rui-header";
+    const titleEl = document.createElement("span");
+    titleEl.className = "rui-title";
+    titleEl.textContent = "🐴 小马题";
+    header.appendChild(titleEl);
+    const timerEl = document.createElement("span");
+    timerEl.className = "rui-timer";
+    timerEl.style.display = state.secondsLeft === null ? "none" : "";
+    timerEl.textContent = state.secondsLeft !== null ? String(state.secondsLeft) : "";
+    header.appendChild(timerEl);
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "rui-close-btn";
+    closeBtn.type = "button";
+    closeBtn.textContent = "✕";
+    closeBtn.title = "隐藏辅助浮层(快捷键不受影响)";
+    header.appendChild(closeBtn);
+    root.appendChild(header);
+    let timerInterval = null;
+    if (state.secondsLeft !== null) {
+      timerInterval = setInterval(() => {
+        try {
+          const fresh = detectRiddle();
+          if (!fresh.present) {
+            if (timerInterval !== null) {
+              clearInterval(timerInterval);
+              timerInterval = null;
+            }
+            return;
+          }
+          const secs = fresh.secondsLeft;
+          if (secs !== null) {
+            timerEl.style.display = "";
+            timerEl.textContent = String(secs);
+            timerEl.classList.toggle("urgent", secs <= cfg.riddleUrgentSec);
+          } else {
+            timerEl.style.display = "none";
+          }
+        } catch {
+        }
+      }, 1e3);
+    }
+    const btnsArea = document.createElement("div");
+    btnsArea.className = "rui-btns";
+    const ponyBtns = [];
+    state.options.forEach((opt, i) => {
+      const btn = document.createElement("div");
+      btn.className = "rui-pony-btn";
+      btn.setAttribute("role", "checkbox");
+      btn.setAttribute("aria-label", opt.name);
+      btn.title = `${opt.name}（快捷键 ${i + 1}）`;
+      const seqEl = document.createElement("span");
+      seqEl.className = "rui-seq";
+      seqEl.textContent = String(i + 1);
+      btn.appendChild(seqEl);
+      const nameEl = document.createElement("span");
+      nameEl.className = "rui-name";
+      nameEl.textContent = opt.name;
+      btn.appendChild(nameEl);
+      try {
+        btn.classList.toggle("selected", opt.el.checked);
+      } catch {
+      }
+      btn.addEventListener("click", () => toggleOption(opt, btn));
+      ponyBtns.push(btn);
+      btnsArea.appendChild(btn);
+    });
+    root.appendChild(btnsArea);
+    const actionsArea = document.createElement("div");
+    actionsArea.className = "rui-actions";
+    let chartOverlay = null;
+    let chartVisible = false;
+    if (cfg.riddleChartOverlay) {
+      const chartBtn = document.createElement("button");
+      chartBtn.className = "rui-chart-btn";
+      chartBtn.type = "button";
+      chartBtn.textContent = "📖 图鉴";
+      chartBtn.title = "切换 PONY CHART 参考图鉴";
+      chartBtn.addEventListener("click", () => {
+        if (!chartVisible) {
+          if (!chartOverlay) {
+            chartOverlay = buildChartOverlay();
+            try {
+              (document.body || document.documentElement).appendChild(chartOverlay);
+            } catch {
+            }
+          }
+          chartOverlay.style.display = "";
+          chartVisible = true;
+          chartBtn.textContent = "📕 关闭图鉴";
+        } else {
+          if (chartOverlay) chartOverlay.style.display = "none";
+          chartVisible = false;
+          chartBtn.textContent = "📖 图鉴";
+        }
+      });
+      actionsArea.appendChild(chartBtn);
+    }
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "rui-submit-btn";
+    submitBtn.type = "button";
+    submitBtn.textContent = "✔ 提交答案";
+    submitBtn.title = "提交已选中的小马（快捷键 Enter）";
+    submitBtn.addEventListener("click", () => {
+      const selected = collectSelected(state);
+      submitRiddle(state, selected);
+    });
+    actionsArea.appendChild(submitBtn);
+    root.appendChild(actionsArea);
+    closeBtn.addEventListener("click", () => {
+      btnsArea.style.display = btnsArea.style.display === "none" ? "" : "none";
+      actionsArea.style.display = actionsArea.style.display === "none" ? "" : "none";
+      closeBtn.textContent = btnsArea.style.display === "none" ? "⬜" : "✕";
+    });
+    try {
+      (document.body || document.documentElement).appendChild(root);
+    } catch {
+      if (timerInterval !== null) clearInterval(timerInterval);
+      return () => {
+      };
+    }
+    const keydownHandler = (e) => {
+      const target = e.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      const action = mapRiddleKey(e.key, state.options.length);
+      switch (action.kind) {
+        case "toggle": {
+          const idx = action.index;
+          const opt = state.options[idx];
+          const btn = ponyBtns[idx];
+          if (opt && btn) {
+            toggleOption(opt, btn);
+            e.preventDefault();
+          }
+          break;
+        }
+        case "submit": {
+          syncBtnHighlights(state.options, ponyBtns);
+          const selected = collectSelected(state);
+          submitRiddle(state, selected);
+          e.preventDefault();
+          break;
+        }
+        case "mute": {
+          try {
+            const isVisible = root.style.display !== "none";
+            root.style.display = isVisible ? "none" : "";
+          } catch {
+          }
+          e.preventDefault();
+          break;
+        }
+      }
+    };
+    if (cfg.riddleHotkeys) {
+      try {
+        document.addEventListener("keydown", keydownHandler);
+      } catch {
+      }
+    }
+    root.addEventListener(
+      "hvab-unmount",
+      () => {
+        if (timerInterval !== null) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        if (cfg.riddleHotkeys) {
+          try {
+            document.removeEventListener("keydown", keydownHandler);
+          } catch {
+          }
+        }
+      },
+      { once: true }
+    );
+    return function unmount2() {
+      if (timerInterval !== null) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      if (cfg.riddleHotkeys) {
+        try {
+          document.removeEventListener("keydown", keydownHandler);
+        } catch {
+        }
+      }
+      try {
+        root.remove();
+      } catch {
+      }
+      if (chartOverlay) {
+        try {
+          chartOverlay.remove();
+        } catch {
+        }
+        chartOverlay = null;
+      }
+      const orphanChart = document.getElementById(CHART_ID);
+      if (orphanChart) {
+        try {
+          orphanChart.remove();
+        } catch {
+        }
+      }
+    };
+  }
+  let active = false;
+  let submitted = false;
+  let unmount = null;
+  function riddleCfg(C) {
+    return {
+      useRiddleAssist: C.useRiddleAssist,
+      riddlePopup: C.riddlePopup,
+      riddleHotkeys: C.riddleHotkeys,
+      riddleAlarm: C.riddleAlarm,
+      riddleNotify: C.riddleNotify,
+      riddleChartOverlay: C.riddleChartOverlay,
+      riddleCollect: C.riddleCollect,
+      riddleUrgentSec: C.riddleUrgentSec,
+      riddleAutoRecognize: C.riddleAutoRecognize
+    };
+  }
+  function tickRiddle() {
+    try {
+      const cfg = riddleCfg(config.all());
+      if (!cfg.useRiddleAssist) {
+        if (active) {
+          unmount == null ? void 0 : unmount();
+          unmount = null;
+          active = false;
+          submitted = false;
+        }
+        return;
+      }
+      const rs = detectRiddle();
+      if (!rs.present) {
+        if (active) {
+          unmount == null ? void 0 : unmount();
+          unmount = null;
+          active = false;
+          submitted = false;
+        }
+        return;
+      }
+      if (!active) {
+        active = true;
+        submitted = false;
+        if (cfg.riddleAlarm) {
+          try {
+            playAlarm();
+          } catch {
+          }
+        }
+        if (cfg.riddleNotify) {
+          try {
+            sendDesktop("小马题!", `剩 ${rs.secondsLeft ?? "?"} 秒, 快答`);
+          } catch {
+          }
+        }
+        try {
+          unmount = mountRiddleUI(rs, cfg);
+        } catch {
+          unmount = null;
+        }
+        if (cfg.riddlePopup) {
+          try {
+            openRiddleWindow();
+          } catch {
+          }
+        }
+      }
+      if (!submitted && rs.secondsLeft != null && rs.secondsLeft <= cfg.riddleUrgentSec) {
+        const selected = rs.options.filter((o) => o.el.checked).map((o) => o.name);
+        if (selected.length > 0) {
+          try {
+            submitRiddle(rs, selected);
+          } catch {
+          }
+          submitted = true;
+        } else {
+          if (cfg.riddleAlarm) {
+            try {
+              playAlarm(1);
+            } catch {
+            }
+          }
+        }
+      }
+    } catch {
+    }
+  }
   let lastFp = "";
   let actedAt = 0;
   let busyUntil = 0;
@@ -2105,6 +2892,12 @@
       lastInBattle = false;
     }
     try {
+      if (config.get("useRiddleAssist")) {
+        try {
+          tickRiddle();
+        } catch {
+        }
+      }
       if (config.get("enabled") && nowIn && Date.now() >= busyUntil) {
         const S = reader.read();
         const fp = fingerprint(S);
@@ -2519,8 +3312,8 @@
     document.body.appendChild(root);
     if (config.get("panelOpen")) togglePanel(panel, true);
     if (config.get("logOpen")) toggleLog(logView, true);
-    bus.on("battle:active", (active) => {
-      if (active) {
+    bus.on("battle:active", (active2) => {
+      if (active2) {
         if (config.get("logOpen")) toggleLog(logView, true);
       } else {
         toggleLog(logView, false);
