@@ -57,8 +57,9 @@
 .hvab-in{opacity:.8;display:inline-flex;align-items:center;gap:2px}
 .hvab-in em{font-style:normal;opacity:.55;font-size:14px}
 .hvab-row input[type=number]{width:46px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:14px monospace;padding:1px 4px;text-align:right}
+.hvab-row input[type=text]{width:92px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:#fff;font:14px monospace;padding:1px 4px}
 /* 提权压过 HV hvg.css 的 input[type=number]:hover/:focus(米白底→白字看不清), 保持深色主题深底白字+蓝边 */
-#hvab-panel .hvab-row input[type=number]:hover,#hvab-panel .hvab-row input[type=number]:focus{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(140,160,220,.7);outline:none}
+#hvab-panel .hvab-row input[type=number]:hover,#hvab-panel .hvab-row input[type=number]:focus,#hvab-panel .hvab-row input[type=text]:hover,#hvab-panel .hvab-row input[type=text]:focus{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(140,160,220,.7);outline:none}
 .hvab-row input[type=checkbox]{accent-color:#3a7;width:15px;height:15px;cursor:pointer}
 #hvab-logbtn{cursor:pointer;border:0;background:none;color:#9aa;font-size:14px;padding:0}
 #hvab-log{position:fixed;right:10px;bottom:10px;z-index:100000;width:min(480px,92vw);max-height:74vh;flex-direction:column;background:rgba(16,18,28,.975);backdrop-filter:blur(9px);border:1px solid rgba(120,140,200,.38);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.6);display:none;color:#dce3f0}
@@ -311,6 +312,18 @@
       { roundAll: 90, level: 300, name: "与龙共舞" }
     ]
   };
+  const FARM_WAKE_KEYS = /* @__PURE__ */ new Set([
+    "farmEnabled",
+    "autoEncounter",
+    "restoreStamina",
+    "grPerDay",
+    "arenaLevels",
+    "staminaLow",
+    "staminaEncounter",
+    "staminaLowWithNat",
+    "autoSwitchIsekai",
+    "autoSkipDefeated"
+  ]);
   let current = { ...DEFAULT_CONFIG, ...Store.get("config", {}) };
   const CONFIG_VERSION = 6;
   if (Store.get("configVersion", 0) < CONFIG_VERSION) {
@@ -326,10 +339,15 @@
       return current[key];
     },
     set(key, val) {
+      const changed = !Object.is(current[key], val);
       const next = { ...current };
       next[key] = val;
       current = next;
       Store.set("config", current);
+      if (changed && FARM_WAKE_KEYS.has(key)) {
+        Store.set("farmState", "IDLE");
+        Store.set("farmCooldownUntil", 0);
+      }
     },
     all() {
       return current;
@@ -412,6 +430,13 @@
     input.onchange = () => writeCfg(key, parseFloat(input.value) || 0);
     return row;
   }
+  function textRow(key, label, hint = "") {
+    const row = el("label", { class: "hvab-row" }, `<span>${label}</span><span class="hvab-in"><input type="text"><em>${hint}</em></span>`);
+    const input = row.querySelector("input");
+    input.value = String(config.get(key) ?? "");
+    input.onchange = () => writeCfg(key, input.value.trim());
+    return row;
+  }
   function swRow(key, label) {
     const row = el("label", { class: "hvab-row" }, `<span>${label}</span><input type="checkbox">`);
     const input = row.querySelector("input");
@@ -465,7 +490,7 @@
   function farmPane() {
     const p = el("div");
     p.appendChild(group("连刷总控", swRow("farmEnabled", "启用连刷(需同时开战斗🧠)"), swRow("autoSwitchIsekai", "刷完切异世界续刷"), swRow("autoSkipDefeated", "战败也续刷(默认关=停机)"), numRow("ISEKAI_SWITCH_GUARD_MIN", "切世界防抖", "分")));
-    p.appendChild(group("竞技场/GF", numRow("grPerDay", "GF每日场数")));
+    p.appendChild(group("竞技场/GF", textRow("arenaLevels", "待刷列表", "gr,5,105"), numRow("grPerDay", "GF每日场数")));
     p.appendChild(group("精力(战前门)", swRow("restoreStamina", "不足喝药恢复"), numRow("staminaLow", "开战精力下限"), numRow("staminaEncounter", "遭遇精力下限"), numRow("staminaLowWithNat", "含自然恢复下限")));
     p.appendChild(group("遭遇战", swRow("autoEncounter", "自动接受遭遇"), numRow("encounterCdMin", "遭遇冷却", "分")));
     p.appendChild(group("节奏", numRow("farmTickMs", "连刷tick", "ms")));
@@ -1983,6 +2008,10 @@
     if (isNewDay(ctx.arena, ctx.nowMs) || ctx.arena.array.length === 0 && C.arenaLevels) {
       const arena = initArenaCtx(ctx.arena, C.arenaLevels, C.grPerDay, ctx.nowMs);
       Store.set("arena", arena);
+      if (ctx.storedState === "COOLDOWN" && arena.array.length > 0) {
+        Store.set("farmState", "IDLE");
+        Store.set("farmCooldownUntil", 0);
+      }
       return arena;
     }
     return ctx.arena;
