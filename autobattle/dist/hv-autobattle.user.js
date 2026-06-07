@@ -464,7 +464,7 @@
   }
   function fmtLine(r) {
     const p = (n, w) => String(n).padStart(w);
-    return `${r.round.padEnd(7)} T${p(r.turn, 2)} | OC ${p(r.oc, 3)} ${r.cannon} | 怪${r.alive}/${r.total} | HP${p(r.hp, 3)} MP${p(r.mp, 3)} SP${p(r.sp, 3)} | 架${r.stance ? "开" : "关"} | ▶ ${r.action}${r.note ? "  « " + r.note : ""}`;
+    return `${r.round.padEnd(7)} T${p(r.turn, 2)} | OC ${p(r.oc, 3)} ${r.cannon} | 怪${r.alive}/${r.total} | HP${p(r.hp, 3)} MP${p(r.mp, 3)} SP${p(r.sp, 3)} | 架${r.stance ? "开" : "关"} | ▶ ${r.action}${r.note ? "  « " + r.note : ""}${r.foe ? "  ‖ " + r.foe : ""}`;
   }
   const logger = {
     push(r) {
@@ -1990,14 +1990,8 @@
             if (S.cannonOnCd) note = `炮:冷却剩${cannonCd}回合`;
             else if (S.overcharge < C.CANNON_MIN_OC) note = `炮:攒OC ${S.overcharge}/${C.CANNON_MIN_OC}`;
           }
-          {
-            const foes = S.enemies.filter((e) => e.alive);
-            const reds = foes.filter((e) => e.is_red_boss);
-            if (foes.length)
-              console.log(
-                `[HVAB:foes] ▶${actionLabel(a)} | 活${foes.length} 红${reds.length} | ` + foes.map((e) => `#${e.eid}${e.is_red_boss ? "红" : ""}${e.stunned ? "晕" : ""}${e.bleeding ? "血" : ""}:${e.hpPct}%`).join(" ") + (reds.length ? " || " + reds.map((e) => `红名#${e.eid}(${e.name || "?"}) ${e.hpPct}% ${e.stunned ? "已晕" : "未晕"} ${e.bleeding ? "流血" : "无血"} [${Object.keys(e.debuff || {}).filter((k) => e.debuff[k]).join(",") || "无减益"}]`).join(" / ") : "")
-              );
-          }
+          const reds = S.enemies.filter((e) => e.alive && e.is_red_boss);
+          const foe = reds.length ? reds.map((e) => `红#${e.eid} ${e.hpPct}% ${e.stunned ? "已晕" : "未晕"} ${e.bleeding ? "流血" : "无血"}`).join(" ") : void 0;
           logger.push({
             round: S.roundAll ? `R${S.roundNow}/${S.roundAll}` : S.battleType,
             turn,
@@ -2010,7 +2004,8 @@
             cannon: S.cannonOnCd ? `冷却${cannonCd}` : S.overcharge >= C.CANNON_MIN_OC ? "可放" : "攒OC",
             stance: S.stanceOn,
             action: actionLabel(a),
-            note
+            note,
+            foe
           });
           if (a.type === "continue") logger.flush();
           if (a == null ? void 0 : a.exec) {
