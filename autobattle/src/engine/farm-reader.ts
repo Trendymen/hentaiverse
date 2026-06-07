@@ -119,9 +119,9 @@ export function readFarm(): FarmContext {
   }
 
   // ── M3 增量: 异世界续刷 + 战败退出 ──
-  const isIsekai = Store.get<boolean>('isIsekai', false);
+  const isIsekai = url.includes('isekai');
   const lastIsekaiSwitch = Store.get<number>('lastIsekaiSwitch', 0);
-  const defeated = Store.get<boolean>('farmDefeated', false);
+  const defeated = page === 'hv-battle-end' && /You have been defeated/i.test(document.body?.textContent ?? '');
 
   return { page, url, host, hvOrigin, nowMs, nowHour, storedState, arena, stamina, encounter, lastEH, lastHref, eventHref, cooldownUntil, isIsekai, lastIsekaiSwitch, defeated };
 }
