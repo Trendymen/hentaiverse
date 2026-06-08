@@ -217,7 +217,7 @@
     // 盾击(同上; 连招给未晕眩目标铺垫, 已晕眩不重复)
     useShieldBashOcFloor: true,
     // 无压力(level==='low')盾击晕杂兵需放完 OC 仍≥地板(炮可用→CANNON_YIELD_OC 175, 否则开架式线 OC_ON*OCMAX 125), 把 OC 留给架式/攒炮; false 退回旧"oc≥25 即晕"(灰度可一键回滚)
-    useEndgameStanceOff: true,
+    useEndgameStanceOff: false,
     // 单红收尾(只剩1红名)关架式攒OC, 让盾击→要害→慈悲处决链在关架式下跑(解除连招stanceOn门槛+强制不攒炮); false 退回旧"架式常开磨"(灰度回退)
     useMercifulBlow: true,
     // 最后的慈悲(红名怪 25%+流血 处决; castHostileOn 已验证; 须配要害产流血→连招末步)
